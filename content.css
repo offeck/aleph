@@ -1,0 +1,173 @@
+/* ======================================================================
+ *  ALEPH v2 — Static CSS (BiDi + Streaming + Focus + Structural fixes)
+ *  Dynamic styles (fonts, themes, widths) are injected by content.js
+ * ====================================================================== */
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  BiDi Rules
+ * ══════════════════════════════════════════════════════════════════════ */
+
+[data-aleph-rtl="true"] {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: embed !important;
+}
+
+.ProseMirror[data-aleph-rtl="true"],
+.ProseMirror[data-aleph-rtl="true"] p,
+#prompt-textarea[data-aleph-rtl="true"],
+[contenteditable][data-aleph-rtl="true"],
+.ql-editor[data-aleph-rtl="true"] {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Math: ALWAYS LTR */
+.katex, .katex-display, span.katex-display,
+.katex-html, .katex-mathml, mjx-container,
+.math-inline, .math-display {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+span.katex-display, .katex-display,
+mjx-container[display="true"], .math-display {
+  text-align: center !important;
+  display: block !important;
+  width: 100% !important;
+}
+
+[data-aleph-rtl="true"] .katex,
+[data-aleph-rtl="true"] .katex-display,
+[data-aleph-rtl="true"] mjx-container,
+[data-aleph-rtl="true"] .math-inline,
+[data-aleph-rtl="true"] .math-display {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+/* Code inside RTL: stay LTR */
+[data-aleph-rtl="true"] pre,
+[data-aleph-rtl="true"] code,
+[data-aleph-rtl="true"] .code-block,
+[data-aleph-rtl="true"] .code-block__code {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
+
+/* RTL lists */
+ul:has(> [data-aleph-rtl="true"]),
+ol:has(> [data-aleph-rtl="true"]) {
+  direction: rtl !important;
+  padding-right: 2rem !important;
+  padding-left: 0 !important;
+}
+
+/* RTL tables */
+[data-aleph-rtl="true"] table { direction: rtl !important; }
+[data-aleph-rtl="true"] table code {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  Streaming Smoothing
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* Fade-in for new paragraphs during streaming */
+@keyframes aleph-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+[data-aleph-stream-enabled] [data-aleph-stream] p,
+[data-aleph-stream-enabled] [data-aleph-stream] li,
+[data-aleph-stream-enabled] [data-aleph-stream] h1,
+[data-aleph-stream-enabled] [data-aleph-stream] h2,
+[data-aleph-stream-enabled] [data-aleph-stream] h3,
+[data-aleph-stream-enabled] [data-aleph-stream] h4,
+[data-aleph-stream-enabled] [data-aleph-stream] pre,
+[data-aleph-stream-enabled] [data-aleph-stream] blockquote {
+  animation: aleph-fade-in 0.3s ease-out both;
+}
+
+/* Smooth scroll behavior during streaming */
+[data-aleph-stream-enabled] {
+  scroll-behavior: smooth;
+}
+
+/* RTL-aware blinking cursor for streaming content */
+@keyframes aleph-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* Claude streaming cursor */
+[data-aleph-stream-enabled] [data-aleph-platform="claude"] .progressive-markdown > :last-child::after,
+[data-aleph-stream-enabled][data-aleph-platform="claude"] .progressive-markdown > :last-child::after {
+  content: "\25AE";
+  animation: aleph-blink 1s step-end infinite;
+  color: var(--aleph-accent, currentColor);
+  opacity: 0.7;
+  margin-inline-start: 2px;
+}
+
+/* ChatGPT streaming cursor */
+[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming > :last-child::after {
+  content: "\25AE";
+  animation: aleph-blink 1s step-end infinite;
+  color: var(--aleph-accent, currentColor);
+  opacity: 0.7;
+  margin-inline-start: 2px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  Focus Mode
+ * ══════════════════════════════════════════════════════════════════════ */
+
+[data-aleph-hidden] {
+  display: none !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  Theme Transitions (smooth switching)
+ * ══════════════════════════════════════════════════════════════════════ */
+
+[data-aleph-theme] body,
+[data-aleph-theme] main,
+[data-aleph-theme] nav,
+[data-aleph-theme] pre,
+[data-aleph-theme] code {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  Platform-specific structural fixes
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* Claude */
+[data-aleph-platform="claude"] [data-aleph-rtl="true"] .inline-flex {
+  float: left;
+}
+
+/* ChatGPT */
+[data-aleph-platform="chatgpt"] [data-aleph-rtl="true"] {
+  unicode-bidi: embed !important;
+}
+
+/* Gemini */
+[data-aleph-platform="gemini"] [data-aleph-rtl="true"] {
+  unicode-bidi: embed !important;
+}
+
+[data-aleph-platform="gemini"] [data-aleph-rtl="true"] code-block {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  display: block !important;
+  text-align: left !important;
+}

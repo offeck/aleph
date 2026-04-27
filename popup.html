@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="logo">&#x05D0;</div>
+    <div>
+      <h1>Aleph</h1>
+      <p class="subtitle">AI Chat Styler v2</p>
+    </div>
+  </header>
+
+  <!-- Platforms -->
+  <section>
+    <h2>Platforms</h2>
+    <label class="toggle-row">
+      <span>Claude</span>
+      <input type="checkbox" id="enableClaude" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>ChatGPT</span>
+      <input type="checkbox" id="enableChatgpt" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Gemini</span>
+      <input type="checkbox" id="enableGemini" checked>
+      <span class="toggle"></span>
+    </label>
+  </section>
+
+  <!-- BiDi -->
+  <section>
+    <h2>Hebrew BiDi</h2>
+    <label class="toggle-row">
+      <span>Auto-detect & fix RTL</span>
+      <input type="checkbox" id="bidiEnabled" checked>
+      <span class="toggle"></span>
+    </label>
+  </section>
+
+  <!-- Theme -->
+  <section>
+    <h2>Theme</h2>
+    <div class="theme-grid" id="themeGrid">
+      <button class="theme-swatch active" data-theme="none" title="Default">
+        <div class="swatch-preview swatch-none"></div>
+        <span>Default</span>
+      </button>
+      <button class="theme-swatch" data-theme="warmDark" title="Warm Dark">
+        <div class="swatch-preview" style="background: #1c1917; border-color: #f59e0b;"></div>
+        <span>Warm</span>
+      </button>
+      <button class="theme-swatch" data-theme="coolDark" title="Cool Dark">
+        <div class="swatch-preview" style="background: #0f172a; border-color: #38bdf8;"></div>
+        <span>Cool</span>
+      </button>
+      <button class="theme-swatch" data-theme="paperLight" title="Paper Light">
+        <div class="swatch-preview" style="background: #faf8f5; border-color: #b45309;"></div>
+        <span>Paper</span>
+      </button>
+      <button class="theme-swatch" data-theme="highContrast" title="High Contrast">
+        <div class="swatch-preview" style="background: #000000; border-color: #ffff00;"></div>
+        <span>HiCon</span>
+      </button>
+      <button class="theme-swatch" data-theme="midnight" title="Midnight">
+        <div class="swatch-preview" style="background: #13111c; border-color: #a78bfa;"></div>
+        <span>Night</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Focus & Streaming -->
+  <section>
+    <h2>Experience</h2>
+    <label class="toggle-row">
+      <span>Focus mode</span>
+      <input type="checkbox" id="focusMode">
+      <span class="toggle"></span>
+    </label>
+    <p class="hint">Hides upgrade banners, promos & clutter</p>
+
+    <label class="toggle-row">
+      <span>Smooth streaming</span>
+      <input type="checkbox" id="streamSmooth" checked>
+      <span class="toggle"></span>
+    </label>
+    <p class="hint">Fade-in animation for streamed responses</p>
+  </section>
+
+  <!-- Typography -->
+  <section>
+    <h2>Typography</h2>
+
+    <label class="field">
+      <span>Font family</span>
+      <select id="fontFamily">
+        <option value="">Default (no override)</option>
+        <option value="Rubik">Rubik</option>
+        <option value="Heebo">Heebo</option>
+        <option value="Assistant">Assistant</option>
+        <option value="Noto Sans Hebrew">Noto Sans Hebrew</option>
+        <option value="Open Sans">Open Sans</option>
+        <option value="Inter">Inter</option>
+        <option value="IBM Plex Sans">IBM Plex Sans</option>
+        <option value="Segoe UI">Segoe UI</option>
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Font size <output id="fontSizeVal">—</output></span>
+      <input type="range" id="fontSize" min="0" max="24" step="1" value="0">
+    </label>
+
+    <label class="field">
+      <span>Line height <output id="lineHeightVal">—</output></span>
+      <input type="range" id="lineHeight" min="0" max="2.4" step="0.1" value="0">
+    </label>
+
+    <label class="field">
+      <span>Paragraph spacing <output id="paragraphSpacingVal">—</output></span>
+      <input type="range" id="paragraphSpacing" min="0" max="32" step="2" value="0">
+    </label>
+  </section>
+
+  <!-- Code -->
+  <section>
+    <h2>Code Blocks</h2>
+
+    <label class="field">
+      <span>Code font</span>
+      <select id="codeFontFamily">
+        <option value="">Default (no override)</option>
+        <option value="Fira Code">Fira Code</option>
+        <option value="JetBrains Mono">JetBrains Mono</option>
+        <option value="Cascadia Code">Cascadia Code</option>
+        <option value="Consolas">Consolas</option>
+        <option value="Source Code Pro">Source Code Pro</option>
+        <option value="IBM Plex Mono">IBM Plex Mono</option>
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Code font size <output id="codeFontSizeVal">—</output></span>
+      <input type="range" id="codeFontSize" min="0" max="22" step="1" value="0">
+    </label>
+  </section>
+
+  <!-- Layout -->
+  <section>
+    <h2>Layout</h2>
+    <label class="field">
+      <span>Chat width <output id="chatWidthVal">—</output></span>
+      <input type="range" id="chatWidth" min="0" max="1600" step="50" value="0">
+    </label>
+
+    <label class="field">
+      <span>Message spacing <output id="messageSpacingVal">—</output></span>
+      <input type="range" id="messageSpacing" min="0" max="48" step="4" value="0">
+    </label>
+  </section>
+
+  <footer>
+    <button id="resetBtn">Reset to defaults</button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
