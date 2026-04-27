@@ -76,12 +76,40 @@ ol:has(> [data-aleph-rtl="true"]) {
  *  Streaming Smoothing
  * ══════════════════════════════════════════════════════════════════════ */
 
-/* Fade-in for new paragraphs during streaming */
-@keyframes aleph-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* ── Hide platform default streaming animations ──────────────────────
+ * Suppress the built-in cursor/typing indicators from each platform
+ * so our custom animations are the only visible ones.
+ */
+
+/* Claude: pulsing dot cursor on progressive rendering */
+[data-aleph-stream-enabled][data-aleph-platform="claude"] .progressive-markdown .cursor,
+[data-aleph-stream-enabled][data-aleph-platform="claude"] .progressive-markdown [class*="cursor"],
+[data-aleph-stream-enabled][data-aleph-platform="claude"] .font-claude-response [class*="blink"],
+[data-aleph-stream-enabled][data-aleph-platform="claude"] .font-claude-response [class*="typing"] {
+  display: none !important;
+  animation: none !important;
 }
 
+/* ChatGPT: blinking cursor and typing dots */
+[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming .cursor,
+[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming [class*="cursor"],
+[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming [class*="blink"],
+[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] [class*="typing-indicator"],
+[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming > .sr-only + span[class]:empty {
+  display: none !important;
+  animation: none !important;
+}
+
+/* Gemini: shimmer/skeleton loading effects */
+[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="shimmer"],
+[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="skeleton"],
+[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="loading-indicator"],
+[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="typing"] {
+  display: none !important;
+  animation: none !important;
+}
+
+/* ── Shared stream element selector ──────────────────────────────────*/
 [data-aleph-stream-enabled] [data-aleph-stream] p,
 [data-aleph-stream-enabled] [data-aleph-stream] li,
 [data-aleph-stream-enabled] [data-aleph-stream] h1,
@@ -90,7 +118,7 @@ ol:has(> [data-aleph-rtl="true"]) {
 [data-aleph-stream-enabled] [data-aleph-stream] h4,
 [data-aleph-stream-enabled] [data-aleph-stream] pre,
 [data-aleph-stream-enabled] [data-aleph-stream] blockquote {
-  animation: aleph-fade-in 0.3s ease-out both;
+  animation-fill-mode: both;
 }
 
 /* Smooth scroll behavior during streaming */
@@ -98,14 +126,85 @@ ol:has(> [data-aleph-rtl="true"]) {
   scroll-behavior: smooth;
 }
 
-/* RTL-aware blinking cursor for streaming content */
+/* ── Animation: Fade In (default) ────────────────────────────────────*/
+@keyframes aleph-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] p,
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] li,
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="fadeIn"] [data-aleph-stream] blockquote {
+  animation: aleph-fade-in 0.3s ease-out both;
+}
+
+/* ── Animation: Typewriter ───────────────────────────────────────────*/
+@keyframes aleph-typewriter {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); }
+  to   { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] p,
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] li,
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="typewriter"] [data-aleph-stream] blockquote {
+  animation: aleph-typewriter 0.5s steps(20, end) both;
+}
+
+/* ── Animation: Slide Up ─────────────────────────────────────────────*/
+@keyframes aleph-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] p,
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] li,
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="slideUp"] [data-aleph-stream] blockquote {
+  animation: aleph-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Animation: Glow ─────────────────────────────────────────────────*/
+@keyframes aleph-glow {
+  0%   { opacity: 0; text-shadow: 0 0 8px var(--aleph-accent, #7c83ff); }
+  50%  { opacity: 1; text-shadow: 0 0 12px var(--aleph-accent, #7c83ff); }
+  100% { opacity: 1; text-shadow: none; }
+}
+
+[data-aleph-stream-anim="glow"] [data-aleph-stream] p,
+[data-aleph-stream-anim="glow"] [data-aleph-stream] li,
+[data-aleph-stream-anim="glow"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="glow"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="glow"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="glow"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="glow"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="glow"] [data-aleph-stream] blockquote {
+  animation: aleph-glow 0.6s ease-out both;
+}
+
+/* ── Animation: None — hides platform default only, no custom anim ──*/
+/* (No animation rules needed; platform defaults are already hidden above) */
+
+/* ── Streaming cursor (applies to all animation modes) ───────────────*/
 @keyframes aleph-blink {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0; }
 }
 
 /* Claude streaming cursor */
-[data-aleph-stream-enabled] [data-aleph-platform="claude"] .progressive-markdown > :last-child::after,
 [data-aleph-stream-enabled][data-aleph-platform="claude"] .progressive-markdown > :last-child::after {
   content: "\25AE";
   animation: aleph-blink 1s step-end infinite;
@@ -121,6 +220,12 @@ ol:has(> [data-aleph-rtl="true"]) {
   color: var(--aleph-accent, currentColor);
   opacity: 0.7;
   margin-inline-start: 2px;
+}
+
+/* No cursor in "none" mode */
+[data-aleph-stream-anim="none"][data-aleph-platform="claude"] .progressive-markdown > :last-child::after,
+[data-aleph-stream-anim="none"][data-aleph-platform="chatgpt"] .result-streaming > :last-child::after {
+  content: none;
 }
 
 

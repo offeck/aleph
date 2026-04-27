@@ -47,29 +47,49 @@
   <section>
     <h2>Theme</h2>
     <div class="theme-grid" id="themeGrid">
-      <button class="theme-swatch active" data-theme="none" title="Default">
+      <button class="theme-swatch active" data-theme="none" title="Default (platform native)">
         <div class="swatch-preview swatch-none"></div>
         <span>Default</span>
       </button>
       <button class="theme-swatch" data-theme="warmDark" title="Warm Dark">
-        <div class="swatch-preview" style="background: #1c1917; border-color: #f59e0b;"></div>
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #1c1917 60%, #292524); border-color: #fb923c;"></div>
         <span>Warm</span>
       </button>
       <button class="theme-swatch" data-theme="coolDark" title="Cool Dark">
-        <div class="swatch-preview" style="background: #0f172a; border-color: #38bdf8;"></div>
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #0f172a 60%, #1e293b); border-color: #38bdf8;"></div>
         <span>Cool</span>
       </button>
       <button class="theme-swatch" data-theme="paperLight" title="Paper Light">
-        <div class="swatch-preview" style="background: #faf8f5; border-color: #b45309;"></div>
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #faf8f5 60%, #f0ebe3); border-color: #c2410c;"></div>
         <span>Paper</span>
       </button>
       <button class="theme-swatch" data-theme="highContrast" title="High Contrast">
-        <div class="swatch-preview" style="background: #000000; border-color: #ffff00;"></div>
+        <div class="swatch-preview" style="background: #000000; border-color: #fde047;"></div>
         <span>HiCon</span>
       </button>
-      <button class="theme-swatch" data-theme="midnight" title="Midnight">
-        <div class="swatch-preview" style="background: #13111c; border-color: #a78bfa;"></div>
+      <button class="theme-swatch" data-theme="midnight" title="Midnight Purple">
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #13111c 60%, #1e1b2e); border-color: #a78bfa;"></div>
         <span>Night</span>
+      </button>
+      <button class="theme-swatch" data-theme="nord" title="Nord">
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #2e3440 60%, #3b4252); border-color: #88c0d0;"></div>
+        <span>Nord</span>
+      </button>
+      <button class="theme-swatch" data-theme="dracula" title="Dracula">
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #282a36 60%, #343746); border-color: #bd93f9;"></div>
+        <span>Dracula</span>
+      </button>
+      <button class="theme-swatch" data-theme="solarized" title="Solarized Dark">
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #002b36 60%, #073642); border-color: #2aa198;"></div>
+        <span>Solar</span>
+      </button>
+      <button class="theme-swatch" data-theme="rosePine" title="Ros&eacute; Pine">
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #191724 60%, #1f1d2e); border-color: #ebbcba;"></div>
+        <span>Ros&eacute;</span>
+      </button>
+      <button class="theme-swatch" data-theme="catppuccin" title="Catppuccin Mocha">
+        <div class="swatch-preview" style="background: linear-gradient(135deg, #1e1e2e 60%, #28283d); border-color: #cba6f7;"></div>
+        <span>Catpp</span>
       </button>
     </div>
   </section>
@@ -89,7 +109,18 @@
       <input type="checkbox" id="streamSmooth" checked>
       <span class="toggle"></span>
     </label>
-    <p class="hint">Fade-in animation for streamed responses</p>
+    <p class="hint">Custom animation for streamed responses (hides platform default)</p>
+
+    <label class="field" id="streamAnimField">
+      <span>Animation style</span>
+      <select id="streamAnimation">
+        <option value="fadeIn">Fade In</option>
+        <option value="typewriter">Typewriter</option>
+        <option value="slideUp">Slide Up</option>
+        <option value="glow">Glow</option>
+        <option value="none">None (suppress default only)</option>
+      </select>
+    </label>
   </section>
 
   <!-- Typography -->

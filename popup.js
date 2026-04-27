@@ -16,11 +16,12 @@
     theme: "none",
     focusMode: false,
     streamSmooth: true,
+    streamAnimation: "fadeIn",
     messageSpacing: 0,
   };
 
   const CHECKBOXES = ["bidiEnabled", "enableClaude", "enableChatgpt", "enableGemini", "focusMode", "streamSmooth"];
-  const SELECTS = ["fontFamily", "codeFontFamily"];
+  const SELECTS = ["fontFamily", "codeFontFamily", "streamAnimation"];
   const RANGES = [
     { id: "fontSize",         outputId: "fontSizeVal",         fmt: v => v == 0 ? "default" : `${v}px` },
     { id: "lineHeight",       outputId: "lineHeightVal",       fmt: v => v == 0 ? "default" : v.toFixed(1) },
@@ -48,6 +49,11 @@
     });
   }
 
+  function updateStreamAnimVisibility(streamEnabled) {
+    const field = document.getElementById("streamAnimField");
+    if (field) field.style.display = streamEnabled ? "" : "none";
+  }
+
   // ── Load settings into UI ──────────────────────────────────────────
   function loadUI() {
     chrome.storage.sync.get(DEFAULTS, (s) => {
@@ -64,6 +70,7 @@
         output.textContent = fmt(parseFloat(s[id]));
       });
       initThemeGrid(s.theme || "none");
+      updateStreamAnimVisibility(s.streamSmooth);
     });
   }
 
@@ -72,6 +79,7 @@
     CHECKBOXES.forEach(id => {
       document.getElementById(id).addEventListener("change", (e) => {
         save(id, e.target.checked);
+        if (id === "streamSmooth") updateStreamAnimVisibility(e.target.checked);
       });
     });
 

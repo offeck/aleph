@@ -27,7 +27,19 @@ Chrome extension (Manifest V3) that provides Hebrew BiDi text fixing, custom the
 
 ## Theme System
 
-Five presets defined in `THEMES` object: `warmDark`, `coolDark`, `paperLight`, `highContrast`, `midnight`. Each defines: `bg`, `bgSecondary`, `bgTertiary`, `text`, `textMuted`, `accent`, `border`, `codeBg`, `codeBorder`, `inputBg`. Applied via CSS custom properties (`--aleph-bg`, `--aleph-accent`, etc.) on `[data-aleph-theme]`.
+Ten presets defined in `THEMES` object: `warmDark`, `coolDark`, `paperLight`, `highContrast`, `midnight`, `nord`, `dracula`, `solarized`, `rosePine`, `catppuccin`. Each defines: `bg`, `bgSecondary`, `bgTertiary`, `text`, `textMuted`, `accent`, `border`, `codeBg`, `codeBorder`, `inputBg`. Applied via CSS custom properties (`--aleph-bg`, `--aleph-accent`, etc.) on `[data-aleph-theme]`.
+
+## Streaming Animation System
+
+When "Smooth streaming" is enabled, platform default streaming animations (cursors, typing indicators, shimmer effects) are hidden via CSS attribute selectors targeting `[data-aleph-stream-enabled][data-aleph-platform]`. Five animation modes selectable via `streamAnimation` setting:
+
+- `fadeIn` — gentle opacity + translateY(4px) fade-in (default)
+- `typewriter` — clip-path reveal with stepped timing
+- `slideUp` — larger translateY(12px) with spring easing
+- `glow` — accent-colored text-shadow that fades out
+- `none` — suppresses platform default only, no custom animation
+
+Animation mode stored as `data-aleph-stream-anim` attribute on `<html>`. CSS in `content.css` matches `[data-aleph-stream-anim="<mode>"]` for each variant.
 
 ## Focus Mode
 

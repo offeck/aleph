@@ -29,11 +29,11 @@
       bgTertiary:  "#1a1614",
       text:        "#e7e5e4",
       textMuted:   "#a8a29e",
-      accent:      "#f59e0b",
+      accent:      "#fb923c",
       border:      "#44403c",
-      codeBg:      "#1c1917",
-      codeBorder:  "#44403c",
-      inputBg:     "#292524",
+      codeBg:      "#211e1b",
+      codeBorder:  "#3a3632",
+      inputBg:     "#252220",
     },
     coolDark: {
       bg:          "#0f172a",
@@ -43,33 +43,33 @@
       textMuted:   "#94a3b8",
       accent:      "#38bdf8",
       border:      "#334155",
-      codeBg:      "#0f172a",
-      codeBorder:  "#334155",
-      inputBg:     "#1e293b",
+      codeBg:      "#0d1424",
+      codeBorder:  "#2d3a4d",
+      inputBg:     "#1a2438",
     },
     paperLight: {
       bg:          "#faf8f5",
-      bgSecondary: "#f5f0e8",
-      bgTertiary:  "#efe9df",
+      bgSecondary: "#f0ebe3",
+      bgTertiary:  "#e8e2d8",
       text:        "#2c2418",
       textMuted:   "#78716c",
-      accent:      "#b45309",
-      border:      "#d6d3d1",
-      codeBg:      "#f5f0e8",
-      codeBorder:  "#d6d3d1",
+      accent:      "#c2410c",
+      border:      "#d4cfc8",
+      codeBg:      "#f3ede4",
+      codeBorder:  "#d4cfc8",
       inputBg:     "#ffffff",
     },
     highContrast: {
       bg:          "#000000",
-      bgSecondary: "#111111",
+      bgSecondary: "#0a0a0a",
       bgTertiary:  "#000000",
       text:        "#ffffff",
-      textMuted:   "#cccccc",
-      accent:      "#ffff00",
-      border:      "#555555",
-      codeBg:      "#111111",
-      codeBorder:  "#555555",
-      inputBg:     "#111111",
+      textMuted:   "#d4d4d4",
+      accent:      "#fde047",
+      border:      "#525252",
+      codeBg:      "#0a0a0a",
+      codeBorder:  "#525252",
+      inputBg:     "#0a0a0a",
     },
     midnight: {
       bg:          "#13111c",
@@ -79,9 +79,69 @@
       textMuted:   "#9b95b0",
       accent:      "#a78bfa",
       border:      "#312d45",
-      codeBg:      "#1a1726",
-      codeBorder:  "#312d45",
-      inputBg:     "#1e1b2e",
+      codeBg:      "#181523",
+      codeBorder:  "#2b2740",
+      inputBg:     "#1b1829",
+    },
+    nord: {
+      bg:          "#2e3440",
+      bgSecondary: "#3b4252",
+      bgTertiary:  "#282e3a",
+      text:        "#eceff4",
+      textMuted:   "#d8dee9",
+      accent:      "#88c0d0",
+      border:      "#4c566a",
+      codeBg:      "#2e3440",
+      codeBorder:  "#434c5e",
+      inputBg:     "#3b4252",
+    },
+    dracula: {
+      bg:          "#282a36",
+      bgSecondary: "#343746",
+      bgTertiary:  "#21222c",
+      text:        "#f8f8f2",
+      textMuted:   "#bfbfbf",
+      accent:      "#bd93f9",
+      border:      "#44475a",
+      codeBg:      "#282a36",
+      codeBorder:  "#44475a",
+      inputBg:     "#343746",
+    },
+    solarized: {
+      bg:          "#002b36",
+      bgSecondary: "#073642",
+      bgTertiary:  "#00252f",
+      text:        "#eee8d5",
+      textMuted:   "#93a1a1",
+      accent:      "#2aa198",
+      border:      "#2f4f56",
+      codeBg:      "#073642",
+      codeBorder:  "#2f4f56",
+      inputBg:     "#073642",
+    },
+    rosePine: {
+      bg:          "#191724",
+      bgSecondary: "#1f1d2e",
+      bgTertiary:  "#15131f",
+      text:        "#e0def4",
+      textMuted:   "#908caa",
+      accent:      "#ebbcba",
+      border:      "#2a2740",
+      codeBg:      "#1f1d2e",
+      codeBorder:  "#2a2740",
+      inputBg:     "#1f1d2e",
+    },
+    catppuccin: {
+      bg:          "#1e1e2e",
+      bgSecondary: "#28283d",
+      bgTertiary:  "#181825",
+      text:        "#cdd6f4",
+      textMuted:   "#a6adc8",
+      accent:      "#cba6f7",
+      border:      "#363654",
+      codeBg:      "#1e1e2e",
+      codeBorder:  "#363654",
+      inputBg:     "#28283d",
     },
   };
 
@@ -167,19 +227,21 @@
       code: ["code-block", "pre code", ".code-container"],
       message: [".response-content", ".model-response-text", "message-content"],
       chatWidth: [".conversation-container"],
-      themeBg: ["body", "main", ".chat-container"],
-      themeText: [".response-content", ".model-response-text", "message-content", "p", "li"],
-      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']"],
+      themeBg: ["body", "main", ".chat-container", "chat-app", "bard-sidenav-container", ".conversation-container"],
+      themeText: [".response-content", ".model-response-text", "message-content", "p", "li", ".query-content"],
+      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea"],
       themeCode: ["code-block", "pre", ".code-container"],
-      themeSidebar: ["nav", "side-navigation-v2"],
+      themeSidebar: ["nav", "side-navigation-v2", "side-navigation-content", ".side-navigation-content"],
       focusHide: [
+        "intent-card",
+        ".card-container",
         ".suggestion-chip",
         ".chip-container",
         "[class*='promo']",
         "[class*='upgrade']",
       ],
-      streaming: [".response-content", ".model-response-text"],
-      messageWrapper: ["model-response", ".conversation-turn"],
+      streaming: [".response-content", ".model-response-text", "model-response"],
+      messageWrapper: ["model-response", ".conversation-turn", ".conversation-container > *"],
     },
   };
 
@@ -202,6 +264,7 @@
     theme: "none",
     focusMode: false,
     streamSmooth: true,
+    streamAnimation: "fadeIn",
     messageSpacing: 0,
   };
 
@@ -262,7 +325,13 @@
     try {
       if (settings.bidiEnabled) patchBidi();
       if (settings.focusMode) applyFocusMode();
-      if (settings.streamSmooth) applyStreamSmooth();
+      if (settings.streamSmooth) {
+        applyStreamSmooth();
+        const anim = settings.streamAnimation || "fadeIn";
+        if (document.documentElement.getAttribute("data-aleph-stream-anim") !== anim) {
+          document.documentElement.setAttribute("data-aleph-stream-anim", anim);
+        }
+      }
     } finally {
       patching = false;
     }
@@ -440,8 +509,10 @@
     // ── Streaming Smoothing ──────────────────────────────────────────────
     if (settings.streamSmooth) {
       document.documentElement.setAttribute("data-aleph-stream-enabled", "true");
+      document.documentElement.setAttribute("data-aleph-stream-anim", settings.streamAnimation || "fadeIn");
     } else {
       document.documentElement.removeAttribute("data-aleph-stream-enabled");
+      document.documentElement.removeAttribute("data-aleph-stream-anim");
     }
 
     // ── Typography overrides ─────────────────────────────────────────────
