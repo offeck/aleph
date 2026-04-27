@@ -138,12 +138,50 @@ input[type="range"]::-moz-range-thumb {
   border: none; cursor: pointer;
 }
 
+/* ── Focus mode sub-toggles ───────────────────────────────────────── */
+.focus-categories {
+  padding-left: 12px;
+  border-left: 2px solid #2a2a4a;
+  margin: 4px 0 8px 4px;
+}
+.sub-toggle { padding: 3px 0; }
+.sub-toggle span:first-child { font-size: 12px; color: #aaa; }
+.toggle.small { width: 28px; height: 16px; }
+.toggle.small::after {
+  width: 12px; height: 12px; top: 2px; left: 2px;
+}
+.toggle-row input:checked + .toggle.small::after {
+  transform: translateX(12px);
+}
+
+/* ── Per-platform theme overrides ────────────────────────────────── */
+.theme-overrides {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #2a2a4a;
+}
+.field.compact { padding: 3px 0; }
+.field.compact > span { font-size: 12px; }
+.field.compact select { padding: 4px 6px; font-size: 11px; }
+
 /* ── Footer ───────────────────────────────────────────────────────── */
 footer {
   padding: 8px 16px;
   border-top: 1px solid #2a2a4a;
   margin-top: 4px;
 }
+.footer-row {
+  display: flex; gap: 8px;
+  margin-bottom: 6px;
+}
+.footer-row button {
+  flex: 1; padding: 6px;
+  background: #2a2a4a; color: #aaa;
+  border: 1px solid #3a3a5a; border-radius: 6px;
+  font-size: 11px; cursor: pointer;
+  transition: all 0.2s;
+}
+.footer-row button:hover { color: #7c83ff; border-color: #7c83ff; }
 #resetBtn {
   width: 100%; padding: 8px;
   background: transparent; color: #888;
@@ -152,3 +190,10 @@ footer {
   transition: all 0.2s;
 }
 #resetBtn:hover { color: #ff6b6b; border-color: #ff6b6b; }
+.footer-hint {
+  text-align: center;
+  margin-top: 6px;
+  font-size: 10px;
+  color: #555;
+  letter-spacing: 0.5px;
+}

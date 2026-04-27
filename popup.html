@@ -9,7 +9,7 @@
     <div class="logo">&#x05D0;</div>
     <div>
       <h1>Aleph</h1>
-      <p class="subtitle">AI Chat Styler v2</p>
+      <p class="subtitle">AI Chat Styler v2.1</p>
     </div>
   </header>
 
@@ -92,6 +92,22 @@
         <span>Catpp</span>
       </button>
     </div>
+
+    <div class="theme-overrides" id="themeOverrides">
+      <p class="hint">Per-platform override (leave Default to use global)</p>
+      <label class="field compact">
+        <span>Claude</span>
+        <select id="themeClaude"><option value="">Default</option></select>
+      </label>
+      <label class="field compact">
+        <span>ChatGPT</span>
+        <select id="themeChatgpt"><option value="">Default</option></select>
+      </label>
+      <label class="field compact">
+        <span>Gemini</span>
+        <select id="themeGemini"><option value="">Default</option></select>
+      </label>
+    </div>
   </section>
 
   <!-- Focus & Streaming -->
@@ -102,7 +118,23 @@
       <input type="checkbox" id="focusMode">
       <span class="toggle"></span>
     </label>
-    <p class="hint">Hides upgrade banners, promos & clutter</p>
+    <div class="focus-categories" id="focusCategories">
+      <label class="toggle-row sub-toggle">
+        <span>Upgrade banners</span>
+        <input type="checkbox" id="focusHideUpgrade" checked>
+        <span class="toggle small"></span>
+      </label>
+      <label class="toggle-row sub-toggle">
+        <span>Suggestion chips</span>
+        <input type="checkbox" id="focusHideChips" checked>
+        <span class="toggle small"></span>
+      </label>
+      <label class="toggle-row sub-toggle">
+        <span>Promos & clutter</span>
+        <input type="checkbox" id="focusHidePromos" checked>
+        <span class="toggle small"></span>
+      </label>
+    </div>
 
     <label class="toggle-row">
       <span>Smooth streaming</span>
@@ -196,7 +228,13 @@
   </section>
 
   <footer>
+    <div class="footer-row">
+      <button id="exportBtn" title="Export settings as JSON">Export</button>
+      <button id="importBtn" title="Import settings from JSON">Import</button>
+    </div>
     <button id="resetBtn">Reset to defaults</button>
+    <input type="file" id="importFile" accept=".json" style="display:none">
+    <p class="hint footer-hint">Alt+Shift+A to toggle on/off</p>
   </footer>
 
   <script src="popup.js"></script>

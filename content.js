@@ -1,12 +1,8 @@
 (function () {
   "use strict";
 
-  /* ======================================================================
-   *  ALEPH v2.0 — Hebrew BiDi + Style Unifier for Claude / ChatGPT / Gemini
-   * ====================================================================== */
-
   const HEB = /[֐-׿]/;
-  const VERSION = "2.0";
+  const VERSION = "2.1";
 
   // ── Platform detection ─────────────────────────────────────────────────
   const host = location.hostname;
@@ -24,126 +20,82 @@
   const THEMES = {
     none: null,
     warmDark: {
-      bg:          "#1c1917",
-      bgSecondary: "#292524",
-      bgTertiary:  "#1a1614",
-      text:        "#e7e5e4",
-      textMuted:   "#a8a29e",
-      accent:      "#fb923c",
-      border:      "#44403c",
-      codeBg:      "#211e1b",
-      codeBorder:  "#3a3632",
-      inputBg:     "#252220",
+      bg: "#1c1917", bgSecondary: "#292524", bgTertiary: "#1a1614",
+      text: "#e7e5e4", textMuted: "#a8a29e", accent: "#fb923c",
+      border: "#44403c", codeBg: "#211e1b", codeBorder: "#3a3632", inputBg: "#252220",
     },
     coolDark: {
-      bg:          "#0f172a",
-      bgSecondary: "#1e293b",
-      bgTertiary:  "#0c1322",
-      text:        "#e2e8f0",
-      textMuted:   "#94a3b8",
-      accent:      "#38bdf8",
-      border:      "#334155",
-      codeBg:      "#0d1424",
-      codeBorder:  "#2d3a4d",
-      inputBg:     "#1a2438",
+      bg: "#0f172a", bgSecondary: "#1e293b", bgTertiary: "#0c1322",
+      text: "#e2e8f0", textMuted: "#94a3b8", accent: "#38bdf8",
+      border: "#334155", codeBg: "#0d1424", codeBorder: "#2d3a4d", inputBg: "#1a2438",
     },
     paperLight: {
-      bg:          "#faf8f5",
-      bgSecondary: "#f0ebe3",
-      bgTertiary:  "#e8e2d8",
-      text:        "#2c2418",
-      textMuted:   "#78716c",
-      accent:      "#c2410c",
-      border:      "#d4cfc8",
-      codeBg:      "#f3ede4",
-      codeBorder:  "#d4cfc8",
-      inputBg:     "#ffffff",
+      bg: "#faf8f5", bgSecondary: "#f0ebe3", bgTertiary: "#e8e2d8",
+      text: "#2c2418", textMuted: "#78716c", accent: "#c2410c",
+      border: "#d4cfc8", codeBg: "#f3ede4", codeBorder: "#d4cfc8", inputBg: "#ffffff",
     },
     highContrast: {
-      bg:          "#000000",
-      bgSecondary: "#0a0a0a",
-      bgTertiary:  "#000000",
-      text:        "#ffffff",
-      textMuted:   "#d4d4d4",
-      accent:      "#fde047",
-      border:      "#525252",
-      codeBg:      "#0a0a0a",
-      codeBorder:  "#525252",
-      inputBg:     "#0a0a0a",
+      bg: "#000000", bgSecondary: "#0a0a0a", bgTertiary: "#000000",
+      text: "#ffffff", textMuted: "#d4d4d4", accent: "#fde047",
+      border: "#525252", codeBg: "#0a0a0a", codeBorder: "#525252", inputBg: "#0a0a0a",
     },
     midnight: {
-      bg:          "#13111c",
-      bgSecondary: "#1e1b2e",
-      bgTertiary:  "#0f0d17",
-      text:        "#e4e0ee",
-      textMuted:   "#9b95b0",
-      accent:      "#a78bfa",
-      border:      "#312d45",
-      codeBg:      "#181523",
-      codeBorder:  "#2b2740",
-      inputBg:     "#1b1829",
+      bg: "#13111c", bgSecondary: "#1e1b2e", bgTertiary: "#0f0d17",
+      text: "#e4e0ee", textMuted: "#9b95b0", accent: "#a78bfa",
+      border: "#312d45", codeBg: "#181523", codeBorder: "#2b2740", inputBg: "#1b1829",
     },
     nord: {
-      bg:          "#2e3440",
-      bgSecondary: "#3b4252",
-      bgTertiary:  "#282e3a",
-      text:        "#eceff4",
-      textMuted:   "#d8dee9",
-      accent:      "#88c0d0",
-      border:      "#4c566a",
-      codeBg:      "#2e3440",
-      codeBorder:  "#434c5e",
-      inputBg:     "#3b4252",
+      bg: "#2e3440", bgSecondary: "#3b4252", bgTertiary: "#282e3a",
+      text: "#eceff4", textMuted: "#d8dee9", accent: "#88c0d0",
+      border: "#4c566a", codeBg: "#2e3440", codeBorder: "#434c5e", inputBg: "#3b4252",
     },
     dracula: {
-      bg:          "#282a36",
-      bgSecondary: "#343746",
-      bgTertiary:  "#21222c",
-      text:        "#f8f8f2",
-      textMuted:   "#bfbfbf",
-      accent:      "#bd93f9",
-      border:      "#44475a",
-      codeBg:      "#282a36",
-      codeBorder:  "#44475a",
-      inputBg:     "#343746",
+      bg: "#282a36", bgSecondary: "#343746", bgTertiary: "#21222c",
+      text: "#f8f8f2", textMuted: "#bfbfbf", accent: "#bd93f9",
+      border: "#44475a", codeBg: "#282a36", codeBorder: "#44475a", inputBg: "#343746",
     },
     solarized: {
-      bg:          "#002b36",
-      bgSecondary: "#073642",
-      bgTertiary:  "#00252f",
-      text:        "#eee8d5",
-      textMuted:   "#93a1a1",
-      accent:      "#2aa198",
-      border:      "#2f4f56",
-      codeBg:      "#073642",
-      codeBorder:  "#2f4f56",
-      inputBg:     "#073642",
+      bg: "#002b36", bgSecondary: "#073642", bgTertiary: "#00252f",
+      text: "#eee8d5", textMuted: "#93a1a1", accent: "#2aa198",
+      border: "#2f4f56", codeBg: "#073642", codeBorder: "#2f4f56", inputBg: "#073642",
     },
     rosePine: {
-      bg:          "#191724",
-      bgSecondary: "#1f1d2e",
-      bgTertiary:  "#15131f",
-      text:        "#e0def4",
-      textMuted:   "#908caa",
-      accent:      "#ebbcba",
-      border:      "#2a2740",
-      codeBg:      "#1f1d2e",
-      codeBorder:  "#2a2740",
-      inputBg:     "#1f1d2e",
+      bg: "#191724", bgSecondary: "#1f1d2e", bgTertiary: "#15131f",
+      text: "#e0def4", textMuted: "#908caa", accent: "#ebbcba",
+      border: "#2a2740", codeBg: "#1f1d2e", codeBorder: "#2a2740", inputBg: "#1f1d2e",
     },
     catppuccin: {
-      bg:          "#1e1e2e",
-      bgSecondary: "#28283d",
-      bgTertiary:  "#181825",
-      text:        "#cdd6f4",
-      textMuted:   "#a6adc8",
-      accent:      "#cba6f7",
-      border:      "#363654",
-      codeBg:      "#1e1e2e",
-      codeBorder:  "#363654",
-      inputBg:     "#28283d",
+      bg: "#1e1e2e", bgSecondary: "#28283d", bgTertiary: "#181825",
+      text: "#cdd6f4", textMuted: "#a6adc8", accent: "#cba6f7",
+      border: "#363654", codeBg: "#1e1e2e", codeBorder: "#363654", inputBg: "#28283d",
     },
   };
+
+  // ── Google Fonts map ───────────────────────────────────────────────────
+  const GOOGLE_FONTS = {
+    "Rubik": "Rubik:wght@400;500;700",
+    "Heebo": "Heebo:wght@400;500;700",
+    "Assistant": "Assistant:wght@400;600;700",
+    "Noto Sans Hebrew": "Noto+Sans+Hebrew:wght@400;500;700",
+    "Open Sans": "Open+Sans:wght@400;600;700",
+    "Inter": "Inter:wght@400;500;700",
+    "IBM Plex Sans": "IBM+Plex+Sans:wght@400;500;700",
+    "Fira Code": "Fira+Code:wght@400;500;700",
+    "JetBrains Mono": "JetBrains+Mono:wght@400;500;700",
+    "Source Code Pro": "Source+Code+Pro:wght@400;500;700",
+    "IBM Plex Mono": "IBM+Plex+Mono:wght@400;500;700",
+  };
+
+  function loadFont(fontName) {
+    if (!fontName || !GOOGLE_FONTS[fontName]) return;
+    const id = "aleph-font-" + fontName.replace(/\s+/g, "-").toLowerCase();
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=" + GOOGLE_FONTS[fontName] + "&display=swap";
+    document.head.appendChild(link);
+  }
 
   // ── Platform-specific selectors ────────────────────────────────────────
   const SELECTORS = {
@@ -165,23 +117,24 @@
       code: [".code-block__code", "pre code", ".code-block"],
       message: [".font-claude-response", "[data-testid='chat-message-content']"],
       chatWidth: [".mx-auto.w-full"],
-      // Theme targets
       themeBg: ["body", "main", ".bg-bg-000", ".bg-bg-100", ".bg-bg-200"],
       themeText: [".font-claude-response", ".font-claude-response-body", "p", "li", "h1", "h2", "h3", "h4"],
       themeInput: [".ProseMirror", "[data-testid='composer']", ".bg-bg-000"],
       themeCode: [".code-block", ".code-block__code", "pre"],
       themeSidebar: ["nav", ".bg-bg-100"],
-      // Focus mode: elements to hide
-      focusHide: [
-        "[data-testid='nav-upgrade']",
-        "[data-testid='upgrade-button']",
-        ".bg-accent-main-000[class*='upgrade']",
-        "[href='/settings/billing']",
-      ],
-      // Streaming containers
+      focusHide: {
+        upgrade: [
+          "[data-testid='nav-upgrade']",
+          "[data-testid='upgrade-button']",
+          ".bg-accent-main-000[class*='upgrade']",
+          "[href='/settings/billing']",
+        ],
+        chips: [],
+        promos: [],
+      },
       streaming: [".progressive-markdown", ".font-claude-response"],
-      // Message wrapper (for spacing)
       messageWrapper: ["[data-testid='chat-message']", ".mb-1\\.5"],
+      chatContainer: ["main", "[data-testid='chat-messages']"],
     },
     chatgpt: {
       text: [
@@ -202,15 +155,21 @@
       themeInput: ["#prompt-textarea", ".bg-token-main-surface-primary", "[contenteditable='true']"],
       themeCode: ["pre", "code.hljs", ".bg-black"],
       themeSidebar: ["nav", ".bg-token-sidebar-surface-primary"],
-      focusHide: [
-        "[data-testid='upgrade-button']",
-        "a[href='/gpts']",
-        "[class*='upgrade']",
-        ".juice\\:hidden",
-        "header .pointer-events-none:has(.rounded-full)",
-      ],
+      focusHide: {
+        upgrade: [
+          "[data-testid='upgrade-button']",
+          "[class*='upgrade']",
+        ],
+        chips: [],
+        promos: [
+          "a[href='/gpts']",
+          ".juice\\:hidden",
+          "header .pointer-events-none:has(.rounded-full)",
+        ],
+      },
       streaming: [".result-streaming", ".markdown"],
       messageWrapper: ["[data-testid^='conversation-turn']", ".group\\/conversation-turn"],
+      chatContainer: ["main", "[class*='thread-content']"],
     },
     gemini: {
       text: [
@@ -232,16 +191,14 @@
       themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea"],
       themeCode: ["code-block", "pre", ".code-container"],
       themeSidebar: ["nav", "side-navigation-v2", "side-navigation-content", ".side-navigation-content"],
-      focusHide: [
-        "intent-card",
-        ".card-container",
-        ".suggestion-chip",
-        ".chip-container",
-        "[class*='promo']",
-        "[class*='upgrade']",
-      ],
+      focusHide: {
+        upgrade: ["[class*='upgrade']"],
+        chips: ["intent-card", ".card-container", ".suggestion-chip", ".chip-container"],
+        promos: ["[class*='promo']"],
+      },
       streaming: [".response-content", ".model-response-text", "model-response"],
       messageWrapper: ["model-response", ".conversation-turn", ".conversation-container > *"],
+      chatContainer: [".conversation-container", "chat-app"],
     },
   };
 
@@ -260,15 +217,74 @@
     codeFontSize: 0,
     codeFontFamily: "",
     chatWidth: 0,
-    // v2: new features
     theme: "none",
+    themeClaude: "",
+    themeChatgpt: "",
+    themeGemini: "",
     focusMode: false,
+    focusHideUpgrade: true,
+    focusHideChips: true,
+    focusHidePromos: true,
     streamSmooth: true,
     streamAnimation: "fadeIn",
     messageSpacing: 0,
   };
 
   let settings = { ...DEFAULTS };
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function isPlatformEnabled() {
+    const key = "enable" + PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1);
+    return settings[key] !== false;
+  }
+
+  function getActiveThemeName() {
+    const platformKey = "theme" + PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1);
+    return settings[platformKey] || settings.theme || "none";
+  }
+
+  function isLightTheme(theme) {
+    if (!theme) return null;
+    const r = parseInt(theme.bg.slice(1, 3), 16);
+    const g = parseInt(theme.bg.slice(3, 5), 16);
+    const b = parseInt(theme.bg.slice(5, 7), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+  }
+
+  function updateColorScheme(theme) {
+    const scheme = theme ? (isLightTheme(theme) ? "light" : "dark") : null;
+    let meta = document.querySelector('meta[name="color-scheme"][data-aleph]');
+    if (scheme) {
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.name = "color-scheme";
+        meta.setAttribute("data-aleph", "true");
+        document.head.appendChild(meta);
+      }
+      meta.content = scheme;
+      document.documentElement.style.colorScheme = scheme;
+    } else if (meta) {
+      meta.remove();
+      document.documentElement.style.removeProperty("color-scheme");
+    }
+  }
+
+  function updateBadge() {
+    if (!chrome?.runtime?.sendMessage) return;
+    if (!isPlatformEnabled()) {
+      try { chrome.runtime.sendMessage({ type: "disabled" }); } catch (e) {}
+      return;
+    }
+    let count = 0;
+    if (settings.bidiEnabled) count++;
+    const themeName = getActiveThemeName();
+    if (themeName !== "none") count++;
+    if (settings.focusMode) count++;
+    if (settings.streamSmooth) count++;
+    if (settings.fontFamily || settings.codeFontFamily) count++;
+    if (settings.chatWidth > 0) count++;
+    try { chrome.runtime.sendMessage({ type: "badge", count }); } catch (e) {}
+  }
 
   // ── Settings loader ────────────────────────────────────────────────────
   function loadSettings() {
@@ -292,13 +308,22 @@
         }
         applyStyles();
         patchAll();
+        updateBadge();
       }
     });
   }
 
-  function isPlatformEnabled() {
-    const key = "enable" + PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1);
-    return settings[key] !== false;
+  // ── Toggle handler (keyboard shortcut) ─────────────────────────────────
+  if (chrome?.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg.type === "toggle") {
+        const key = "enable" + PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1);
+        const newVal = !isPlatformEnabled();
+        if (chrome?.storage?.sync) {
+          chrome.storage.sync.set({ [key]: newVal });
+        }
+      }
+    });
   }
 
   // ── BiDi Detection ─────────────────────────────────────────────────────
@@ -370,18 +395,23 @@
 
   // ── Focus Mode ─────────────────────────────────────────────────────────
   function applyFocusMode() {
-    SEL.focusHide.forEach((sel) => {
+    const cats = SEL.focusHide;
+    const selectors = [];
+    if (settings.focusHideUpgrade && cats.upgrade) selectors.push(...cats.upgrade);
+    if (settings.focusHideChips && cats.chips) selectors.push(...cats.chips);
+    if (settings.focusHidePromos && cats.promos) selectors.push(...cats.promos);
+
+    selectors.forEach((sel) => {
       try {
         document.querySelectorAll(sel).forEach((el) => {
           if (!el.hasAttribute("data-aleph-hidden")) {
             el.setAttribute("data-aleph-hidden", "true");
           }
         });
-      } catch (e) { /* selector may be invalid on some platforms */ }
+      } catch (e) {}
     });
 
-    // Text-based matching for upgrade buttons that lack stable selectors
-    if (PLATFORM === "chatgpt") {
+    if (PLATFORM === "chatgpt" && settings.focusHideUpgrade) {
       document.querySelectorAll("button, a, [role='menuitem'], .trailing").forEach((el) => {
         const txt = el.textContent.trim();
         if (txt === "Upgrade" || txt === "Upgrade plan" || txt === "Get Plus") {
@@ -410,6 +440,10 @@
   // ── Style Injector ─────────────────────────────────────────────────────
   const STYLE_ID = "aleph-dynamic-styles";
 
+  function buildThemeSelector(base, selectors) {
+    return selectors.map(s => `[data-aleph-theme] ${s.trim()}`).join(",\n");
+  }
+
   function applyStyles() {
     if (!isPlatformEnabled()) {
       const existing = document.getElementById(STYLE_ID);
@@ -417,18 +451,21 @@
       document.documentElement.removeAttribute("data-aleph-theme");
       document.documentElement.removeAttribute("data-aleph-focus");
       document.documentElement.removeAttribute("data-aleph-stream-enabled");
+      document.documentElement.removeAttribute("data-aleph-stream-anim");
+      updateColorScheme(null);
       return;
     }
 
     let css = "";
 
-    // ── Theme ──────────────────────────────────────────────────────────
-    const theme = THEMES[settings.theme];
+    // ── Theme (per-platform override) ─────────────────────────────────
+    const activeThemeName = getActiveThemeName();
+    const theme = THEMES[activeThemeName];
     if (theme) {
-      document.documentElement.setAttribute("data-aleph-theme", settings.theme);
+      document.documentElement.setAttribute("data-aleph-theme", activeThemeName);
+      updateColorScheme(theme);
 
-      // Set CSS custom properties on root
-      css += `:root[data-aleph-theme="${settings.theme}"] {
+      css += `:root[data-aleph-theme="${activeThemeName}"] {
         --aleph-bg: ${theme.bg};
         --aleph-bg2: ${theme.bgSecondary};
         --aleph-bg3: ${theme.bgTertiary};
@@ -441,57 +478,41 @@
         --aleph-input-bg: ${theme.inputBg};
       }\n`;
 
-      // Background overrides
-      const bgSel = SEL.themeBg.join(",\n");
-      css += `[data-aleph-theme] ${bgSel.split(",").map(s => s.trim()).join(",\n[data-aleph-theme] ")} {
+      css += `${buildThemeSelector("", SEL.themeBg)} {
         background-color: var(--aleph-bg) !important;
       }\n`;
 
-      // Secondary backgrounds (sidebar, cards)
-      const sidebarSel = SEL.themeSidebar.join(",\n");
-      css += `[data-aleph-theme] ${sidebarSel.split(",").map(s => s.trim()).join(",\n[data-aleph-theme] ")} {
+      css += `${buildThemeSelector("", SEL.themeSidebar)} {
         background-color: var(--aleph-bg2) !important;
         border-color: var(--aleph-border) !important;
       }\n`;
 
-      // Text overrides
       css += `[data-aleph-theme] { color: var(--aleph-text) !important; }\n`;
-      const textSel = SEL.themeText.join(",\n");
-      css += `[data-aleph-theme] ${textSel.split(",").map(s => s.trim()).join(",\n[data-aleph-theme] ")} {
+      css += `${buildThemeSelector("", SEL.themeText)} {
         color: var(--aleph-text) !important;
       }\n`;
 
-      // Input overrides
-      const inputSel = SEL.themeInput.join(",\n");
-      css += `[data-aleph-theme] ${inputSel.split(",").map(s => s.trim()).join(",\n[data-aleph-theme] ")} {
+      css += `${buildThemeSelector("", SEL.themeInput)} {
         background-color: var(--aleph-input-bg) !important;
         color: var(--aleph-text) !important;
         border-color: var(--aleph-border) !important;
       }\n`;
 
-      // Code block overrides
-      const codeSel = SEL.themeCode.join(",\n");
-      css += `[data-aleph-theme] ${codeSel.split(",").map(s => s.trim()).join(",\n[data-aleph-theme] ")} {
+      css += `${buildThemeSelector("", SEL.themeCode)} {
         background-color: var(--aleph-code-bg) !important;
         border-color: var(--aleph-code-border) !important;
         color: var(--aleph-text) !important;
       }\n`;
 
-      // Accent color for links and highlights
       css += `[data-aleph-theme] a { color: var(--aleph-accent) !important; }\n`;
-
-      // Border overrides
-      css += `[data-aleph-theme] * {
-        border-color: var(--aleph-border);
-      }\n`;
-
-      // Scrollbar theming
+      css += `[data-aleph-theme] * { border-color: var(--aleph-border); }\n`;
       css += `[data-aleph-theme] ::-webkit-scrollbar { width: 8px; }
       [data-aleph-theme] ::-webkit-scrollbar-track { background: var(--aleph-bg); }
       [data-aleph-theme] ::-webkit-scrollbar-thumb { background: var(--aleph-border); border-radius: 4px; }\n`;
 
     } else {
       document.documentElement.removeAttribute("data-aleph-theme");
+      updateColorScheme(null);
     }
 
     // ── Focus Mode ───────────────────────────────────────────────────────
@@ -500,7 +521,6 @@
       css += `[data-aleph-hidden] { display: none !important; }\n`;
     } else {
       document.documentElement.removeAttribute("data-aleph-focus");
-      // Remove hidden markers
       document.querySelectorAll("[data-aleph-hidden]").forEach(el => {
         el.removeAttribute("data-aleph-hidden");
       });
@@ -514,6 +534,10 @@
       document.documentElement.removeAttribute("data-aleph-stream-enabled");
       document.documentElement.removeAttribute("data-aleph-stream-anim");
     }
+
+    // ── Font loading ─────────────────────────────────────────────────────
+    if (settings.fontFamily) loadFont(settings.fontFamily);
+    if (settings.codeFontFamily) loadFont(settings.codeFontFamily);
 
     // ── Typography overrides ─────────────────────────────────────────────
     const textSelectors = SEL.text.concat(SEL.message).join(",\n");
@@ -563,7 +587,7 @@
     styleEl.textContent = css;
   }
 
-  // ── Observer ───────────────────────────────────────────────────────────
+  // ── Observer (scoped to relevant mutations) ────────────────────────────
   let timer = null;
   function scheduleUpdate() {
     if (patching) return;
@@ -571,7 +595,14 @@
     timer = setTimeout(patchAll, 120);
   }
 
-  new MutationObserver(scheduleUpdate).observe(document.body, {
+  new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.target === document.head || m.target.closest?.("head")) continue;
+      if (m.target.id === STYLE_ID) continue;
+      scheduleUpdate();
+      return;
+    }
+  }).observe(document.body, {
     childList: true, subtree: true, characterData: true,
   });
 
@@ -579,12 +610,13 @@
   loadSettings().then(() => {
     applyStyles();
     patchAll();
+    updateBadge();
     setTimeout(patchAll, 1500);
     setInterval(patchAll, 3000);
   });
 
   console.log(
-    `%c[Aleph v${VERSION}] ✓ Loaded on ${PLATFORM}`,
+    `%c[Aleph v${VERSION}] loaded on ${PLATFORM}`,
     "color:#4ade80;font-weight:bold;font-size:14px"
   );
 })();

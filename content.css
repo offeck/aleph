@@ -10,7 +10,7 @@
 [data-aleph-rtl="true"] {
   direction: rtl !important;
   text-align: right !important;
-  unicode-bidi: embed !important;
+  unicode-bidi: plaintext !important;
 }
 
 .ProseMirror[data-aleph-rtl="true"],

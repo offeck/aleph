@@ -14,14 +14,38 @@
     codeFontFamily: "",
     chatWidth: 0,
     theme: "none",
+    themeClaude: "",
+    themeChatgpt: "",
+    themeGemini: "",
     focusMode: false,
+    focusHideUpgrade: true,
+    focusHideChips: true,
+    focusHidePromos: true,
     streamSmooth: true,
     streamAnimation: "fadeIn",
     messageSpacing: 0,
   };
 
-  const CHECKBOXES = ["bidiEnabled", "enableClaude", "enableChatgpt", "enableGemini", "focusMode", "streamSmooth"];
-  const SELECTS = ["fontFamily", "codeFontFamily", "streamAnimation"];
+  const THEME_NAMES = {
+    none: "Default",
+    warmDark: "Warm Dark",
+    coolDark: "Cool Dark",
+    paperLight: "Paper Light",
+    highContrast: "High Contrast",
+    midnight: "Midnight",
+    nord: "Nord",
+    dracula: "Dracula",
+    solarized: "Solarized",
+    rosePine: "Rosé Pine",
+    catppuccin: "Catppuccin",
+  };
+
+  const CHECKBOXES = [
+    "bidiEnabled", "enableClaude", "enableChatgpt", "enableGemini",
+    "focusMode", "streamSmooth",
+    "focusHideUpgrade", "focusHideChips", "focusHidePromos",
+  ];
+  const SELECTS = ["fontFamily", "codeFontFamily", "streamAnimation", "themeClaude", "themeChatgpt", "themeGemini"];
   const RANGES = [
     { id: "fontSize",         outputId: "fontSizeVal",         fmt: v => v == 0 ? "default" : `${v}px` },
     { id: "lineHeight",       outputId: "lineHeightVal",       fmt: v => v == 0 ? "default" : v.toFixed(1) },
@@ -33,6 +57,21 @@
 
   function save(key, value) {
     chrome.storage.sync.set({ [key]: value });
+  }
+
+  // ── Populate per-platform theme dropdowns ──────────────────────────
+  function populateThemeSelects() {
+    ["themeClaude", "themeChatgpt", "themeGemini"].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel || sel.options.length > 1) return;
+      Object.entries(THEME_NAMES).forEach(([key, name]) => {
+        if (key === "none") return;
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = name;
+        sel.appendChild(opt);
+      });
+    });
   }
 
   // ── Theme grid ─────────────────────────────────────────────────────
@@ -54,37 +93,83 @@
     if (field) field.style.display = streamEnabled ? "" : "none";
   }
 
+  function updateFocusCategoriesVisibility(focusEnabled) {
+    const cats = document.getElementById("focusCategories");
+    if (cats) cats.style.display = focusEnabled ? "" : "none";
+  }
+
   // ── Load settings into UI ──────────────────────────────────────────
   function loadUI() {
+    populateThemeSelects();
     chrome.storage.sync.get(DEFAULTS, (s) => {
       CHECKBOXES.forEach(id => {
-        document.getElementById(id).checked = s[id];
+        const el = document.getElementById(id);
+        if (el) el.checked = s[id];
       });
       SELECTS.forEach(id => {
-        document.getElementById(id).value = s[id];
+        const el = document.getElementById(id);
+        if (el) el.value = s[id];
       });
       RANGES.forEach(({ id, outputId, fmt }) => {
         const input = document.getElementById(id);
         const output = document.getElementById(outputId);
-        input.value = s[id];
-        output.textContent = fmt(parseFloat(s[id]));
+        if (input && output) {
+          input.value = s[id];
+          output.textContent = fmt(parseFloat(s[id]));
+        }
       });
       initThemeGrid(s.theme || "none");
       updateStreamAnimVisibility(s.streamSmooth);
+      updateFocusCategoriesVisibility(s.focusMode);
     });
+  }
+
+  // ── Export / Import ────────────────────────────────────────────────
+  function exportSettings() {
+    chrome.storage.sync.get(null, (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "aleph-settings.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  function importSettings(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        const filtered = {};
+        for (const key of Object.keys(DEFAULTS)) {
+          if (key in data) filtered[key] = data[key];
+        }
+        chrome.storage.sync.set(filtered, () => loadUI());
+      } catch (err) {
+        console.error("[Aleph] Import failed:", err);
+      }
+    };
+    reader.readAsText(file);
   }
 
   // ── Bind events ────────────────────────────────────────────────────
   function bindEvents() {
     CHECKBOXES.forEach(id => {
-      document.getElementById(id).addEventListener("change", (e) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("change", (e) => {
         save(id, e.target.checked);
         if (id === "streamSmooth") updateStreamAnimVisibility(e.target.checked);
+        if (id === "focusMode") updateFocusCategoriesVisibility(e.target.checked);
       });
     });
 
     SELECTS.forEach(id => {
-      document.getElementById(id).addEventListener("change", (e) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("change", (e) => {
         save(id, e.target.value);
       });
     });
@@ -92,6 +177,7 @@
     RANGES.forEach(({ id, outputId, fmt }) => {
       const input = document.getElementById(id);
       const output = document.getElementById(outputId);
+      if (!input || !output) return;
       input.addEventListener("input", () => {
         output.textContent = fmt(parseFloat(input.value));
       });
@@ -102,6 +188,19 @@
 
     document.getElementById("resetBtn").addEventListener("click", () => {
       chrome.storage.sync.set(DEFAULTS, () => loadUI());
+    });
+
+    document.getElementById("exportBtn").addEventListener("click", exportSettings);
+
+    document.getElementById("importBtn").addEventListener("click", () => {
+      document.getElementById("importFile").click();
+    });
+
+    document.getElementById("importFile").addEventListener("change", (e) => {
+      if (e.target.files[0]) {
+        importSettings(e.target.files[0]);
+        e.target.value = "";
+      }
     });
   }
 
