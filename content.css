@@ -77,47 +77,47 @@ ol:has(> [data-aleph-rtl="true"]) {
  * ══════════════════════════════════════════════════════════════════════ */
 
 /* ── Hide platform default streaming animations ──────────────────────
- * Suppress the built-in cursor/typing indicators from each platform
- * so our custom animations are the only visible ones.
+ * Only suppress when user picks a custom animation (not "platform").
+ * "platform" = keep native Claude/ChatGPT/Gemini animations untouched.
  */
 
 /* Claude: pulsing dot cursor on progressive rendering */
-[data-aleph-stream-enabled][data-aleph-platform="claude"] .progressive-markdown .cursor,
-[data-aleph-stream-enabled][data-aleph-platform="claude"] .progressive-markdown [class*="cursor"],
-[data-aleph-stream-enabled][data-aleph-platform="claude"] .font-claude-response [class*="blink"],
-[data-aleph-stream-enabled][data-aleph-platform="claude"] .font-claude-response [class*="typing"] {
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="claude"] .progressive-markdown .cursor,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="claude"] .progressive-markdown [class*="cursor"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="claude"] .font-claude-response [class*="blink"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="claude"] .font-claude-response [class*="typing"] {
   display: none !important;
   animation: none !important;
 }
 
 /* ChatGPT: blinking cursor and typing dots */
-[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming .cursor,
-[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming [class*="cursor"],
-[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming [class*="blink"],
-[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] [class*="typing-indicator"],
-[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming > .sr-only + span[class]:empty {
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="chatgpt"] .result-streaming .cursor,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="chatgpt"] .result-streaming [class*="cursor"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="chatgpt"] .result-streaming [class*="blink"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="chatgpt"] [class*="typing-indicator"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="chatgpt"] .result-streaming > .sr-only + span[class]:empty {
   display: none !important;
   animation: none !important;
 }
 
 /* Gemini: shimmer/skeleton loading effects */
-[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="shimmer"],
-[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="skeleton"],
-[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="loading-indicator"],
-[data-aleph-stream-enabled][data-aleph-platform="gemini"] .response-content [class*="typing"] {
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="gemini"] .response-content [class*="shimmer"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="gemini"] .response-content [class*="skeleton"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="gemini"] .response-content [class*="loading-indicator"],
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"])[data-aleph-platform="gemini"] .response-content [class*="typing"] {
   display: none !important;
   animation: none !important;
 }
 
-/* ── Shared stream element selector ──────────────────────────────────*/
-[data-aleph-stream-enabled] [data-aleph-stream] p,
-[data-aleph-stream-enabled] [data-aleph-stream] li,
-[data-aleph-stream-enabled] [data-aleph-stream] h1,
-[data-aleph-stream-enabled] [data-aleph-stream] h2,
-[data-aleph-stream-enabled] [data-aleph-stream] h3,
-[data-aleph-stream-enabled] [data-aleph-stream] h4,
-[data-aleph-stream-enabled] [data-aleph-stream] pre,
-[data-aleph-stream-enabled] [data-aleph-stream] blockquote {
+/* ── Shared stream element selector (custom animations only) ─────────*/
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] p,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] li,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] h1,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] h2,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] h3,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] h4,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] pre,
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]) [data-aleph-stream] blockquote {
   animation-fill-mode: both;
 }
 
@@ -195,6 +195,107 @@ ol:has(> [data-aleph-rtl="true"]) {
   animation: aleph-glow 0.6s ease-out both;
 }
 
+/* ── Animation: Blur ────────────────────────────────────────────────*/
+@keyframes aleph-blur {
+  from { opacity: 0; filter: blur(6px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+
+[data-aleph-stream-anim="blur"] [data-aleph-stream] p,
+[data-aleph-stream-anim="blur"] [data-aleph-stream] li,
+[data-aleph-stream-anim="blur"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="blur"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="blur"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="blur"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="blur"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="blur"] [data-aleph-stream] blockquote {
+  animation: aleph-blur 0.4s ease-out both;
+}
+
+/* ── Animation: Scale ───────────────────────────────────────────────*/
+@keyframes aleph-scale {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+[data-aleph-stream-anim="scale"] [data-aleph-stream] p,
+[data-aleph-stream-anim="scale"] [data-aleph-stream] li,
+[data-aleph-stream-anim="scale"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="scale"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="scale"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="scale"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="scale"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="scale"] [data-aleph-stream] blockquote {
+  animation: aleph-scale 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Animation: Elastic ─────────────────────────────────────────────*/
+@keyframes aleph-elastic {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.96); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  80%  { transform: translateY(1px) scale(0.995); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] p,
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] li,
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="elastic"] [data-aleph-stream] blockquote {
+  animation: aleph-elastic 0.5s ease-out both;
+}
+
+/* ── Animation: Highlight ───────────────────────────────────────────*/
+@keyframes aleph-highlight {
+  0%   { opacity: 0; background-size: 0% 100%; }
+  40%  { opacity: 1; background-size: 100% 100%; }
+  100% { opacity: 1; background-size: 0% 100%; background-position: right; }
+}
+
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] p,
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] li,
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="highlight"] [data-aleph-stream] blockquote {
+  background: linear-gradient(90deg, var(--aleph-accent, #7c83ff) 0%, var(--aleph-accent, #7c83ff) 100%) no-repeat left;
+  background-size: 0% 100%;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  animation: aleph-highlight 0.7s ease-out both;
+}
+
+/* ── Animation: Cascade ─────────────────────────────────────────────*/
+@keyframes aleph-cascade {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] p,
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] li,
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] h1,
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] h2,
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] h3,
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] h4,
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] pre,
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] blockquote {
+  animation: aleph-cascade 0.3s ease-out both;
+}
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(2)  { animation-delay: 0.04s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(3)  { animation-delay: 0.08s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(4)  { animation-delay: 0.12s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(5)  { animation-delay: 0.16s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(6)  { animation-delay: 0.20s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(7)  { animation-delay: 0.24s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(8)  { animation-delay: 0.28s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(9)  { animation-delay: 0.32s; }
+[data-aleph-stream-anim="cascade"] [data-aleph-stream] :nth-child(10) { animation-delay: 0.36s; }
+
 /* ── Animation: None — hides platform default only, no custom anim ──*/
 /* (No animation rules needed; platform defaults are already hidden above) */
 
@@ -204,8 +305,8 @@ ol:has(> [data-aleph-rtl="true"]) {
   50%      { opacity: 0; }
 }
 
-/* Claude streaming cursor */
-[data-aleph-stream-enabled][data-aleph-platform="claude"] .progressive-markdown > :last-child::after {
+/* Claude streaming cursor (only for custom animations, not platform/none) */
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]):not([data-aleph-stream-anim="none"])[data-aleph-platform="claude"] .progressive-markdown > :last-child::after {
   content: "\25AE";
   animation: aleph-blink 1s step-end infinite;
   color: var(--aleph-accent, currentColor);
@@ -213,19 +314,13 @@ ol:has(> [data-aleph-rtl="true"]) {
   margin-inline-start: 2px;
 }
 
-/* ChatGPT streaming cursor */
-[data-aleph-stream-enabled][data-aleph-platform="chatgpt"] .result-streaming > :last-child::after {
+/* ChatGPT streaming cursor (only for custom animations, not platform/none) */
+[data-aleph-stream-enabled]:not([data-aleph-stream-anim="platform"]):not([data-aleph-stream-anim="none"])[data-aleph-platform="chatgpt"] .result-streaming > :last-child::after {
   content: "\25AE";
   animation: aleph-blink 1s step-end infinite;
   color: var(--aleph-accent, currentColor);
   opacity: 0.7;
   margin-inline-start: 2px;
-}
-
-/* No cursor in "none" mode */
-[data-aleph-stream-anim="none"][data-aleph-platform="claude"] .progressive-markdown > :last-child::after,
-[data-aleph-stream-anim="none"][data-aleph-platform="chatgpt"] .result-streaming > :last-child::after {
-  content: none;
 }
 
 

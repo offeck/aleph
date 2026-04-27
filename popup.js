@@ -22,7 +22,7 @@
     focusHideChips: true,
     focusHidePromos: true,
     streamSmooth: true,
-    streamAnimation: "fadeIn",
+    streamAnimation: "platform",
     messageSpacing: 0,
   };
 

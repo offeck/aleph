@@ -226,7 +226,7 @@
     focusHideChips: true,
     focusHidePromos: true,
     streamSmooth: true,
-    streamAnimation: "fadeIn",
+    streamAnimation: "platform",
     messageSpacing: 0,
   };
 
@@ -352,7 +352,7 @@
       if (settings.focusMode) applyFocusMode();
       if (settings.streamSmooth) {
         applyStreamSmooth();
-        const anim = settings.streamAnimation || "fadeIn";
+        const anim = settings.streamAnimation || "platform";
         if (document.documentElement.getAttribute("data-aleph-stream-anim") !== anim) {
           document.documentElement.setAttribute("data-aleph-stream-anim", anim);
         }
@@ -529,7 +529,7 @@
     // ── Streaming Smoothing ──────────────────────────────────────────────
     if (settings.streamSmooth) {
       document.documentElement.setAttribute("data-aleph-stream-enabled", "true");
-      document.documentElement.setAttribute("data-aleph-stream-anim", settings.streamAnimation || "fadeIn");
+      document.documentElement.setAttribute("data-aleph-stream-anim", settings.streamAnimation || "platform");
     } else {
       document.documentElement.removeAttribute("data-aleph-stream-enabled");
       document.documentElement.removeAttribute("data-aleph-stream-anim");
