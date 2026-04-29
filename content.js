@@ -596,7 +596,7 @@
     return merged;
   }
 
-  const HEB_SEG_RE = /([֐-׿]+(?:\s+[֐-׿]+)*)|([^֐-׿]+)/g;
+  const HEB_SEG_RE = /([֐-׿✓✗⚠☑]+(?:\s+[֐-׿✓✗⚠☑]+)*)|([^֐-׿✓✗⚠☑]+)/g;
 
   function cleanMathText(s) {
     s = s.replace(/,\s*;/g, ";");
