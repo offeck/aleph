@@ -445,15 +445,16 @@
 
   const DELIMITED_RE = /\$\$([^$]+)\$\$|\$([^$\n]+)\$|\\\((.+?)\\\)|\\\[(.+?)\\\]/g;
   const LATEX_CMD_RE_G = new RegExp(LATEX_CMD_RE.source, "g");
-  const CH_MATH_OP = /[0-9.+\-=<>!,:|/ ]/;
+  const UNICODE_MATH = "→←↔⇒⇐⇔≠≤≥≈≡∼≅≢±∓∞·×÷∈∉∋⊂⊃⊆⊇⊄⊅∪∩∧∨¬∀∃∄∂∇√∑∏∐∫∬∭∮≪≫∝∅⟨⟩⌈⌉⌊⌋▶◀△▽⊕⊗⊖⊘";
+  const CH_MATH_OP = new RegExp("[0-9.+\\-=<>!,:|/ " + UNICODE_MATH.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "]");
   const CH_ALPHA = /[a-zA-Z]/;
   const SPACE_LOOK_CMD = /^\\[a-zA-Z]/;
   const SPACE_LOOK_NUM = /^[0-9{^_]/;
   const SPACE_LOOK_VAR_CMD = /^[a-zA-Z]{1,2}\s*\\[a-zA-Z]/;
   const SPACE_LOOK_VAR_NUM = /^[a-zA-Z]{1,2}\s*[0-9+\-=<>]/;
   const WORD_BEFORE_CMD = /^[a-zA-Z]+\s*[\\{^_]/;
-  const EXPAND_BACK_STOP = /[0-9.+\-=<>\\]/;
-  const PROXIMITY_GAP = /^[\s\w.,=<>+\-*/|]*$/;
+  const EXPAND_BACK_STOP = new RegExp("[0-9.+\\-=<>\\\\" + UNICODE_MATH.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "]");
+  const PROXIMITY_GAP = /^[^֐-׿]*$/;
   const HAS_DOLLAR = /\$[^$]+\$/;
   const HAS_LPAREN = /\\\(/;
   const HAS_LBRACKET = /\\\[/;
@@ -614,7 +615,27 @@
     return merged;
   }
 
+  const UNICODE_TO_LATEX = [
+    [/→/g, "\\to "], [/←/g, "\\leftarrow "], [/↔/g, "\\leftrightarrow "],
+    [/⇒/g, "\\Rightarrow "], [/⇐/g, "\\Leftarrow "], [/⇔/g, "\\Leftrightarrow "],
+    [/≠/g, "\\neq "], [/≤/g, "\\leq "], [/≥/g, "\\geq "],
+    [/≈/g, "\\approx "], [/≡/g, "\\equiv "], [/∼/g, "\\sim "], [/≅/g, "\\cong "],
+    [/±/g, "\\pm "], [/∓/g, "\\mp "], [/∞/g, "\\infty "],
+    [/·/g, "\\cdot "], [/×/g, "\\times "], [/÷/g, "\\div "],
+    [/∈/g, "\\in "], [/∉/g, "\\notin "], [/∋/g, "\\ni "],
+    [/⊂/g, "\\subset "], [/⊃/g, "\\supset "], [/⊆/g, "\\subseteq "], [/⊇/g, "\\supseteq "],
+    [/∪/g, "\\cup "], [/∩/g, "\\cap "], [/∧/g, "\\wedge "], [/∨/g, "\\vee "],
+    [/¬/g, "\\neg "], [/∀/g, "\\forall "], [/∃/g, "\\exists "],
+    [/∂/g, "\\partial "], [/∇/g, "\\nabla "],
+    [/∑/g, "\\sum "], [/∏/g, "\\prod "], [/∫/g, "\\int "], [/∬/g, "\\iint "], [/∭/g, "\\iiint "],
+    [/√/g, "\\sqrt "],
+    [/⟨/g, "\\langle "], [/⟩/g, "\\rangle "],
+    [/⌈/g, "\\lceil "], [/⌉/g, "\\rceil "], [/⌊/g, "\\lfloor "], [/⌋/g, "\\rfloor "],
+    [/⊕/g, "\\oplus "], [/⊗/g, "\\otimes "],
+  ];
+
   function cleanMathText(s) {
+    for (const [re, repl] of UNICODE_TO_LATEX) s = s.replace(re, repl);
     s = s.replace(/,\s*;/g, ";");
     s = s.replace(/;\s*,/g, ";");
     s = s.replace(/[.,]\s*(d[a-z])(?=[,.\s)\]}]|$)/g, "\\,$1");
