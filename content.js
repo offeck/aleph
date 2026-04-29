@@ -509,6 +509,20 @@
         continue;
       }
       if (ch === "^" || ch === "_") { end++; continue; }
+      if ((ch === "(" || ch === "[") && end > cmdStart) {
+        const prev = text[end - 1];
+        if (CH_ALPHA.test(prev) || prev === "}") {
+          const close = ch === "(" ? ")" : "]";
+          let depth = 1;
+          end++;
+          while (end < len && depth > 0) {
+            if (text[end] === ch) depth++;
+            else if (text[end] === close) depth--;
+            end++;
+          }
+          continue;
+        }
+      }
       if (CH_MATH_OP.test(ch)) {
         if (ch === " ") {
           const rest = text.slice(end + 1);
@@ -561,8 +575,12 @@
     while (s > 0) {
       const ch = text[s - 1];
       if (CH_MATH_OP.test(ch)) {
-        if (ch === " " && s - 2 >= 0 && !EXPAND_BACK_STOP.test(text[s - 2])) break;
+        if (ch === " " && s - 2 >= 0 && !EXPAND_BACK_STOP.test(text[s - 2]) && !CH_ALPHA.test(text[s - 2])) break;
         s--;
+      } else if (CH_ALPHA.test(ch)) {
+        let ws = s - 1;
+        while (ws > 0 && CH_ALPHA.test(text[ws - 1])) ws--;
+        if (s - ws <= 2) { s = ws; } else { break; }
       } else break;
     }
     while (s < start && text[s] === " ") s++;
@@ -596,15 +614,9 @@
     return merged;
   }
 
-  const HEB_SEG_RE = /([֐-׿✓✗⚠☑]+(?:\s+[֐-׿✓✗⚠☑]+)*)|([^֐-׿✓✗⚠☑]+)/g;
-
   function cleanMathText(s) {
     s = s.replace(/,\s*;/g, ";");
     s = s.replace(/;\s*,/g, ";");
-    s = s.replace(/\$\$([^$]+)\$\$/g, "$1");
-    s = s.replace(/\$([^$\n]+)\$/g, "$1");
-    s = s.replace(/\\\((.+?)\\\)/g, "$1");
-    s = s.replace(/\\\[(.+?)\\\]/g, "$1");
     s = s.replace(/[.,]\s*(d[a-z])(?=[,.\s)\]}]|$)/g, "\\,$1");
     s = s.replace(/(d[a-z])\s*,\s*(d[a-z])/g, "$1\\,$2");
     return s;
@@ -614,82 +626,78 @@
     const text = textNode.textContent;
     if (!text || text.trim().length === 0) return;
 
-    const segments = [];
-    HEB_SEG_RE.lastIndex = 0;
-    let m;
-    while ((m = HEB_SEG_RE.exec(text)) !== null) {
-      if (m[1]) segments.push({ type: "heb", content: m[0] });
-      else segments.push({ type: "other", content: m[0] });
+    const regions = [];
+
+    DELIMITED_RE.lastIndex = 0;
+    let dm;
+    while ((dm = DELIMITED_RE.exec(text)) !== null) {
+      const latex = dm[1] || dm[2] || dm[3] || dm[4];
+      const display = !!(dm[1] || dm[4]);
+      regions.push({ start: dm.index, end: dm.index + dm[0].length, latex, display });
     }
 
-    let hasLatex = false;
-    for (const s of segments) {
-      if (s.type === "other" && (LATEX_CMD_RE.test(s.content) || HAS_DOLLAR.test(s.content) || HAS_LPAREN.test(s.content) || HAS_LBRACKET.test(s.content))) {
-        hasLatex = true;
-        break;
+    const bare = findBareLatexRegions(text);
+    for (const b of bare) {
+      if (!regions.some(r => b.start < r.end && b.end > r.start)) {
+        regions.push({ ...b, display: false });
       }
     }
-    if (!hasLatex) return;
+
+    if (regions.length === 0) return;
+
+    regions.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const r of regions) {
+      const last = merged[merged.length - 1];
+      if (last && (r.start <= last.end ||
+          (r.start - last.end <= 10 && PROXIMITY_GAP.test(text.slice(last.end, r.start))))) {
+        last.end = Math.max(last.end, r.end);
+        last.latex = text.slice(last.start, last.end);
+        last.display = last.display || r.display;
+      } else {
+        merged.push({ start: r.start, end: r.end, latex: r.latex || text.slice(r.start, r.end), display: r.display });
+      }
+    }
 
     const wrapper = document.createElement("span");
     wrapper.setAttribute("data-aleph-latex-rendered", "true");
 
-    for (const seg of segments) {
-      if (seg.type === "heb") {
-        wrapper.appendChild(document.createTextNode(seg.content));
-      } else {
-        const mathText = cleanMathText(seg.content);
-        const ltrSpan = document.createElement("span");
-        ltrSpan.dir = "ltr";
-        ltrSpan.style.unicodeBidi = "isolate";
-
-        if (LATEX_CMD_RE.test(mathText) || HAS_DOLLAR.test(mathText) || HAS_LPAREN.test(mathText) || HAS_LBRACKET.test(mathText)) {
-          try {
-            katex.render(mathText.trim(), ltrSpan, {
-              throwOnError: true,
-              displayMode: false,
-              output: "html",
-            });
-          } catch (e) {
-            renderFragments(mathText, ltrSpan);
-          }
-        } else {
-          ltrSpan.textContent = seg.content;
-        }
-        wrapper.appendChild(ltrSpan);
+    let lastEnd = 0;
+    for (const region of merged) {
+      if (region.start > lastEnd) {
+        wrapper.appendChild(document.createTextNode(text.slice(lastEnd, region.start)));
       }
+
+      let mathText = region.latex;
+      mathText = mathText.replace(/^\$\$([\s\S]*)\$\$$/, "$1");
+      mathText = mathText.replace(/^\$([^$]*)\$$/, "$1");
+      mathText = mathText.replace(/^\\\(([\s\S]*)\\\)$/, "$1");
+      mathText = mathText.replace(/^\\\[([\s\S]*)\\\]$/, "$1");
+      mathText = cleanMathText(mathText);
+
+      const ltrSpan = document.createElement("span");
+      ltrSpan.dir = "ltr";
+      ltrSpan.style.unicodeBidi = "isolate";
+
+      try {
+        katex.render(mathText.trim(), ltrSpan, {
+          throwOnError: true,
+          displayMode: region.display,
+          output: "html",
+        });
+      } catch (e) {
+        ltrSpan.textContent = region.latex;
+      }
+
+      wrapper.appendChild(ltrSpan);
+      lastEnd = region.end;
+    }
+
+    if (lastEnd < text.length) {
+      wrapper.appendChild(document.createTextNode(text.slice(lastEnd)));
     }
 
     textNode.parentNode.replaceChild(wrapper, textNode);
-  }
-
-  function renderFragments(mathText, container) {
-    const bare = findBareLatexRegions(mathText);
-    if (bare.length === 0) {
-      container.textContent = mathText;
-      return;
-    }
-    let lastEnd = 0;
-    for (const b of bare) {
-      if (b.start > lastEnd) {
-        container.appendChild(document.createTextNode(mathText.slice(lastEnd, b.start)));
-      }
-      const mathSpan = document.createElement("span");
-      try {
-        katex.render(b.latex, mathSpan, {
-          throwOnError: true,
-          displayMode: false,
-          output: "html",
-        });
-        container.appendChild(mathSpan);
-      } catch (e) {
-        container.appendChild(document.createTextNode(mathText.slice(b.start, b.end)));
-      }
-      lastEnd = b.end;
-    }
-    if (lastEnd < mathText.length) {
-      container.appendChild(document.createTextNode(mathText.slice(lastEnd)));
-    }
   }
 
   const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()֐-׿]*\)/g;
