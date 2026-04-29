@@ -149,12 +149,12 @@
       math: [".katex", ".katex-display", ".katex-html", ".katex-mathml", "mjx-container", ".math-inline", ".math-display"],
       code: ["code.hljs", "pre code", ".code-block__code"],
       message: [".markdown", "[data-message-author-role='assistant']"],
-      chatWidth: ["main [class*='thread-content']", "main .max-w-3xl"],
-      themeBg: ["body", "main", ".bg-token-main-surface-primary", ".bg-white", ".dark\\:bg-gray-800"],
+      chatWidth: ["main .group\\/thread", "main [class*='thread-content']", "main .max-w-3xl"],
+      themeBg: ["body", "main", ".bg-token-bg-primary", ".bg-token-bg-secondary", ".bg-token-bg-tertiary", ".bg-token-bg-elevated-primary"],
       themeText: [".markdown", ".prose", "p", "li", "h1", "h2", "h3", "h4"],
-      themeInput: ["#prompt-textarea", ".bg-token-main-surface-primary", "[contenteditable='true']"],
-      themeCode: ["pre", "code.hljs", ".bg-black"],
-      themeSidebar: ["nav", ".bg-token-sidebar-surface-primary"],
+      themeInput: ["#prompt-textarea", ".bg-token-bg-primary", "[contenteditable='true']"],
+      themeCode: ["pre", "code.hljs", ".bg-token-bg-tertiary"],
+      themeSidebar: ["nav", "[class*='sidebar'][class*='shrink']"],
       focusHide: {
         upgrade: [
           "[data-testid='upgrade-button']",
@@ -169,7 +169,7 @@
       },
       streaming: [".result-streaming", ".markdown"],
       messageWrapper: ["[data-testid^='conversation-turn']", ".group\\/conversation-turn"],
-      chatContainer: ["main", "[class*='thread-content']"],
+      chatContainer: ["main", ".group\\/thread", "[class*='thread-content']"],
     },
     gemini: {
       text: [
@@ -444,6 +444,19 @@
   const LATEX_CMD_RE = /\\(?:frac|int|iint|iiint|oint|sum|prod|coprod|sqrt|leq|geq|neq|cdot|cdots|ldots|ddots|vdots|times|div|pm|mp|circ|ast|star|dagger|ddagger|amalg|cap|cup|uplus|sqcap|sqcup|vee|wedge|oplus|ominus|otimes|oslash|odot|bigcup|bigcap|bigvee|bigwedge|bigoplus|bigotimes|alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|mu|nu|xi|pi|varpi|rho|varrho|sigma|varsigma|tau|upsilon|phi|varphi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|infty|partial|nabla|forall|exists|nexists|neg|lnot|approx|equiv|sim|simeq|cong|propto|subset|supset|subseteq|supseteq|subsetneq|supsetneq|in|notin|ni|rightarrow|leftarrow|Rightarrow|Leftarrow|leftrightarrow|Leftrightarrow|mapsto|implies|iff|to|gets|uparrow|downarrow|lim|limsup|liminf|sin|cos|tan|sec|csc|cot|sinh|cosh|tanh|arcsin|arccos|arctan|log|ln|exp|max|min|sup|inf|det|dim|ker|gcd|deg|hom|arg|binom|dbinom|tbinom|choose|text|textrm|textbf|textit|textsf|texttt|mathrm|mathbf|mathbb|mathcal|mathfrak|mathscr|mathit|mathsf|boldsymbol|overline|underline|widehat|widetilde|overrightarrow|overleftarrow|hat|tilde|bar|vec|dot|ddot|acute|grave|check|breve|not|quad|qquad|left|right|big|Big|bigg|Bigg|langle|rangle|lceil|rceil|lfloor|rfloor|bmod|pmod|operatorname|stackrel|overset|underset|limits|nolimits|displaystyle|textstyle|scriptstyle|color|boxed|cancel|bcancel|xcancel|sout|begin|end|matrix|pmatrix|bmatrix|vmatrix|cases|array|aligned|gathered|split|substack)\b/;
 
   const DELIMITED_RE = /\$\$([^$]+)\$\$|\$([^$\n]+)\$|\\\((.+?)\\\)|\\\[(.+?)\\\]/g;
+  const LATEX_CMD_RE_G = new RegExp(LATEX_CMD_RE.source, "g");
+  const CH_MATH_OP = /[0-9.+\-=<>!,:|/ ]/;
+  const CH_ALPHA = /[a-zA-Z]/;
+  const SPACE_LOOK_CMD = /^\\[a-zA-Z]/;
+  const SPACE_LOOK_NUM = /^[0-9{^_]/;
+  const SPACE_LOOK_VAR_CMD = /^[a-zA-Z]{1,2}\s*\\[a-zA-Z]/;
+  const SPACE_LOOK_VAR_NUM = /^[a-zA-Z]{1,2}\s*[0-9+\-=<>]/;
+  const WORD_BEFORE_CMD = /^[a-zA-Z]+\s*[\\{^_]/;
+  const EXPAND_BACK_STOP = /[0-9.+\-=<>\\]/;
+  const PROXIMITY_GAP = /^[\s\w.,=<>+\-*/|]*$/;
+  const HAS_DOLLAR = /\$[^$]+\$/;
+  const HAS_LPAREN = /\\\(/;
+  const HAS_LBRACKET = /\\\[/;
 
   function isInsideSkip(node) {
     let el = node.parentElement;
@@ -457,7 +470,7 @@
       const tag = el.tagName;
       if (tag === "MJX-CONTAINER" || tag === "PRE" || tag === "CODE") return true;
       if (el.hasAttribute("data-aleph-latex-rendered")) return true;
-      if (tag === "SPAN" && el.closest(".katex")) return true;
+      if (el.hasAttribute("data-aleph-math-isolated")) return true;
       el = el.parentElement;
     }
     return false;
@@ -477,7 +490,7 @@
       const ch = text[end];
       if (ch === "\\") {
         let cmdEnd = end + 1;
-        while (cmdEnd < len && /[a-zA-Z]/.test(text[cmdEnd])) cmdEnd++;
+        while (cmdEnd < len && CH_ALPHA.test(text[cmdEnd])) cmdEnd++;
         if (cmdEnd > end + 1) {
           end = cmdEnd;
           continue;
@@ -496,18 +509,18 @@
         continue;
       }
       if (ch === "^" || ch === "_") { end++; continue; }
-      if (/[0-9.+\-=<>!,;:|/ ]/.test(ch)) {
+      if (CH_MATH_OP.test(ch)) {
         if (ch === " ") {
           const rest = text.slice(end + 1);
-          if (/^\\[a-zA-Z]/.test(rest) || /^[0-9{^_]/.test(rest)) {
+          if (SPACE_LOOK_CMD.test(rest) || SPACE_LOOK_NUM.test(rest)) {
             end++;
             continue;
           }
-          if (/^[a-zA-Z]{1,2}\s*\\[a-zA-Z]/.test(rest)) {
+          if (SPACE_LOOK_VAR_CMD.test(rest)) {
             end++;
             continue;
           }
-          if (/^[a-zA-Z]{1,2}\s*[0-9+\-=<>]/.test(rest)) {
+          if (SPACE_LOOK_VAR_NUM.test(rest)) {
             end++;
             continue;
           }
@@ -516,14 +529,14 @@
         end++;
         continue;
       }
-      if (/[a-zA-Z]/.test(ch)) {
+      if (CH_ALPHA.test(ch)) {
         const rest = text.slice(end);
-        if (/^[a-zA-Z]+\s*[\\{^_]/.test(rest)) {
+        if (WORD_BEFORE_CMD.test(rest)) {
           end++;
           continue;
         }
         let wordEnd = end;
-        while (wordEnd < len && /[a-zA-Z]/.test(text[wordEnd])) wordEnd++;
+        while (wordEnd < len && CH_ALPHA.test(text[wordEnd])) wordEnd++;
         const word = text.slice(end, wordEnd);
         if (word.length <= 2) {
           end = wordEnd;
@@ -547,8 +560,8 @@
     let s = start;
     while (s > 0) {
       const ch = text[s - 1];
-      if (/[0-9.+\-=<>!,;:|/ ]/.test(ch)) {
-        if (ch === " " && s - 2 >= 0 && !/[0-9.+\-=<>\\]/.test(text[s - 2])) break;
+      if (CH_MATH_OP.test(ch)) {
+        if (ch === " " && s - 2 >= 0 && !EXPAND_BACK_STOP.test(text[s - 2])) break;
         s--;
       } else break;
     }
@@ -558,13 +571,13 @@
 
   function findBareLatexRegions(text) {
     const regions = [];
+    LATEX_CMD_RE_G.lastIndex = 0;
     let match;
-    const re = new RegExp(LATEX_CMD_RE.source, "g");
-    while ((match = re.exec(text)) !== null) {
+    while ((match = LATEX_CMD_RE_G.exec(text)) !== null) {
       let start = match.index;
       let end = extractLatexExpression(text, start);
       start = expandBackward(text, start);
-      let latex = text.slice(start, end).trim();
+      const latex = text.slice(start, end).trim();
       if (latex.length <= 1) continue;
       if (/^\\\w+$/.test(latex) && /^\\(?:n|t|r|s|d|w|b|0)$/.test(latex)) continue;
       regions.push({ start, end, latex });
@@ -572,97 +585,141 @@
     const merged = [];
     for (const r of regions.sort((a, b) => a.start - b.start)) {
       const last = merged[merged.length - 1];
-      if (last && r.start <= last.end) {
+      if (last && (r.start <= last.end ||
+          (r.start - last.end <= 10 && PROXIMITY_GAP.test(text.slice(last.end, r.start))))) {
         last.end = Math.max(last.end, r.end);
         last.latex = text.slice(last.start, last.end).trim();
       } else {
         merged.push({ ...r });
       }
     }
-    const proximity = [];
-    for (const r of merged) {
-      const last = proximity[proximity.length - 1];
-      if (last) {
-        const gap = text.slice(last.end, r.start);
-        if (gap.length <= 10 && /^[\s\w.,=<>+\-*/|]*$/.test(gap)) {
-          last.end = r.end;
-          last.latex = text.slice(last.start, last.end).trim();
-          continue;
-        }
-      }
-      proximity.push({ ...r });
-    }
-    return proximity;
+    return merged;
+  }
+
+  const HEB_SEG_RE = /([֐-׿]+(?:\s+[֐-׿]+)*)|([^֐-׿]+)/g;
+
+  function cleanMathText(s) {
+    s = s.replace(/,\s*;/g, ";");
+    s = s.replace(/;\s*,/g, ";");
+    s = s.replace(/\$\$([^$]+)\$\$/g, "$1");
+    s = s.replace(/\$([^$\n]+)\$/g, "$1");
+    s = s.replace(/\\\((.+?)\\\)/g, "$1");
+    s = s.replace(/\\\[(.+?)\\\]/g, "$1");
+    s = s.replace(/[.,]\s*(d[a-z])(?=[,.\s)\]}]|$)/g, "\\,$1");
+    s = s.replace(/(d[a-z])\s*,\s*(d[a-z])/g, "$1\\,$2");
+    return s;
   }
 
   function renderLatexInNode(textNode) {
     const text = textNode.textContent;
     if (!text || text.trim().length === 0) return;
 
-    const parts = [];
-    let lastIdx = 0;
-    DELIMITED_RE.lastIndex = 0;
-    let dm;
-    while ((dm = DELIMITED_RE.exec(text)) !== null) {
-      if (dm.index > lastIdx) {
-        parts.push({ type: "text", content: text.slice(lastIdx, dm.index) });
-      }
-      const latex = dm[1] || dm[2] || dm[3] || dm[4];
-      const display = !!(dm[1] || dm[4]);
-      parts.push({ type: "latex", latex, display, raw: dm[0] });
-      lastIdx = dm.index + dm[0].length;
-    }
-    if (lastIdx < text.length) {
-      parts.push({ type: "text", content: text.slice(lastIdx) });
+    const segments = [];
+    HEB_SEG_RE.lastIndex = 0;
+    let m;
+    while ((m = HEB_SEG_RE.exec(text)) !== null) {
+      if (m[1]) segments.push({ type: "heb", content: m[0] });
+      else segments.push({ type: "other", content: m[0] });
     }
 
-    const finalParts = [];
-    for (const p of parts) {
-      if (p.type === "latex") {
-        finalParts.push(p);
-      } else {
-        const bare = findBareLatexRegions(p.content);
-        if (bare.length === 0) {
-          finalParts.push(p);
-        } else {
-          let idx = 0;
-          for (const b of bare) {
-            if (b.start > idx) {
-              finalParts.push({ type: "text", content: p.content.slice(idx, b.start) });
-            }
-            finalParts.push({ type: "latex", latex: b.latex, display: false, raw: p.content.slice(b.start, b.end) });
-            idx = b.end;
-          }
-          if (idx < p.content.length) {
-            finalParts.push({ type: "text", content: p.content.slice(idx) });
-          }
-        }
+    let hasLatex = false;
+    for (const s of segments) {
+      if (s.type === "other" && (LATEX_CMD_RE.test(s.content) || HAS_DOLLAR.test(s.content) || HAS_LPAREN.test(s.content) || HAS_LBRACKET.test(s.content))) {
+        hasLatex = true;
+        break;
       }
     }
-
-    if (!finalParts.some(p => p.type === "latex")) return;
+    if (!hasLatex) return;
 
     const wrapper = document.createElement("span");
     wrapper.setAttribute("data-aleph-latex-rendered", "true");
 
-    for (const p of finalParts) {
-      if (p.type === "text") {
-        wrapper.appendChild(document.createTextNode(p.content));
+    for (const seg of segments) {
+      if (seg.type === "heb") {
+        wrapper.appendChild(document.createTextNode(seg.content));
       } else {
-        const mathSpan = document.createElement("span");
-        try {
-          katex.render(p.latex, mathSpan, {
-            throwOnError: true,
-            displayMode: p.display,
-            output: "html",
-          });
-          wrapper.appendChild(mathSpan);
-        } catch (e) {
-          wrapper.appendChild(document.createTextNode(p.raw));
+        const mathText = cleanMathText(seg.content);
+        const ltrSpan = document.createElement("span");
+        ltrSpan.dir = "ltr";
+        ltrSpan.style.unicodeBidi = "isolate";
+
+        if (LATEX_CMD_RE.test(mathText) || HAS_DOLLAR.test(mathText) || HAS_LPAREN.test(mathText) || HAS_LBRACKET.test(mathText)) {
+          try {
+            katex.render(mathText.trim(), ltrSpan, {
+              throwOnError: true,
+              displayMode: false,
+              output: "html",
+            });
+          } catch (e) {
+            renderFragments(mathText, ltrSpan);
+          }
+        } else {
+          ltrSpan.textContent = seg.content;
         }
+        wrapper.appendChild(ltrSpan);
       }
     }
 
+    textNode.parentNode.replaceChild(wrapper, textNode);
+  }
+
+  function renderFragments(mathText, container) {
+    const bare = findBareLatexRegions(mathText);
+    if (bare.length === 0) {
+      container.textContent = mathText;
+      return;
+    }
+    let lastEnd = 0;
+    for (const b of bare) {
+      if (b.start > lastEnd) {
+        container.appendChild(document.createTextNode(mathText.slice(lastEnd, b.start)));
+      }
+      const mathSpan = document.createElement("span");
+      try {
+        katex.render(b.latex, mathSpan, {
+          throwOnError: true,
+          displayMode: false,
+          output: "html",
+        });
+        container.appendChild(mathSpan);
+      } catch (e) {
+        container.appendChild(document.createTextNode(mathText.slice(b.start, b.end)));
+      }
+      lastEnd = b.end;
+    }
+    if (lastEnd < mathText.length) {
+      container.appendChild(document.createTextNode(mathText.slice(lastEnd)));
+    }
+  }
+
+  const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()֐-׿]*\)/g;
+
+  function isolateMathText(textNode) {
+    const text = textNode.textContent;
+    MATH_PAREN_RE.lastIndex = 0;
+    let match;
+    const regions = [];
+    while ((match = MATH_PAREN_RE.exec(text)) !== null) {
+      regions.push({ start: match.index, end: match.index + match[0].length, text: match[0] });
+    }
+    if (regions.length === 0) return;
+    const wrapper = document.createElement("span");
+    wrapper.setAttribute("data-aleph-math-isolated", "true");
+    let lastEnd = 0;
+    for (const r of regions) {
+      if (r.start > lastEnd) {
+        wrapper.appendChild(document.createTextNode(text.slice(lastEnd, r.start)));
+      }
+      const ltrSpan = document.createElement("span");
+      ltrSpan.dir = "ltr";
+      ltrSpan.style.unicodeBidi = "isolate";
+      ltrSpan.textContent = r.text;
+      wrapper.appendChild(ltrSpan);
+      lastEnd = r.end;
+    }
+    if (lastEnd < text.length) {
+      wrapper.appendChild(document.createTextNode(text.slice(lastEnd)));
+    }
     textNode.parentNode.replaceChild(wrapper, textNode);
   }
 
@@ -672,17 +729,21 @@
     document.querySelectorAll(messageSel).forEach((msg) => {
       if (isMessageStreaming(msg)) return;
       const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-      const nodes = [];
+      const latexNodes = [];
+      const mathTextNodes = [];
       let node;
       while ((node = walker.nextNode())) {
         if (isInsideSkip(node)) continue;
         const txt = node.textContent;
         if (!txt || txt.trim().length === 0) continue;
-        if (LATEX_CMD_RE.test(txt) || /\$[^$]+\$/.test(txt) || /\\\(/.test(txt) || /\\\[/.test(txt)) {
-          nodes.push(node);
+        if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
+          latexNodes.push(node);
+        } else if ((MATH_PAREN_RE.lastIndex = 0, MATH_PAREN_RE.test(txt))) {
+          mathTextNodes.push(node);
         }
       }
-      nodes.forEach(renderLatexInNode);
+      latexNodes.forEach(renderLatexInNode);
+      mathTextNodes.forEach(isolateMathText);
     });
   }
 

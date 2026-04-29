@@ -2,3 +2,4 @@
 *.py
 node_modules/
 *.zip
+.claude/settings.local.json
