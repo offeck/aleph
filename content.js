@@ -503,6 +503,14 @@
             end++;
             continue;
           }
+          if (/^[a-zA-Z]{1,2}\s*\\[a-zA-Z]/.test(rest)) {
+            end++;
+            continue;
+          }
+          if (/^[a-zA-Z]{1,2}\s*[0-9+\-=<>]/.test(rest)) {
+            end++;
+            continue;
+          }
           break;
         }
         end++;
@@ -510,12 +518,20 @@
       }
       if (/[a-zA-Z]/.test(ch)) {
         const rest = text.slice(end);
-        if (/^[a-zA-Z]+\s*[\\{^_]/.test(rest) || /^[a-zA-Z](?:\s|$)/.test(rest)) {
+        if (/^[a-zA-Z]+\s*[\\{^_]/.test(rest)) {
           end++;
           continue;
         }
         let wordEnd = end;
         while (wordEnd < len && /[a-zA-Z]/.test(text[wordEnd])) wordEnd++;
+        const word = text.slice(end, wordEnd);
+        if (word.length <= 2) {
+          end = wordEnd;
+          if (end < len && text[end] === ",") {
+            end++;
+          }
+          continue;
+        }
         if (wordEnd < len && (text[wordEnd] === "{" || text[wordEnd] === "^" || text[wordEnd] === "_" || text[wordEnd] === "\\")) {
           end = wordEnd;
           continue;
@@ -563,7 +579,20 @@
         merged.push({ ...r });
       }
     }
-    return merged;
+    const proximity = [];
+    for (const r of merged) {
+      const last = proximity[proximity.length - 1];
+      if (last) {
+        const gap = text.slice(last.end, r.start);
+        if (gap.length <= 10 && /^[\s\w.,=<>+\-*/|]*$/.test(gap)) {
+          last.end = r.end;
+          last.latex = text.slice(last.start, last.end).trim();
+          continue;
+        }
+      }
+      proximity.push({ ...r });
+    }
+    return proximity;
   }
 
   function renderLatexInNode(textNode) {
