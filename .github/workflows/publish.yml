@@ -1,0 +1,79 @@
+name: Publish to Chrome Web Store
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate manifest.json
+        run: |
+          node -e "
+            const manifest = require('./manifest.json');
+            const required = ['manifest_version', 'name', 'version', 'description'];
+            for (const key of required) {
+              if (!manifest[key]) { console.error('Missing: ' + key); process.exit(1); }
+            }
+            if (manifest.manifest_version !== 3) {
+              console.error('Expected Manifest V3'); process.exit(1);
+            }
+            const semver = /^\d+\.\d+\.\d+$/;
+            if (!semver.test(manifest.version)) {
+              console.error('Invalid version format: ' + manifest.version); process.exit(1);
+            }
+            console.log('Manifest OK — ' + manifest.name + ' v' + manifest.version);
+          "
+
+      - name: Check required files exist
+        run: |
+          for f in background.js content.js content.css popup.html popup.css popup.js icons/icon16.png icons/icon48.png icons/icon128.png; do
+            [ -f "$f" ] || { echo "Missing: $f"; exit 1; }
+          done
+          echo "All required files present"
+
+      - name: Lint JavaScript (syntax check)
+        run: |
+          for f in background.js content.js popup.js; do
+            node --check "$f" || exit 1
+          done
+          echo "No syntax errors"
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install chrome-webstore-upload-cli
+        run: npm install -g chrome-webstore-upload-cli
+
+      - name: Package extension
+        run: |
+          zip -r extension.zip \
+            manifest.json \
+            background.js \
+            content.js \
+            content.css \
+            popup.html \
+            popup.css \
+            popup.js \
+            icons/ \
+            vendor/ \
+            -x "*.DS_Store"
+          echo "Packaged $(du -h extension.zip | cut -f1)"
+
+      - name: Upload to Chrome Web Store
+        run: chrome-webstore-upload upload --source extension.zip --auto-publish
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
