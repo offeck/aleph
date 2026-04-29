@@ -496,7 +496,7 @@
         continue;
       }
       if (ch === "^" || ch === "_") { end++; continue; }
-      if (/[0-9.+\-=<>!,;:()[\]|/ ]/.test(ch)) {
+      if (/[0-9.+\-=<>!,;:|/ ]/.test(ch)) {
         if (ch === " ") {
           const rest = text.slice(end + 1);
           if (/^\\[a-zA-Z]/.test(rest) || /^[0-9{^_]/.test(rest)) {
@@ -531,8 +531,8 @@
     let s = start;
     while (s > 0) {
       const ch = text[s - 1];
-      if (/[0-9.+\-=<>!()[\]|/ ]/.test(ch)) {
-        if (ch === " " && s - 2 >= 0 && !/[0-9.+\-=<>)\\]/.test(text[s - 2])) break;
+      if (/[0-9.+\-=<>!,;:|/ ]/.test(ch)) {
+        if (ch === " " && s - 2 >= 0 && !/[0-9.+\-=<>\\]/.test(text[s - 2])) break;
         s--;
       } else break;
     }
