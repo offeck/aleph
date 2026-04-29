@@ -13,7 +13,9 @@
       "Bash(git branch:*)",
       "WebSearch",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Skill(update-config)",
+      "Bash(curl -sL \"https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js\" -o \"C:/Users/offeck/Downloads/aleph/vendor/katex/katex.min.js\")"
     ]
   }
 }

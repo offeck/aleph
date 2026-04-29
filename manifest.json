@@ -33,7 +33,7 @@
         "https://chat.openai.com/*",
         "https://gemini.google.com/*"
       ],
-      "js": ["content.js"],
+      "js": ["vendor/katex/katex.min.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

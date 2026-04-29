@@ -225,6 +225,7 @@
     focusHideUpgrade: true,
     focusHideChips: true,
     focusHidePromos: true,
+    latexFix: true,
     streamSmooth: true,
     streamAnimation: "platform",
     messageSpacing: 0,
@@ -283,6 +284,7 @@
     if (settings.streamSmooth) count++;
     if (settings.fontFamily || settings.codeFontFamily) count++;
     if (settings.chatWidth > 0) count++;
+    if (settings.latexFix) count++;
     try { chrome.runtime.sendMessage({ type: "badge", count }); } catch (e) {}
   }
 
@@ -350,6 +352,7 @@
     try {
       if (settings.bidiEnabled) patchBidi();
       if (settings.focusMode) applyFocusMode();
+      if (settings.latexFix) patchLatex();
       if (settings.streamSmooth) {
         applyStreamSmooth();
         const anim = settings.streamAnimation || "platform";
@@ -434,6 +437,223 @@
           }
         });
       } catch (e) {}
+    });
+  }
+
+  // ── LaTeX Fixer ────────────────────────────────────────────────────────
+  const LATEX_CMD_RE = /\\(?:frac|int|iint|iiint|oint|sum|prod|coprod|sqrt|leq|geq|neq|cdot|cdots|ldots|ddots|vdots|times|div|pm|mp|circ|ast|star|dagger|ddagger|amalg|cap|cup|uplus|sqcap|sqcup|vee|wedge|oplus|ominus|otimes|oslash|odot|bigcup|bigcap|bigvee|bigwedge|bigoplus|bigotimes|alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|mu|nu|xi|pi|varpi|rho|varrho|sigma|varsigma|tau|upsilon|phi|varphi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|infty|partial|nabla|forall|exists|nexists|neg|lnot|approx|equiv|sim|simeq|cong|propto|subset|supset|subseteq|supseteq|subsetneq|supsetneq|in|notin|ni|rightarrow|leftarrow|Rightarrow|Leftarrow|leftrightarrow|Leftrightarrow|mapsto|implies|iff|to|gets|uparrow|downarrow|lim|limsup|liminf|sin|cos|tan|sec|csc|cot|sinh|cosh|tanh|arcsin|arccos|arctan|log|ln|exp|max|min|sup|inf|det|dim|ker|gcd|deg|hom|arg|binom|dbinom|tbinom|choose|text|textrm|textbf|textit|textsf|texttt|mathrm|mathbf|mathbb|mathcal|mathfrak|mathscr|mathit|mathsf|boldsymbol|overline|underline|widehat|widetilde|overrightarrow|overleftarrow|hat|tilde|bar|vec|dot|ddot|acute|grave|check|breve|not|quad|qquad|left|right|big|Big|bigg|Bigg|langle|rangle|lceil|rceil|lfloor|rfloor|bmod|pmod|operatorname|stackrel|overset|underset|limits|nolimits|displaystyle|textstyle|scriptstyle|color|boxed|cancel|bcancel|xcancel|sout|begin|end|matrix|pmatrix|bmatrix|vmatrix|cases|array|aligned|gathered|split|substack)\b/;
+
+  const DELIMITED_RE = /\$\$([^$]+)\$\$|\$([^$\n]+)\$|\\\((.+?)\\\)|\\\[(.+?)\\\]/g;
+
+  function isInsideSkip(node) {
+    let el = node.parentElement;
+    while (el) {
+      if (el.classList && (
+        el.classList.contains("katex") ||
+        el.classList.contains("katex-display") ||
+        el.classList.contains("katex-html") ||
+        el.classList.contains("katex-mathml")
+      )) return true;
+      const tag = el.tagName;
+      if (tag === "MJX-CONTAINER" || tag === "PRE" || tag === "CODE") return true;
+      if (el.hasAttribute("data-aleph-latex-rendered")) return true;
+      if (tag === "SPAN" && el.closest(".katex")) return true;
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  function isMessageStreaming(msg) {
+    if (PLATFORM === "chatgpt") {
+      return !!(msg.closest(".result-streaming") || msg.querySelector(".result-streaming"));
+    }
+    return false;
+  }
+
+  function extractLatexExpression(text, cmdStart) {
+    let end = cmdStart;
+    const len = text.length;
+    while (end < len) {
+      const ch = text[end];
+      if (ch === "\\") {
+        let cmdEnd = end + 1;
+        while (cmdEnd < len && /[a-zA-Z]/.test(text[cmdEnd])) cmdEnd++;
+        if (cmdEnd > end + 1) {
+          end = cmdEnd;
+          continue;
+        }
+        end = cmdEnd;
+        continue;
+      }
+      if (ch === "{") {
+        let depth = 1;
+        end++;
+        while (end < len && depth > 0) {
+          if (text[end] === "{") depth++;
+          else if (text[end] === "}") depth--;
+          end++;
+        }
+        continue;
+      }
+      if (ch === "^" || ch === "_") { end++; continue; }
+      if (/[0-9.+\-=<>!,;:()[\]|/ ]/.test(ch)) {
+        if (ch === " ") {
+          const rest = text.slice(end + 1);
+          if (/^\\[a-zA-Z]/.test(rest) || /^[0-9{^_]/.test(rest)) {
+            end++;
+            continue;
+          }
+          break;
+        }
+        end++;
+        continue;
+      }
+      if (/[a-zA-Z]/.test(ch)) {
+        const rest = text.slice(end);
+        if (/^[a-zA-Z]+\s*[\\{^_]/.test(rest) || /^[a-zA-Z](?:\s|$)/.test(rest)) {
+          end++;
+          continue;
+        }
+        let wordEnd = end;
+        while (wordEnd < len && /[a-zA-Z]/.test(text[wordEnd])) wordEnd++;
+        if (wordEnd < len && (text[wordEnd] === "{" || text[wordEnd] === "^" || text[wordEnd] === "_" || text[wordEnd] === "\\")) {
+          end = wordEnd;
+          continue;
+        }
+        break;
+      }
+      break;
+    }
+    return end;
+  }
+
+  function expandBackward(text, start) {
+    let s = start;
+    while (s > 0) {
+      const ch = text[s - 1];
+      if (/[0-9.+\-=<>!()[\]|/ ]/.test(ch)) {
+        if (ch === " " && s - 2 >= 0 && !/[0-9.+\-=<>)\\]/.test(text[s - 2])) break;
+        s--;
+      } else break;
+    }
+    while (s < start && text[s] === " ") s++;
+    return s;
+  }
+
+  function findBareLatexRegions(text) {
+    const regions = [];
+    let match;
+    const re = new RegExp(LATEX_CMD_RE.source, "g");
+    while ((match = re.exec(text)) !== null) {
+      let start = match.index;
+      let end = extractLatexExpression(text, start);
+      start = expandBackward(text, start);
+      let latex = text.slice(start, end).trim();
+      if (latex.length <= 1) continue;
+      if (/^\\\w+$/.test(latex) && /^\\(?:n|t|r|s|d|w|b|0)$/.test(latex)) continue;
+      regions.push({ start, end, latex });
+    }
+    const merged = [];
+    for (const r of regions.sort((a, b) => a.start - b.start)) {
+      const last = merged[merged.length - 1];
+      if (last && r.start <= last.end) {
+        last.end = Math.max(last.end, r.end);
+        last.latex = text.slice(last.start, last.end).trim();
+      } else {
+        merged.push({ ...r });
+      }
+    }
+    return merged;
+  }
+
+  function renderLatexInNode(textNode) {
+    const text = textNode.textContent;
+    if (!text || text.trim().length === 0) return;
+
+    const parts = [];
+    let lastIdx = 0;
+    DELIMITED_RE.lastIndex = 0;
+    let dm;
+    while ((dm = DELIMITED_RE.exec(text)) !== null) {
+      if (dm.index > lastIdx) {
+        parts.push({ type: "text", content: text.slice(lastIdx, dm.index) });
+      }
+      const latex = dm[1] || dm[2] || dm[3] || dm[4];
+      const display = !!(dm[1] || dm[4]);
+      parts.push({ type: "latex", latex, display, raw: dm[0] });
+      lastIdx = dm.index + dm[0].length;
+    }
+    if (lastIdx < text.length) {
+      parts.push({ type: "text", content: text.slice(lastIdx) });
+    }
+
+    const finalParts = [];
+    for (const p of parts) {
+      if (p.type === "latex") {
+        finalParts.push(p);
+      } else {
+        const bare = findBareLatexRegions(p.content);
+        if (bare.length === 0) {
+          finalParts.push(p);
+        } else {
+          let idx = 0;
+          for (const b of bare) {
+            if (b.start > idx) {
+              finalParts.push({ type: "text", content: p.content.slice(idx, b.start) });
+            }
+            finalParts.push({ type: "latex", latex: b.latex, display: false, raw: p.content.slice(b.start, b.end) });
+            idx = b.end;
+          }
+          if (idx < p.content.length) {
+            finalParts.push({ type: "text", content: p.content.slice(idx) });
+          }
+        }
+      }
+    }
+
+    if (!finalParts.some(p => p.type === "latex")) return;
+
+    const wrapper = document.createElement("span");
+    wrapper.setAttribute("data-aleph-latex-rendered", "true");
+
+    for (const p of finalParts) {
+      if (p.type === "text") {
+        wrapper.appendChild(document.createTextNode(p.content));
+      } else {
+        const mathSpan = document.createElement("span");
+        try {
+          katex.render(p.latex, mathSpan, {
+            throwOnError: true,
+            displayMode: p.display,
+            output: "html",
+          });
+          wrapper.appendChild(mathSpan);
+        } catch (e) {
+          wrapper.appendChild(document.createTextNode(p.raw));
+        }
+      }
+    }
+
+    textNode.parentNode.replaceChild(wrapper, textNode);
+  }
+
+  function patchLatex() {
+    if (typeof katex === "undefined" || !settings.latexFix) return;
+    const messageSel = SEL.message.join(", ");
+    document.querySelectorAll(messageSel).forEach((msg) => {
+      if (isMessageStreaming(msg)) return;
+      const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      let node;
+      while ((node = walker.nextNode())) {
+        if (isInsideSkip(node)) continue;
+        const txt = node.textContent;
+        if (!txt || txt.trim().length === 0) continue;
+        if (LATEX_CMD_RE.test(txt) || /\$[^$]+\$/.test(txt) || /\\\(/.test(txt) || /\\\[/.test(txt)) {
+          nodes.push(node);
+        }
+      }
+      nodes.forEach(renderLatexInNode);
     });
   }
 

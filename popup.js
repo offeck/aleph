@@ -21,6 +21,7 @@
     focusHideUpgrade: true,
     focusHideChips: true,
     focusHidePromos: true,
+    latexFix: true,
     streamSmooth: true,
     streamAnimation: "platform",
     messageSpacing: 0,
@@ -42,7 +43,7 @@
 
   const CHECKBOXES = [
     "bidiEnabled", "enableClaude", "enableChatgpt", "enableGemini",
-    "focusMode", "streamSmooth",
+    "focusMode", "latexFix", "streamSmooth",
     "focusHideUpgrade", "focusHideChips", "focusHidePromos",
   ];
   const SELECTS = ["fontFamily", "codeFontFamily", "streamAnimation", "themeClaude", "themeChatgpt", "themeGemini"];
