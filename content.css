@@ -56,6 +56,20 @@ mjx-container[display="true"], .math-display {
   text-align: left !important;
 }
 
+/* Paragraph-level RTL: use embed so direction:rtl is respected as the base
+   direction. plaintext (the default above) picks direction from the first
+   strong character, which breaks paragraphs that start with LTR text like
+   "NP-completeness" but are predominantly Hebrew. */
+p[data-aleph-rtl="true"],
+li[data-aleph-rtl="true"],
+h1[data-aleph-rtl="true"],
+h2[data-aleph-rtl="true"],
+h3[data-aleph-rtl="true"],
+h4[data-aleph-rtl="true"],
+blockquote[data-aleph-rtl="true"] {
+  unicode-bidi: embed !important;
+}
+
 /* RTL lists */
 ul:has(> [data-aleph-rtl="true"]),
 ol:has(> [data-aleph-rtl="true"]) {
