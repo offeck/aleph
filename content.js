@@ -343,6 +343,77 @@
     return false;
   }
 
+  // ── Markdown Fixer ──────────────────────────────────────────────────────
+  const MD_RE = /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*([^*\s][^*]*?[^*\s])\*|\*([^*\s])\*/g;
+
+  function patchMarkdown() {
+    const messageSel = SEL.message.join(", ");
+    document.querySelectorAll(messageSel).forEach((msg) => {
+      const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      let node;
+      while ((node = walker.nextNode())) {
+        const el = node.parentElement;
+        if (!el) continue;
+        if (el.closest("code, pre, style, script, .katex, .katex-display, mjx-container, [data-aleph-md-fixed]")) continue;
+        if (el.tagName === "STRONG" || el.tagName === "EM" || el.tagName === "STYLE" || el.tagName === "SCRIPT") continue;
+        const txt = node.textContent;
+        if (txt && /\*{1,3}[^*]+\*{1,3}/.test(txt)) {
+          nodes.push(node);
+        }
+      }
+      nodes.forEach(fixMarkdownInNode);
+    });
+  }
+
+  function fixMarkdownInNode(textNode) {
+    const text = textNode.textContent;
+    if (!text) return;
+    MD_RE.lastIndex = 0;
+    let match;
+    const regions = [];
+    while ((match = MD_RE.exec(text)) !== null) {
+      if (match[1] !== undefined) {
+        regions.push({ start: match.index, end: match.index + match[0].length, content: match[1], type: "bolditalic" });
+      } else if (match[2] !== undefined) {
+        regions.push({ start: match.index, end: match.index + match[0].length, content: match[2], type: "bold" });
+      } else {
+        const content = match[3] !== undefined ? match[3] : match[4];
+        regions.push({ start: match.index, end: match.index + match[0].length, content, type: "italic" });
+      }
+    }
+    if (regions.length === 0) return;
+
+    const wrapper = document.createElement("span");
+    wrapper.setAttribute("data-aleph-md-fixed", "true");
+    let lastEnd = 0;
+    for (const r of regions) {
+      if (r.start > lastEnd) {
+        wrapper.appendChild(document.createTextNode(text.slice(lastEnd, r.start)));
+      }
+      if (r.type === "bolditalic") {
+        const strong = document.createElement("strong");
+        const em = document.createElement("em");
+        em.textContent = r.content;
+        strong.appendChild(em);
+        wrapper.appendChild(strong);
+      } else if (r.type === "bold") {
+        const strong = document.createElement("strong");
+        strong.textContent = r.content;
+        wrapper.appendChild(strong);
+      } else {
+        const em = document.createElement("em");
+        em.textContent = r.content;
+        wrapper.appendChild(em);
+      }
+      lastEnd = r.end;
+    }
+    if (lastEnd < text.length) {
+      wrapper.appendChild(document.createTextNode(text.slice(lastEnd)));
+    }
+    textNode.parentNode.replaceChild(wrapper, textNode);
+  }
+
   // ── BiDi Patcher ───────────────────────────────────────────────────────
   let patching = false;
 
@@ -353,6 +424,7 @@
       if (settings.bidiEnabled) patchBidi();
       if (settings.focusMode) applyFocusMode();
       if (settings.latexFix) patchLatex();
+      patchMarkdown();
       if (settings.streamSmooth) {
         applyStreamSmooth();
         const anim = settings.streamAnimation || "platform";
@@ -653,6 +725,8 @@
     let dm;
     while ((dm = DELIMITED_RE.exec(text)) !== null) {
       const latex = dm[1] || dm[2] || dm[3] || dm[4];
+      if (HEB.test(latex)) continue;
+      if (dm[2] !== undefined && !/[\\{}^_]/.test(dm[2])) continue;
       const display = !!(dm[1] || dm[4]);
       regions.push({ start: dm.index, end: dm.index + dm[0].length, latex, display });
     }
@@ -689,6 +763,13 @@
         wrapper.appendChild(document.createTextNode(text.slice(lastEnd, region.start)));
       }
 
+      const regionText = text.slice(region.start, region.end);
+      if (HEB.test(regionText)) {
+        wrapper.appendChild(document.createTextNode(regionText));
+        lastEnd = region.end;
+        continue;
+      }
+
       let mathText = region.latex;
       mathText = mathText.replace(/^\$\$([\s\S]*)\$\$$/, "$1");
       mathText = mathText.replace(/^\$([^$]*)\$$/, "$1");
@@ -707,7 +788,9 @@
           output: "html",
         });
       } catch (e) {
-        ltrSpan.textContent = region.latex;
+        wrapper.appendChild(document.createTextNode(regionText));
+        lastEnd = region.end;
+        continue;
       }
 
       wrapper.appendChild(ltrSpan);

@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "lastBackfill": "2026-05-07",
+  "sessions": [
+    {
+      "id": "claude-bidi-math-001",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/ccc0d6dd-3925-4ee0-be07-681aa69413e8",
+      "description": "Hebrew math content (splitting real integrals). Inline LaTeX in Hebrew bullet points showed raw code instead of rendered math.",
+      "category": "bidi-math",
+      "precedingMessage": "the latex in claude doesnt compile correctly sometimes",
+      "checks": ["rtl-direction", "math-ltr-isolation", "latex-rendered", "no-console-errors"],
+      "source": "backfill:82847070",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    },
+    {
+      "id": "claude-bidi-math-002",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/503afebb-7775-4fda-9056-a34290a46974",
+      "description": "Hebrew math (Jacobian matrix, Question 4b). dxdy renders on wrong side, parenthesized ranges not rendered, integral symbol problematic, comma-semicolon artifacts.",
+      "category": "bidi-math",
+      "precedingMessage": "The dxdy should on the left instead of on the right",
+      "checks": ["rtl-direction", "math-ltr-isolation", "latex-rendered", "no-console-errors"],
+      "source": "backfill:82847070",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    },
+    {
+      "id": "claude-latex-001",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/93741b2d-7dd3-4343-9c0c-d25f07e80706",
+      "description": "Hebrew financial text with dollar amounts and stock tickers. LaTeX fixer treated currency $ as math delimiters, garbling Hebrew text and stripping dollar signs.",
+      "category": "latex-rendering",
+      "precedingMessage": "the hebrew text with the numbers looks fumbled",
+      "checks": ["rtl-direction", "latex-rendered", "no-console-errors"],
+      "source": "backfill:61196eb7",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    },
+    {
+      "id": "claude-bidi-math-003",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/28c4542e-86d1-4c2a-b49c-4d73f2966fd9",
+      "description": "Hebrew math (derivatives, continuity, integrability). Used for regression testing of LaTeX fixer and BiDi math isolation.",
+      "category": "bidi-math",
+      "checks": ["rtl-direction", "math-ltr-isolation", "latex-rendered", "no-console-errors"],
+      "source": "backfill:61196eb7",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    },
+    {
+      "id": "claude-bidi-text-001",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/8623be72-91bc-4d7e-a412-415c37fa1d67",
+      "description": "Hebrew computer science topics list. Item 10 (NP-completeness) rendered LTR because unicode-bidi:plaintext picked English 'N' as first strong character.",
+      "category": "bidi-text",
+      "precedingMessage": "Please check why 10 shows incorrectly (ltr)",
+      "checks": ["rtl-direction", "no-console-errors"],
+      "source": "backfill:13f565e1",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    },
+    {
+      "id": "claude-bidi-text-002",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/fd656f57-6ef2-4f57-a698-5f9c199e8498",
+      "description": "Hebrew exam material analysis. Used for regression testing of RTL paragraph-level unicode-bidi:embed fix.",
+      "category": "bidi-text",
+      "checks": ["rtl-direction", "no-console-errors"],
+      "source": "backfill:13f565e1",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    },
+    {
+      "id": "claude-general-001",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/67e054e9-b336-48b3-8684-ca02c794dd98",
+      "description": "Navigated during LaTeX fix session for cross-conversation testing. Verify extension injects and runs without errors.",
+      "category": "general",
+      "checks": ["rtl-direction", "selectors-match", "no-console-errors"],
+      "source": "backfill:82847070",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    },
+    {
+      "id": "chatgpt-theme-001",
+      "platform": "chatgpt",
+      "url": "https://chatgpt.com/c/69efc59b-dbec-83eb-9061-16d1951e435d",
+      "description": "ChatGPT conversation used to verify updated theme selectors (bg-token-bg-primary, sidebar, thread). Confirmed selector matches after DOM changes.",
+      "category": "theme",
+      "checks": ["selectors-match", "theme-applied", "rtl-direction", "no-console-errors"],
+      "source": "backfill:82847070",
+      "addedAt": "2026-05-07",
+      "status": "active"
+    }
+  ]
+}

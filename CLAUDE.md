@@ -1,5 +1,63 @@
 # Aleph — AI Chat Styler
 
+## Development Guidelines
+
+### 1. Restate Before Acting
+- Before implementing, restate the request back to confirm understanding
+- If multiple interpretations exist, present them — don't pick silently
+- If something is unclear, stop and ask rather than guess
+- State your assumptions explicitly so they can be corrected early
+
+### 2. Search Before Building
+- Before writing new code, search the codebase for existing utilities, patterns, or similar implementations
+- Aleph already has shared patterns (platform detection, selector sets, `applyStyles()`, `patchAll()`) — use them
+- Don't reimplement what already exists in a different form
+- Check `SELECTORS[platform]` before hardcoding selectors; check `THEMES` before adding color logic
+
+### 3. Generalized Solutions Only
+- Every fix must address the root cause, not just the visible symptom
+- Never monkey-patch or write a fix that only covers one occurrence of a general problem
+- Before implementing, ask: "Will this fix ALL instances of this class of bug, or just the one I'm looking at?"
+- If a pattern appears in multiple places, fix the shared function — not each call site individually
+- If a selector breaks on one platform, check whether the same class of selector is fragile on other platforms too
+
+### 4. Simplicity First
+- Minimum code that solves the problem — nothing speculative
+- No features, abstractions, or "flexibility" beyond what was asked
+- If 200 lines could be 50, rewrite it
+- Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify
+
+### 5. Surgical Changes
+- Only modify what the task requires — don't "improve" adjacent code, comments, or formatting
+- Match existing code style even if you'd do it differently
+- Remove only dead code that YOUR changes created, not pre-existing dead code
+- Every changed line should trace directly to the request
+- Don't refactor things that aren't broken
+
+### 6. Verify Everything — No Regressions
+This extension has tightly interconnected features (BiDi, themes, focus mode, streaming, fonts, chat width). A change to one can silently break others.
+
+Before reporting any change as complete:
+1. **Reproduce first**: If fixing a bug, confirm you can reproduce it before changing code
+2. **Verify the fix**: Confirm the specific change works as intended
+3. **Check for console errors**: Load the extension and confirm no errors in the console
+4. **Cross-platform check**: If the change touches shared code or `content.js`/`content.css`, test on all affected platforms (Claude, ChatGPT, Gemini)
+5. **Regression sweep**: Spot-check related features:
+   - Touched styling/themes → verify themes still apply correctly
+   - Touched the MutationObserver or `patchAll()` → verify BiDi detection still fires
+   - Touched selectors → verify focus mode still hides elements
+   - Touched `applyStyles()` → verify typography, code blocks, chat width still work
+6. **State what wasn't tested**: If you can't verify something (e.g., no browser access), explicitly say so — never assume a change is safe
+
+### 7. Goal-Driven Execution
+- Transform tasks into verifiable success criteria before starting
+- For multi-step tasks, state a brief plan with verification steps:
+  ```
+  1. [Step] → verify: [check]
+  2. [Step] → verify: [check]
+  ```
+- Loop until verified — don't report done based on assumption
+
 ## Project Overview
 
 Chrome extension (Manifest V3) that provides Hebrew BiDi text fixing, custom themes, focus mode, streaming smoothing, and consistent typography/layout styling across Claude, ChatGPT, and Gemini.
@@ -13,6 +71,7 @@ Chrome extension (Manifest V3) that provides Hebrew BiDi text fixing, custom the
 - `content.js` — Main content script. Platform detection, BiDi engine, theme injection, focus mode, streaming smoothing, font loading, color-scheme, style injector. Runs at `document_idle`.
 - `content.css` — Static CSS rules for BiDi, streaming animations, focus mode hiding, theme transitions, platform-specific structural fixes
 - `popup.html` / `popup.css` / `popup.js` — Settings popup UI with toggle switches, theme grid, per-platform theme overrides, focus mode categories, range sliders, export/import
+- `tests/sessions.json` — Visual regression test registry. Stores known problematic chat sessions with platform, URL, bug description, and checks to run.
 
 ## Key Patterns
 
@@ -65,6 +124,54 @@ Hides upgrade banners, promos, and UI clutter via `data-aleph-hidden` attribute 
 - Claude on paid plans has no upgrade elements to hide (expected behavior)
 - Gemini suggestion chips use `<intent-card>` custom elements inside `.card-container`
 - Gemini uses TrustedHTML policy — cannot set innerHTML from page context, use Quill API or insertText
+
+## Test Registry
+
+`tests/sessions.json` tracks known problematic chat sessions for visual regression testing. Each entry has a platform, URL, bug description, category, and an array of checks to run.
+
+**Auto-update**: When you discover or fix a visual bug during a conversation:
+1. Read `tests/sessions.json`
+2. If discovering a new bug: add an entry with the session URL, platform, category, description, and checks
+3. If fixing a known bug: update its `status` to `"fixed"`
+4. Write the updated file
+
+**Valid check IDs**: `rtl-direction`, `math-ltr-isolation`, `no-console-errors`, `latex-rendered`, `theme-applied`, `focus-hidden`, `streaming-attrs`, `selectors-match`
+
+**Valid categories**: `bidi-text`, `bidi-math`, `latex-rendering`, `theme`, `streaming`, `focus-mode`, `selector-breakage`, `general`
+
+## Pre-Push Regression Tests
+
+When the user asks to push commits:
+
+1. Read `tests/sessions.json` and collect all entries with `"status": "active"`
+2. For each entry, grouped by platform:
+   a. Navigate to the session URL via `mcp__claude-in-chrome__navigate`
+   b. Wait ~5 seconds for page load + extension initialization (patchAll runs at 0ms, 1.5s, then every 3s)
+   c. Verify the URL loaded correctly (not redirected to login/404)
+   d. Run each check from the entry's `checks` array using `mcp__claude-in-chrome__javascript_tool`
+   e. Read console messages for Aleph errors via `mcp__claude-in-chrome__read_console_messages`
+   f. Record pass/fail per check
+3. Report summary:
+   - If ALL pass: proceed with `git push`
+   - If ANY fail: report which sessions/checks failed, ask user whether to push anyway or investigate
+
+### Check implementations
+
+**`rtl-direction`** — Verify Hebrew elements have `data-aleph-rtl="true"` and computed `direction: rtl`. Also check for missed Hebrew elements without the attribute, scoped to message containers only (not sidebar/navigation). Use `SELECTORS[platform].message` to find containers.
+
+**`math-ltr-isolation`** — Verify `.katex` and `mjx-container` elements maintain `direction: ltr` inside RTL containers.
+
+**`no-console-errors`** — Use `read_console_messages` with pattern `Aleph|aleph` at error level.
+
+**`latex-rendered`** — Verify `.katex` elements exist and no `.katex-error` spans are present.
+
+**`theme-applied`** — When `data-aleph-theme` is set, verify `--aleph-bg`, `--aleph-text`, `--aleph-accent`, `--aleph-border` CSS custom properties are present.
+
+**`focus-hidden`** — Verify `[data-aleph-hidden]` elements have `display: none`.
+
+**`streaming-attrs`** — Verify `data-aleph-stream-enabled` and `data-aleph-stream-anim` attributes on `<html>`.
+
+**`selectors-match`** — Verify `[data-aleph-platform]`, `[data-aleph-rtl]`, `[data-aleph-theme]` selectors find DOM elements.
 
 ## Common Tasks
 
