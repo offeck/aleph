@@ -253,20 +253,27 @@
     return { plan: model && /opus/i.test(model) ? "pro" : "free", model };
   }
 
-  // ChatGPT: primary detection via /backend-api/accounts/check (session cookie only).
-  // Returns subscription_plan like "chatgptplusplan", "chatgptproplan", "chatgptguestplan".
+  // ChatGPT: detect plan via accounts API + models API cross-check.
   let chatgptApiPlan = null;
   function detectChatgptViaApi() {
     if (chatgptApiPlan) return;
-    fetch("/backend-api/accounts/check/v4-2023-04-27", { credentials: "same-origin" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        const sub = data?.accounts?.default?.entitlement?.subscription_plan || "";
-        if (/plusplan/i.test(sub)) chatgptApiPlan = "plus";
-        else if (/proplan/i.test(sub)) chatgptApiPlan = "pro";
-        else chatgptApiPlan = "free";
-      })
-      .catch(() => {});
+    Promise.all([
+      fetch("/backend-api/accounts/check/v4-2023-04-27", { credentials: "same-origin" })
+        .then((r) => r.ok ? r.json() : null).catch(() => null),
+      fetch("/backend-api/models", { credentials: "same-origin" })
+        .then((r) => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([acctData, modelsData]) => {
+      const sub = acctData?.accounts?.default?.entitlement?.subscription_plan || "";
+      if (/plusplan/i.test(sub)) { chatgptApiPlan = "plus"; return; }
+      if (/proplan/i.test(sub)) { chatgptApiPlan = "pro"; return; }
+
+      const slugs = modelsData?.models?.map((m) => m.slug) || [];
+      const hasPro = slugs.some((s) => /^o[1-9]|^gpt-5-[2-9]|^gpt-5-[0-9]{2}/.test(s));
+      const hasPlus = slugs.some((s) => /^gpt-5$|^gpt-5-1$/.test(s));
+      if (hasPro) chatgptApiPlan = "pro";
+      else if (hasPlus) chatgptApiPlan = "plus";
+      else chatgptApiPlan = "free";
+    }).catch(() => {});
   }
 
   function detectChatgpt() {
@@ -354,6 +361,48 @@
     } catch (e) {}
   }
 
+  // ── Model capabilities enrichment ──────────────────────
+  // Fetches available models + capabilities from each platform's API.
+  let capabilitiesFetched = false;
+  function pollModelCapabilities() {
+    if (capabilitiesFetched) return;
+    capabilitiesFetched = true;
+    try {
+      if (PLATFORM === "claude") {
+        const cookies = document.cookie.split(";").reduce((a, c) => {
+          const [k, ...v] = c.trim().split("="); a[k] = v.join("="); return a;
+        }, {});
+        const orgId = cookies["lastActiveOrg"];
+        if (!orgId) return;
+        const modelBtn = document.querySelector('[data-testid="model-selector-dropdown"]');
+        const ariaLabel = modelBtn?.getAttribute("aria-label") || "";
+        const modelSlug = ariaLabel.replace(/^Model:\s*/i, "").trim().toLowerCase().replace(/\s+/g, "-");
+        const apiSlug = "claude-" + modelSlug.replace(/extended$/i, "").replace(/-$/, "").replace(/\./g, "-");
+        fetch("/api/organizations/" + orgId + "/model_configs/" + apiSlug, { credentials: "same-origin" })
+          .then((r) => r.ok ? r.json() : null)
+          .then((cfg) => {
+            if (!cfg) return;
+            send({ type: "insights-model-caps", platform: "claude", caps: {
+              apiModel: cfg.api_model, maxTokens: cfg.max_tokens_cap,
+              imageIn: cfg.image_in, pdfIn: cfg.pdf_in,
+            }});
+          }).catch(() => {});
+      }
+      if (PLATFORM === "chatgpt") {
+        fetch("/backend-api/models?iim=false&is_gizmo=false", { credentials: "same-origin" })
+          .then((r) => r.ok ? r.json() : null)
+          .then((data) => {
+            if (!data?.models) return;
+            const models = data.models.map((m) => ({
+              slug: m.slug, title: m.title, maxTokens: m.max_tokens,
+              tools: m.enabled_tools,
+            }));
+            send({ type: "insights-model-caps", platform: "chatgpt", caps: { availableModels: models } });
+          }).catch(() => {});
+      }
+    } catch (e) {}
+  }
+
   // ── Claude real usage polling ────────────────────────────
   // Fetches /api/organizations/{orgId}/usage with session cookie (no API key).
   // Returns real utilization percentages and reset times.
@@ -422,11 +471,26 @@
   }
 
   // ── Gemini real usage polling ───────────────────────────
-  // Fetches qpEbW RPC which returns per-feature quota table:
-  // [[category, feature_id, ?], status, ?, [reset_ts_s, reset_ts_ns], limit, remaining]
+  // Fetches qpEbW RPC which returns per-feature quota table.
+  // WIZ_global_data lives in page context (MAIN world), but content scripts
+  // run in ISOLATED world — so we extract the values from <script> tags in the DOM.
+  function getGeminiSessionData() {
+    const scripts = document.querySelectorAll("script");
+    let sid = "", at = "";
+    for (const s of scripts) {
+      const text = s.textContent || "";
+      if (!text.includes("WIZ_global_data")) continue;
+      const sidMatch = text.match(/FdrFJe["']?\s*[:=]\s*["']([^"']+)["']/);
+      const atMatch = text.match(/SNlM0e["']?\s*[:=]\s*["']([^"']+)["']/);
+      if (sidMatch) sid = sidMatch[1];
+      if (atMatch) at = atMatch[1];
+      break;
+    }
+    return { sid, at };
+  }
+
   function pollGeminiUsage() {
-    const sid = window.WIZ_global_data?.FdrFJe || "";
-    const at = window.WIZ_global_data?.SNlM0e || "";
+    const { sid, at } = getGeminiSessionData();
     if (!sid) return;
     const body = new URLSearchParams();
     body.append("f.req", JSON.stringify([[["qpEbW", "[]", null, "generic"]]]));
@@ -448,6 +512,19 @@
         try { quotas = JSON.parse(dataStr); } catch (e) { return; }
         if (!Array.isArray(quotas) || !Array.isArray(quotas[0])) return;
 
+        // Gemini feature IDs mapped via empirical testing:
+        // - Feature 4 CONFIRMED: decrements by 1 per "Pro" mode message (limit 25 for AI Pro)
+        // - Flash mode: no quota consumed (unlimited for Pro users)
+        // - Feature 15: likely "Deep/Thinking" mode (limit 80)
+        // Other features mapped by limit magnitude vs Google's published quotas.
+        const GEMINI_FEATURE_NAMES = {
+          4: "Pro 3.1", 15: "Thinking", 25: "Chat", 7: "Flash",
+          13: "Extended", 16: "Agent", 9: "Images", 21: "Image Edit",
+          17: "Music 30s", 24: "Screen", 26: "Audio", 14: "Slides",
+          19: "Music Full", 8: "Notebook", 11: "Live",
+          3: "Video Pro", 18: "Video", 5: "Video Lite", 12: "Ultra Only",
+        };
+
         const features = [];
         for (const q of quotas[0]) {
           if (!Array.isArray(q) || q.length < 6) continue;
@@ -456,9 +533,14 @@
           const limit = q[4];
           const remaining = q[5];
           if (typeof limit !== "number" || typeof remaining !== "number") continue;
-          features.push({ id: featureId, limit, remaining, resetsAt: resetTs ? new Date(resetTs * 1000).toISOString() : null });
+          if (limit === 0) continue;
+          features.push({
+            id: featureId,
+            name: GEMINI_FEATURE_NAMES[featureId] || "Feature " + featureId,
+            limit, remaining,
+            resetsAt: resetTs ? new Date(resetTs * 1000).toISOString() : null,
+          });
         }
-        // Find the main chat feature — the one with the highest limit (typically 1000 for Pro)
         features.sort((a, b) => b.limit - a.limit);
         send({
           type: "insights-usage", platform: "gemini",
@@ -476,6 +558,7 @@
     detectSubscription();
     markExistingMessages();
     startMessageObserver();
+    pollModelCapabilities();
     if (PLATFORM === "claude") pollClaudeUsage();
     if (PLATFORM === "chatgpt") pollChatgptUsage();
     if (PLATFORM === "gemini") pollGeminiUsage();
