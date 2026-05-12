@@ -974,6 +974,12 @@
         background-color: var(--aleph-bg) !important;
       }\n`;
 
+      if (PLATFORM === "gemini") {
+        css += `[data-aleph-theme] body, [data-aleph-theme] main.chat-app {
+          background-image: linear-gradient(var(--aleph-bg), var(--aleph-bg)) !important;
+        }\n`;
+      }
+
       css += `${buildThemeSelector("", SEL.themeSidebar)} {
         background-color: var(--aleph-bg2) !important;
         border-color: var(--aleph-border) !important;

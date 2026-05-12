@@ -9,41 +9,71 @@
     <div class="logo">&#x05D0;</div>
     <div>
       <h1>Aleph</h1>
-      <p class="subtitle">AI Chat Styler v2.4.0</p>
+      <p class="subtitle">AI Chat Styler</p>
     </div>
+    <button id="settingsBtn" class="icon-btn" title="Settings">&#x2699;</button>
   </header>
 
-  <!-- Platforms -->
+  <!-- ── Insights Zone ─────────────────────────────────────────── -->
+  <section class="insights-zone" id="insightsZone">
+
+    <div class="insight-card" id="spendCard">
+      <h2>Monthly Spend</h2>
+      <div class="spend-amount" id="spendAmount">$0</div>
+      <div class="spend-breakdown" id="spendBreakdown">
+        <span class="spend-item claude"><span class="dot"></span>Detecting...</span>
+      </div>
+    </div>
+
+    <div class="insight-card" id="todayCard">
+      <h2>Today</h2>
+      <div class="today-stats">
+        <span class="stat"><strong id="todayTime">0m</strong> time</span>
+        <span class="stat"><strong id="todayMsgs">0</strong> msgs</span>
+        <span class="stat"><strong id="todayTokens">~0</strong> tokens</span>
+      </div>
+      <div class="time-bar" id="todayTimeBar"></div>
+    </div>
+
+    <div class="insight-card" id="weekCard">
+      <div class="insight-card-header">
+        <h2>This Week</h2>
+        <span class="trend-badge" id="weekTrend"></span>
+      </div>
+      <div class="sparkline" id="weekSparkline"></div>
+      <div class="spark-footer">
+        <span class="spark-total" id="weekTotal">0h total</span>
+        <span class="spark-labels">
+          <span class="spark-label-dot claude"></span>Claude
+          <span class="spark-label-dot chatgpt"></span>GPT
+          <span class="spark-label-dot gemini"></span>Gemini
+        </span>
+      </div>
+    </div>
+
+    <div class="insight-card" id="tokenCard">
+      <div class="insight-card-header">
+        <h2>Tokens</h2>
+        <span class="trend-badge" id="tokenTrend"></span>
+      </div>
+      <div class="sparkline" id="tokenSparkline"></div>
+      <span class="spark-total" id="tokenTotal">~0 total</span>
+    </div>
+
+    <p class="remark" id="remark">Open an AI chat to start tracking</p>
+    <button id="dashboardBtn" class="dashboard-btn">View Full Dashboard &rarr;</button>
+  </section>
+
+  <!-- ── Controls Zone ─────────────────────────────────────────── -->
   <section>
-    <h2>Platforms</h2>
+    <h2>Focus Mode</h2>
     <label class="toggle-row">
-      <span>Claude</span>
-      <input type="checkbox" id="enableClaude" checked>
-      <span class="toggle"></span>
-    </label>
-    <label class="toggle-row">
-      <span>ChatGPT</span>
-      <input type="checkbox" id="enableChatgpt" checked>
-      <span class="toggle"></span>
-    </label>
-    <label class="toggle-row">
-      <span>Gemini</span>
-      <input type="checkbox" id="enableGemini" checked>
+      <span>Hide distractions</span>
+      <input type="checkbox" id="focusMode">
       <span class="toggle"></span>
     </label>
   </section>
 
-  <!-- BiDi -->
-  <section>
-    <h2>Hebrew BiDi</h2>
-    <label class="toggle-row">
-      <span>Auto-detect & fix RTL</span>
-      <input type="checkbox" id="bidiEnabled" checked>
-      <span class="toggle"></span>
-    </label>
-  </section>
-
-  <!-- Theme -->
   <section>
     <h2>Theme</h2>
     <div class="theme-grid" id="themeGrid">
@@ -108,86 +138,15 @@
         <span>GitHub</span>
       </button>
     </div>
-
-    <div class="theme-overrides" id="themeOverrides">
-      <p class="hint">Per-platform override (leave Default to use global)</p>
-      <label class="field compact">
-        <span>Claude</span>
-        <select id="themeClaude"><option value="">Default</option></select>
-      </label>
-      <label class="field compact">
-        <span>ChatGPT</span>
-        <select id="themeChatgpt"><option value="">Default</option></select>
-      </label>
-      <label class="field compact">
-        <span>Gemini</span>
-        <select id="themeGemini"><option value="">Default</option></select>
-      </label>
-    </div>
-  </section>
-
-  <!-- Focus & Streaming -->
-  <section>
-    <h2>Experience</h2>
-    <label class="toggle-row">
-      <span>Focus mode</span>
-      <input type="checkbox" id="focusMode">
-      <span class="toggle"></span>
-    </label>
-    <div class="focus-categories" id="focusCategories">
-      <label class="toggle-row sub-toggle">
-        <span>Upgrade banners</span>
-        <input type="checkbox" id="focusHideUpgrade" checked>
-        <span class="toggle small"></span>
-      </label>
-      <label class="toggle-row sub-toggle">
-        <span>Suggestion chips</span>
-        <input type="checkbox" id="focusHideChips" checked>
-        <span class="toggle small"></span>
-      </label>
-      <label class="toggle-row sub-toggle">
-        <span>Promos & clutter</span>
-        <input type="checkbox" id="focusHidePromos" checked>
-        <span class="toggle small"></span>
-      </label>
-    </div>
-
-    <label class="toggle-row">
-      <span>Fix broken LaTeX</span>
-      <input type="checkbox" id="latexFix" checked>
-      <span class="toggle"></span>
-    </label>
-    <p class="hint">Re-render inline math that platforms fail to display</p>
-
-    <label class="toggle-row">
-      <span>Smooth streaming</span>
-      <input type="checkbox" id="streamSmooth" checked>
-      <span class="toggle"></span>
-    </label>
-    <p class="hint">Custom animation for streamed responses (hides platform default)</p>
-
-    <label class="field" id="streamAnimField">
-      <span>Animation style</span>
-      <select id="streamAnimation">
-        <option value="platform">Platform Default</option>
-        <option value="fadeIn">Fade In</option>
-        <option value="typewriter">Typewriter</option>
-        <option value="slideUp">Slide Up</option>
-        <option value="glow">Glow</option>
-        <option value="blur">Blur</option>
-        <option value="scale">Scale</option>
-        <option value="elastic">Elastic</option>
-        <option value="highlight">Highlight</option>
-        <option value="cascade">Cascade</option>
-        <option value="none">None (suppress default only)</option>
-      </select>
+    <label class="toggle-row compact" id="themePlatformRow" style="display:none">
+      <span>Apply only to <strong id="currentPlatformName"></strong></span>
+      <input type="checkbox" id="themeApplyLocal">
+      <span class="toggle small"></span>
     </label>
   </section>
 
-  <!-- Typography -->
   <section>
     <h2>Typography</h2>
-
     <label class="field">
       <span>Font family</span>
       <select id="fontFamily">
@@ -202,66 +161,27 @@
         <option value="Segoe UI">Segoe UI</option>
       </select>
     </label>
-
     <label class="field">
-      <span>Font size <output id="fontSizeVal">—</output></span>
+      <span>Font size <output id="fontSizeVal">default</output></span>
       <input type="range" id="fontSize" min="0" max="24" step="1" value="0">
     </label>
-
-    <label class="field">
-      <span>Line height <output id="lineHeightVal">—</output></span>
-      <input type="range" id="lineHeight" min="0" max="2.4" step="0.1" value="0">
-    </label>
-
-    <label class="field">
-      <span>Paragraph spacing <output id="paragraphSpacingVal">—</output></span>
-      <input type="range" id="paragraphSpacing" min="0" max="32" step="2" value="0">
-    </label>
   </section>
 
-  <!-- Code -->
   <section>
-    <h2>Code Blocks</h2>
-
-    <label class="field">
-      <span>Code font</span>
-      <select id="codeFontFamily">
-        <option value="">Default (no override)</option>
-        <option value="Fira Code">Fira Code</option>
-        <option value="JetBrains Mono">JetBrains Mono</option>
-        <option value="Cascadia Code">Cascadia Code</option>
-        <option value="Consolas">Consolas</option>
-        <option value="Source Code Pro">Source Code Pro</option>
-        <option value="IBM Plex Mono">IBM Plex Mono</option>
-      </select>
-    </label>
-
-    <label class="field">
-      <span>Code font size <output id="codeFontSizeVal">—</output></span>
-      <input type="range" id="codeFontSize" min="0" max="22" step="1" value="0">
-    </label>
-  </section>
-
-  <!-- Layout -->
-  <section>
-    <h2>Layout</h2>
-    <label class="field">
-      <span>Chat width <output id="chatWidthVal">—</output></span>
-      <input type="range" id="chatWidth" min="0" max="1600" step="50" value="0">
-    </label>
-
-    <label class="field">
-      <span>Message spacing <output id="messageSpacingVal">—</output></span>
-      <input type="range" id="messageSpacing" min="0" max="48" step="4" value="0">
-    </label>
+    <h2>Platforms</h2>
+    <div class="platform-chips" id="platformChips">
+      <button class="chip active" data-platform="claude" data-key="enableClaude">Claude</button>
+      <button class="chip active" data-platform="chatgpt" data-key="enableChatgpt">ChatGPT</button>
+      <button class="chip active" data-platform="gemini" data-key="enableGemini">Gemini</button>
+    </div>
   </section>
 
   <footer>
     <div class="footer-row">
+      <button id="settingsBtn2" title="Advanced settings">&#x2699; Settings</button>
       <button id="exportBtn" title="Export settings as JSON">Export</button>
       <button id="importBtn" title="Import settings from JSON">Import</button>
     </div>
-    <button id="resetBtn">Reset to defaults</button>
     <input type="file" id="importFile" accept=".json" style="display:none">
     <p class="hint footer-hint">Alt+Shift+A to toggle on/off</p>
   </footer>

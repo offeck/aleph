@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aleph Insights</title>
+  <link rel="stylesheet" href="insights.css">
+</head>
+<body>
+
+  <header>
+    <div class="logo">&#x05D0;</div>
+    <h1>Insights Dashboard</h1>
+  </header>
+
+  <!-- ── Subscriptions ─────────────────────────────────────────── -->
+  <section id="subscriptions">
+    <h2>Subscriptions</h2>
+    <div class="sub-cards">
+      <div class="sub-card" id="subClaude">
+        <div class="sub-platform">Claude</div>
+        <span class="plan-badge">Detecting...</span>
+        <div class="sub-price"></div>
+        <div class="model-name"></div>
+        <div class="sub-tokens">
+          <span class="tokens-in">0 in</span>
+          <span class="tokens-out">0 out</span>
+        </div>
+      </div>
+      <div class="sub-card" id="subChatgpt">
+        <div class="sub-platform">ChatGPT</div>
+        <span class="plan-badge">Detecting...</span>
+        <div class="sub-price"></div>
+        <div class="model-name"></div>
+        <div class="sub-tokens">
+          <span class="tokens-in">0 in</span>
+          <span class="tokens-out">0 out</span>
+        </div>
+      </div>
+      <div class="sub-card" id="subGemini">
+        <div class="sub-platform">Gemini</div>
+        <span class="plan-badge">Detecting...</span>
+        <div class="sub-price"></div>
+        <div class="model-name"></div>
+        <div class="sub-tokens">
+          <span class="tokens-in">0 in</span>
+          <span class="tokens-out">0 out</span>
+        </div>
+      </div>
+    </div>
+    <div class="total-spend" id="totalSpend">$0.00 / month</div>
+  </section>
+
+  <!-- ── 24-Hour Activity ──────────────────────────────────────── -->
+  <section id="hourlyChart">
+    <h2>24-Hour Activity</h2>
+    <div class="hour-chart" id="hourChart"></div>
+    <div class="chart-legend">
+      <span class="legend-item"><span class="legend-dot claude"></span>Claude</span>
+      <span class="legend-item"><span class="legend-dot chatgpt"></span>ChatGPT</span>
+      <span class="legend-item"><span class="legend-dot gemini"></span>Gemini</span>
+    </div>
+  </section>
+
+  <!-- ── Today's Stats ─────────────────────────────────────────── -->
+  <section id="todayStats">
+    <h2>Today's Stats</h2>
+    <div class="stats-table" id="statsTable">
+      <div class="stats-header">
+        <span>Platform</span>
+        <span>Time</span>
+        <span>Messages</span>
+        <span>~Tokens In</span>
+        <span>~Tokens Out</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── This Week ─────────────────────────────────────────────── -->
+  <section id="weekSection">
+    <h2>This Week</h2>
+    <div class="week-grid" id="weekGrid"></div>
+  </section>
+
+  <!-- ── Predictions ───────────────────────────────────────────── -->
+  <section id="predictions">
+    <h2>Predictions</h2>
+    <div class="prediction-cards">
+      <div class="prediction-card">
+        <div class="prediction-label">This Week</div>
+        <div class="prediction-value" id="predWeek">0.0h</div>
+        <div class="prediction-hint">projected total</div>
+      </div>
+      <div class="prediction-card">
+        <div class="prediction-label">This Month</div>
+        <div class="prediction-value" id="predMonth">0.0h</div>
+        <div class="prediction-hint">projected total</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AI Whisperer Status ───────────────────────────────────── -->
+  <section id="remarkSection">
+    <p class="remark-text" id="remarkText">Use AI chat platforms to start tracking.</p>
+  </section>
+
+  <!-- ── Manual Override ───────────────────────────────────────── -->
+  <section id="overrides">
+    <h2>Manual Override</h2>
+    <div class="override-row">
+      <label class="override-field">
+        <span>Claude</span>
+        <select id="overrideClaude">
+          <option value="free">Free</option>
+          <option value="pro">Pro ($20)</option>
+          <option value="max5x">Max 5x ($100)</option>
+          <option value="max20x">Max 20x ($200)</option>
+        </select>
+      </label>
+      <label class="override-field">
+        <span>ChatGPT</span>
+        <select id="overrideChatgpt">
+          <option value="free">Free</option>
+          <option value="plus">Plus ($20)</option>
+          <option value="pro">Pro ($200)</option>
+        </select>
+      </label>
+      <label class="override-field">
+        <span>Gemini</span>
+        <select id="overrideGemini">
+          <option value="free">Free</option>
+          <option value="ai_pro">AI Pro ($19.99)</option>
+          <option value="ai_ultra">AI Ultra ($249.99)</option>
+        </select>
+      </label>
+    </div>
+    <p class="override-hint">Override will persist until you reset it</p>
+  </section>
+
+  <script src="insights.js"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aleph Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <div class="logo">&#x05D0;</div>
+      <h1>Settings</h1>
+    </div>
+    <a href="popup.html" id="backLink" class="back-link">&larr; Back to popup</a>
+  </header>
+
+  <!-- ── Platforms ──────────────────────────────────────────────── -->
+  <section>
+    <h2>Platforms</h2>
+    <label class="toggle-row">
+      <span>Claude</span>
+      <input type="checkbox" id="enableClaude" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>ChatGPT</span>
+      <input type="checkbox" id="enableChatgpt" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Gemini</span>
+      <input type="checkbox" id="enableGemini" checked>
+      <span class="toggle"></span>
+    </label>
+  </section>
+
+  <!-- ── BiDi ──────────────────────────────────────────────────── -->
+  <section>
+    <h2>BiDi</h2>
+    <label class="toggle-row">
+      <span>Auto-detect &amp; fix BiDi</span>
+      <input type="checkbox" id="bidiEnabled" checked>
+      <span class="toggle"></span>
+    </label>
+  </section>
+
+  <!-- ── Focus Categories ──────────────────────────────────────── -->
+  <section>
+    <h2>Focus Categories</h2>
+    <label class="toggle-row">
+      <span>Upgrade banners</span>
+      <input type="checkbox" id="focusHideUpgrade" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Suggestion chips</span>
+      <input type="checkbox" id="focusHideChips" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Promos &amp; clutter</span>
+      <input type="checkbox" id="focusHidePromos" checked>
+      <span class="toggle"></span>
+    </label>
+  </section>
+
+  <!-- ── Theme Overrides ───────────────────────────────────────── -->
+  <section>
+    <h2>Theme Overrides</h2>
+    <label class="field">
+      <span>Claude</span>
+      <select id="themeClaude">
+        <option value="">Default</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>ChatGPT</span>
+      <select id="themeChatgpt">
+        <option value="">Default</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Gemini</span>
+      <select id="themeGemini">
+        <option value="">Default</option>
+      </select>
+    </label>
+  </section>
+
+  <!-- ── Experience ────────────────────────────────────────────── -->
+  <section>
+    <h2>Experience</h2>
+    <label class="toggle-row">
+      <span>Fix broken LaTeX</span>
+      <input type="checkbox" id="latexFix" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Smooth streaming</span>
+      <input type="checkbox" id="streamSmooth" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="field" id="streamAnimField">
+      <span>Animation style</span>
+      <select id="streamAnimation">
+        <option value="platform">Platform Default</option>
+        <option value="fadeIn">Fade In</option>
+        <option value="typewriter">Typewriter</option>
+        <option value="slideUp">Slide Up</option>
+        <option value="glow">Glow</option>
+        <option value="blur">Blur</option>
+        <option value="scale">Scale</option>
+        <option value="elastic">Elastic</option>
+        <option value="highlight">Highlight</option>
+        <option value="cascade">Cascade</option>
+        <option value="none">None (suppress default only)</option>
+      </select>
+    </label>
+  </section>
+
+  <!-- ── Advanced Typography ───────────────────────────────────── -->
+  <section>
+    <h2>Advanced Typography</h2>
+    <label class="field">
+      <span>Line height <output id="lineHeightVal">default</output></span>
+      <input type="range" id="lineHeight" min="0" max="2.4" step="0.1" value="0">
+    </label>
+    <label class="field">
+      <span>Paragraph spacing <output id="paragraphSpacingVal">default</output></span>
+      <input type="range" id="paragraphSpacing" min="0" max="32" step="2" value="0">
+    </label>
+    <label class="field">
+      <span>Code font</span>
+      <select id="codeFontFamily">
+        <option value="">Default</option>
+        <option value="Fira Code">Fira Code</option>
+        <option value="JetBrains Mono">JetBrains Mono</option>
+        <option value="Cascadia Code">Cascadia Code</option>
+        <option value="Consolas">Consolas</option>
+        <option value="Source Code Pro">Source Code Pro</option>
+        <option value="IBM Plex Mono">IBM Plex Mono</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Code font size <output id="codeFontSizeVal">default</output></span>
+      <input type="range" id="codeFontSize" min="0" max="22" step="1" value="0">
+    </label>
+  </section>
+
+  <!-- ── Layout ────────────────────────────────────────────────── -->
+  <section>
+    <h2>Layout</h2>
+    <label class="field">
+      <span>Chat width <output id="chatWidthVal">default</output></span>
+      <input type="range" id="chatWidth" min="0" max="1600" step="50" value="0">
+    </label>
+    <label class="field">
+      <span>Message spacing <output id="messageSpacingVal">default</output></span>
+      <input type="range" id="messageSpacing" min="0" max="48" step="4" value="0">
+    </label>
+  </section>
+
+  <!-- ── Data ──────────────────────────────────────────────────── -->
+  <section>
+    <h2>Data</h2>
+    <button id="resetBtn">Reset to defaults</button>
+  </section>
+
+  <script src="settings.js"></script>
+</body>
+</html>
