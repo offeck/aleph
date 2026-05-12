@@ -272,7 +272,16 @@
       });
 
       const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"];
+      const DAY_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const todayDow = now.getDay();
+
+      // Build date strings for each of the 7 days
+      const dayDates = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        dayDates.push(d);
+      }
 
       const maxDaySeconds = Math.max(...dayTotals.map((d) => d.total), 1);
       const sparkline = document.getElementById("weekSparkline");
@@ -282,8 +291,24 @@
       for (let di = 0; di < dayTotals.length; di++) {
         const day = dayTotals[di];
         const isToday = di === 6;
+        const dayOfWeek = dayDates[di].getDay();
+        const dateStr = dayDates[di].toLocaleDateString([], { month: "short", day: "numeric" });
+
         const bar = document.createElement("div");
         bar.className = "spark-bar" + (isToday ? " today-bar" : "");
+
+        // Tooltip content
+        const parts = [`${DAY_FULL[dayOfWeek]}, ${dateStr}`];
+        if (day.total > 0) {
+          parts.push(`Time: ${formatTime(day.total)}`);
+          for (const p of ["claude", "chatgpt", "gemini"]) {
+            if (day[p] > 0) parts.push(`  ${PLATFORM_LABELS[p]}: ${formatTime(day[p])}`);
+          }
+        } else {
+          parts.push("No activity");
+        }
+        bar.setAttribute("data-tooltip", parts.join("\n"));
+
         for (const p of ["gemini", "chatgpt", "claude"]) {
           if (day[p] <= 0) continue;
           const seg = document.createElement("div");
@@ -293,7 +318,6 @@
         }
         sparkline.appendChild(bar);
 
-        const dayOfWeek = (todayDow - 6 + di + 7) % 7;
         const lbl = document.createElement("span");
         lbl.className = "spark-day-label" + (isToday ? " today" : "");
         lbl.textContent = DAY_NAMES[dayOfWeek];
@@ -333,8 +357,17 @@
         const day = dayTotals[di];
         const isToday = di === 6;
         weekTotalTokens += day.tokens;
+        const dayOfWeek = dayDates[di].getDay();
+        const dateStr = dayDates[di].toLocaleDateString([], { month: "short", day: "numeric" });
+
         const bar = document.createElement("div");
         bar.className = "spark-bar" + (isToday ? " today-bar" : "");
+
+        const parts = [`${DAY_FULL[dayOfWeek]}, ${dateStr}`];
+        if (day.tokens > 0) parts.push(`Tokens: ${formatTokens(day.tokens)}`);
+        else parts.push("No tokens");
+        bar.setAttribute("data-tooltip", parts.join("\n"));
+
         if (day.tokens > 0) {
           const seg = document.createElement("div");
           seg.className = "spark-seg";
@@ -343,7 +376,6 @@
           bar.appendChild(seg);
         }
 
-        const dayOfWeek = (todayDow - 6 + di + 7) % 7;
         const lbl = document.createElement("span");
         lbl.className = "spark-day-label" + (isToday ? " today" : "");
         lbl.textContent = DAY_NAMES[dayOfWeek];
