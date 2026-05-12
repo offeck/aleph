@@ -253,27 +253,43 @@
     return { plan: model && /opus/i.test(model) ? "pro" : "free", model };
   }
 
-  // ChatGPT: detect plan via accounts API + models API cross-check.
+  // ChatGPT: detect plan from available models.
+  // The accounts/check API is unreliable (returns "guest" for Plus users).
+  // Instead, infer tier from model access: Pro has o3, Plus has gpt-5-5,
+  // Go has gpt-5, Free only has mini models.
   let chatgptApiPlan = null;
+
+  function planFromModels(slugs) {
+    const has = (re) => slugs.some((s) => re.test(s));
+    if (has(/^o3$/)) return "pro";
+    if (has(/^gpt-5-5/)) return "plus";
+    if (has(/^gpt-5$/)) return "plus";
+    if (slugs.length > 0) return "free";
+    return null;
+  }
+
   function detectChatgptViaApi() {
     if (chatgptApiPlan) return;
-    Promise.all([
-      fetch("/backend-api/accounts/check/v4-2023-04-27", { credentials: "same-origin" })
-        .then((r) => r.ok ? r.json() : null).catch(() => null),
-      fetch("/backend-api/models", { credentials: "same-origin" })
-        .then((r) => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([acctData, modelsData]) => {
-      const sub = acctData?.accounts?.default?.entitlement?.subscription_plan || "";
-      if (/plusplan/i.test(sub)) { chatgptApiPlan = "plus"; return; }
-      if (/proplan/i.test(sub)) { chatgptApiPlan = "pro"; return; }
 
-      const slugs = modelsData?.models?.map((m) => m.slug) || [];
-      const hasPro = slugs.some((s) => /^o[1-9]|^gpt-5-[2-9]|^gpt-5-[0-9]{2}/.test(s));
-      const hasPlus = slugs.some((s) => /^gpt-5$|^gpt-5-1$/.test(s));
-      if (hasPro) chatgptApiPlan = "pro";
-      else if (hasPlus) chatgptApiPlan = "plus";
-      else chatgptApiPlan = "free";
-    }).catch(() => {});
+    // 1. Try localStorage models cache (instant, no network)
+    try {
+      const key = Object.keys(localStorage).find((k) => k.endsWith("/models"));
+      if (key) {
+        const raw = JSON.parse(localStorage.getItem(key));
+        const slugs = (raw?.value?.categories || []).map((c) => c.defaultModel).filter(Boolean);
+        const plan = planFromModels(slugs);
+        if (plan) { chatgptApiPlan = plan; return; }
+      }
+    } catch (e) {}
+
+    // 2. Fallback: fetch models API
+    fetch("/backend-api/models", { credentials: "same-origin" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const slugs = data?.models?.map((m) => m.slug) || [];
+        chatgptApiPlan = planFromModels(slugs) || "free";
+      })
+      .catch(() => {});
   }
 
   function detectChatgpt() {
@@ -291,17 +307,16 @@
       }
     } catch (e) {}
 
-    // Use API result if available (most reliable)
     if (chatgptApiPlan) return { plan: chatgptApiPlan, model };
 
-    // DOM fallback: profile button text ends with plan name
-    const profileBtn = document.querySelector('[data-testid="accounts-profile-button"]');
-    const profileText = profileBtn?.textContent?.trim() || "";
-    let plan = "free";
-    if (/Plus$/i.test(profileText)) plan = "plus";
-    else if (/Pro$/i.test(profileText)) plan = "pro";
+    // Cookie-based fallback: infer tier from the selected model
+    if (model) {
+      if (/^o3$/.test(model)) return { plan: "pro", model };
+      if (/^gpt-5-5|^gpt-5-[2-9]/.test(model)) return { plan: "plus", model };
+      if (/^gpt-5$|^gpt-5-1$/.test(model)) return { plan: "plus", model };
+    }
 
-    return { plan, model };
+    return { plan: "free", model };
   }
 
   function detectGemini() {
