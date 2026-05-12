@@ -152,6 +152,16 @@
     return null;
   }
 
+  function getCurrentModel() {
+    if (PLATFORM === "chatgpt") {
+      try {
+        const c = document.cookie.split(";").reduce((a, c) => { const [k,...v] = c.trim().split("="); a[k]=v.join("="); return a; }, {});
+        if (c["oai-last-model-config"]) return JSON.parse(decodeURIComponent(c["oai-last-model-config"])).model || "auto";
+      } catch (e) {}
+    }
+    return null;
+  }
+
   function processNewMessage(el) {
     if (countedMessages.has(el)) return;
     countedMessages.add(el);
@@ -163,6 +173,8 @@
       platform: PLATFORM,
       role,
       estimatedTokens: estimateTokens(text),
+      model: getCurrentModel(),
+      timestamp: Date.now(),
     });
   }
 

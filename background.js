@@ -30,6 +30,14 @@ const REMARKS = {
       "Your sleep schedule called. It wants a word.",
       "Fun fact: AI responses at 3am aren't better. But we respect the grind.",
       "Night owl mode: activated. Productivity: questionable.",
+      "Plot twist: {platform} is the reason you can't sleep.",
+      "You and {platform} are the only ones awake right now. Romantic.",
+      "At {hour}am, every prompt feels like a masterpiece. It's not.",
+      "Your circadian rhythm just filed a complaint.",
+      "If insomnia was a sport, you'd be going pro.",
+      "NASA called — they can see your screen glow from orbit.",
+      "Late-night AI usage: because bad decisions need a thought partner.",
+      "Somewhere, a sleep researcher is writing a paper about you.",
     ],
   },
   longSession: {
@@ -42,6 +50,14 @@ const REMARKS = {
       "That's {hoursRound} hours of pure human-AI synergy.",
       "Impressive stamina. {platform} is probably tired too.",
       "You and {platform}, sitting in a tree... P-R-O-M-P-T-I-N-G.",
+      "{hoursRound} hours. Your chair called — it needs a break too.",
+      "You've been at this longer than most Marvel movies. Respect.",
+      "At {minutes} minutes, {platform} is your longest conversation today. Including humans.",
+      "{platform} has seen your best work and your worst typos.",
+      "If {platform} could order you food, it would have by now.",
+      "Your keyboard deserves hazard pay after {minutes} minutes.",
+      "{hoursRound} hours straight? That's not a session, that's a relationship.",
+      "Your posture during this {minutes}-minute session: concerning.",
     ],
   },
   tokenHeavy: {
@@ -53,6 +69,13 @@ const REMARKS = {
       "At ~{todayTokensK}K tokens, you're basically co-authoring with AI.",
       "~{todayTokensK}K tokens. Somewhere, a GPU is warm because of you.",
       "That's ~{todayTokensK}K tokens of pure wisdom. Probably.",
+      "~{todayTokensK}K tokens — that's more words than most Tinder profiles.",
+      "You've burned through ~{todayTokensK}K tokens. The data center felt that.",
+      "At this token rate, you're single-handedly funding AI research.",
+      "~{todayTokensK}K tokens. Your electricity bill is blushing.",
+      "Tolstoy wrote War and Peace with fewer characters than your {todayTokensK}K.",
+      "~{todayTokensK}K tokens: the director's cut of your thoughts.",
+      "If tokens were frequent flyer miles, you'd be in first class.",
     ],
   },
   multiPlatform: {
@@ -64,6 +87,13 @@ const REMARKS = {
       "Why pick one AI when you can have them all?",
       "Diversifying your AI portfolio. Smart move.",
       "Three AIs walk into a browser tab... and you talked to all of them.",
+      "You're like a bee pollinating between AI flowers. Majestic.",
+      "Using all 3 AIs? You must be settling an argument between them.",
+      "One AI for each mood. We get it.",
+      "Playing AIs against each other? That's either genius or supervillain behavior.",
+      "Triple-booking AI chats like a true power user.",
+      "When one AI says no, you have two backups. Strategy.",
+      "Claude for poetry, ChatGPT for code, Gemini for... we won't ask.",
     ],
   },
   highSpend: {
@@ -76,6 +106,13 @@ const REMARKS = {
       "Your AI budget could buy {coffees} coffees a month.",
       "${total}/month to talk to machines. Welcome to the future.",
       "At ${total}/month, each AI response costs you about... never mind.",
+      "${total}/month. But can you really put a price on procrastination?",
+      "Your bank statement just has {coffees} lines that say 'AI subscription'.",
+      "${total}/month. Cheaper than therapy, more productive than Twitter.",
+      "You're basically an angel investor in AI. A small angel. With a subscription.",
+      "For ${total}/month you get unlimited AI wisdom. And unlimited distraction.",
+      "${total}/month — your accountant has questions.",
+      "That's {coffees} avocado toasts worth of AI per month. Millennials approve.",
     ],
   },
   prediction: {
@@ -87,6 +124,12 @@ const REMARKS = {
       "Weekly forecast: {weekHours}h of asking machines to think for you.",
       "{weekHours}h this week and climbing. You're in the AI power user club.",
       "By Friday, you'll have spent {weekHours}h with AI. Plan your alibi.",
+      "{weekHours}h projected. At this pace, AI owes YOU a salary.",
+      "At {weekHours}h/week, you'll hit expert level by... next week.",
+      "{monthHours}h this month. That's more screen time than a Netflix binge.",
+      "If AI usage was tracked on Strava, you'd be top of the leaderboard.",
+      "Pace: {weekHours}h/week. Vibe: unstoppable. Posture: debatable.",
+      "{weekHours}h this week? Somewhere, an AI is bragging about you to other AIs.",
     ],
   },
   earlyBird: {
@@ -98,6 +141,56 @@ const REMARKS = {
       "6am prompt engineering. Peak performance.",
       "Birds are singing, sun is rising, and you're prompting. Priorities.",
       "The early bird gets the... best AI responses? Sure, let's go with that.",
+      "Your alarm: *beep*. You: 'Hey {platform}, quick question...'",
+      "Morning routine: coffee, AI, contemplate existence. In that order.",
+      "You prompt before you brush your teeth. No judgment. Okay, a little.",
+      "Rise and grind — literally, you're grinding tokens at {hour}am.",
+      "Dawn patrol prompting. The AI appreciates your punctuality.",
+      "Sunrise, coffee, {platform}. The holy trinity.",
+    ],
+  },
+  evening: {
+    condition: (d) => d.hour >= 20 && d.hour < 24 && d.todayActive,
+    pool: [
+      "Evening AI session. Is this winding down or ramping up?",
+      "Other people watch TV at night. You train AI. Different breed.",
+      "Nighttime prompting: where all the 'just one more question' happens.",
+      "{platform} is your evening entertainment. Better than most shows, honestly.",
+      "The sun set {sunHoursAgo} hours ago. Just saying.",
+      "Prime-time TV vs. prime-time AI. You made your choice.",
+      "This is the part of the night where prompts get philosophical.",
+      "Evening mode: when 'let me ask AI real quick' becomes 2 hours.",
+      "Your browser tabs at {hour}pm: AI chat, AI chat, AI chat, and one recipe you'll never cook.",
+      "Winding down with some light AI conversation. Totally normal behavior.",
+    ],
+  },
+  weekend: {
+    condition: (d) => d.isWeekend && d.todayActive,
+    pool: [
+      "AI on a {dayName}? Some people go outside. Not judging.",
+      "Weekend AI warrior reporting for duty.",
+      "{dayName} plans: brunch, AI, existential questions. Classic.",
+      "Using {platform} on {dayName}? Your friends are at the beach.",
+      "The weekend: when your AI finally gets some quality time with you.",
+      "Work-life-AI balance on {dayName}: balance not found.",
+      "Happy {dayName}! Your AI is happy to see you too. Probably.",
+      "{dayName} vibes: sweatpants, snacks, and sophisticated AI prompts.",
+      "Weekend project or weekend rabbit hole? Either way, {platform} is here.",
+      "Friends: 'Let's go out!' You: 'I'm having a fascinating chat with {platform}.'",
+    ],
+  },
+  messageBurst: {
+    condition: (d) => d.todayMessages >= 30,
+    pool: [
+      "{msgCount} messages today. That's a whole group chat, but just you and AI.",
+      "You've sent {msgCount} messages today. Your thumbs deserve a medal.",
+      "{msgCount} messages. At this point, {platform} knows your writing style better than you do.",
+      "Chatty day! {msgCount} messages and still going.",
+      "{msgCount} prompts fired today. Rate of fire: impressive.",
+      "Your message count ({msgCount}) just passed your step count. Priorities.",
+      "{msgCount} messages today — each one a tiny masterpiece of curiosity.",
+      "The AI has processed {msgCount} of your requests today. Give it a raise.",
+      "{msgCount} messages deep. This isn't a chat, it's an epic.",
     ],
   },
   lowUsage: {
@@ -109,6 +202,10 @@ const REMARKS = {
       "Your AI subscriptions are feeling neglected.",
       "Low usage week. Saving your best prompts for later?",
       "{weekMin} minutes all week? Either very efficient or very busy.",
+      "Minimalist AI usage. Marie Kondo would approve.",
+      "The AIs are refreshing their tabs waiting for you.",
+      "Quality over quantity? With {weekMin} minutes, it better be quality.",
+      "Your AI is like a gym membership: paid for, rarely visited.",
     ],
   },
   firstTime: {
@@ -118,13 +215,16 @@ const REMARKS = {
       "Day one of tracking. The data journey begins.",
       "Your AI usage story starts here. No pressure.",
       "First day! Check back tomorrow for your hourly breakdown.",
+      "Welcome! We promise to only mildly judge your AI habits.",
+      "And so it begins. Your AI data era.",
     ],
   },
 };
 
 const REMARK_PRIORITY = [
   "lateNight", "longSession", "tokenHeavy", "multiPlatform",
-  "highSpend", "prediction", "earlyBird", "lowUsage", "firstTime",
+  "highSpend", "messageBurst", "weekend", "evening",
+  "prediction", "earlyBird", "lowUsage", "firstTime",
 ];
 
 async function generateRemark(platform) {
@@ -174,6 +274,13 @@ async function generateRemark(platform) {
   const projectedWeekHours = dayOfWeek > 0 ? Math.round(weekHours / dayOfWeek * 7 * 10) / 10 : weekHours;
   const projectedMonthHours = Math.round(projectedWeekHours * 4.3 * 10) / 10;
 
+  let todayMessages = 0;
+  for (const p of platforms) {
+    todayMessages += (usage[p]?.messageCount || 0);
+  }
+
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
   const ctx = {
     hour: now.getHours(),
     todayActive: activePlatforms.length > 0,
@@ -184,6 +291,8 @@ async function generateRemark(platform) {
     weekMinutes,
     todayTokensK: Math.round(todayTokens / 1000),
     isFirstDay: !hasAnyPrior,
+    isWeekend: now.getDay() === 0 || now.getDay() === 6,
+    todayMessages,
   };
 
   const vars = {
@@ -197,6 +306,9 @@ async function generateRemark(platform) {
     coffees: String(Math.round(totalMonthly / 5)),
     weekMin: String(weekMinutes),
     todayTokensK: String(Math.round(todayTokens / 1000)),
+    dayName: dayNames[now.getDay()],
+    msgCount: String(todayMessages),
+    sunHoursAgo: String(Math.max(0, now.getHours() - 18)),
   };
 
   for (const cat of REMARK_PRIORITY) {
@@ -212,7 +324,7 @@ async function generateRemark(platform) {
       text = text.replace(new RegExp("\\{" + k + "\\}", "g"), v);
     }
 
-    const updatedUsed = [...usedRemarks, template].slice(-30);
+    const updatedUsed = [...usedRemarks, template].slice(-80);
     await writeLocal("insights_used_remarks", updatedUsed);
     await writeLocal("insights_last_remark", { text, category: cat, generatedAt: Date.now() });
     return text;
@@ -272,7 +384,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         modelCaps[p] = await readLocal("insights_model_caps_" + p, null);
       }
 
-      sendResponse({ subs, today, remark, weekData, prevWeekData, platformUsage, modelCaps });
+      const chatgptModelTs = await readLocal("insights_chatgpt_model_ts", {});
+
+      sendResponse({ subs, today, remark, weekData, prevWeekData, platformUsage, modelCaps, chatgptModelTs });
     })();
     return true;
   }
@@ -311,7 +425,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
   }
 
-  // Insights: message + tokens
+  // Insights: message + tokens + per-model timestamps (for ChatGPT rolling window)
   if (msg.type === "insights-message") {
     (async () => {
       const key = todayKey();
@@ -321,6 +435,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       usage[p].messageCount++;
       if (msg.role === "user") usage[p].tokensIn += (msg.estimatedTokens || 0);
       else if (msg.role === "assistant") usage[p].tokensOut += (msg.estimatedTokens || 0);
+
+      // Store per-model timestamps for rolling-window tracking (ChatGPT)
+      if (p === "chatgpt" && msg.model && msg.role === "user") {
+        const tsKey = "insights_chatgpt_model_ts";
+        const modelTs = await readLocal(tsKey, {});
+        const m = msg.model;
+        if (!modelTs[m]) modelTs[m] = [];
+        modelTs[m].push(msg.timestamp || Date.now());
+        // Prune timestamps older than 24 hours
+        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+        for (const k of Object.keys(modelTs)) {
+          modelTs[k] = modelTs[k].filter((t) => t > cutoff);
+          if (modelTs[k].length === 0) delete modelTs[k];
+        }
+        await writeLocal(tsKey, modelTs);
+      }
       await writeLocal(key, usage);
     })();
   }

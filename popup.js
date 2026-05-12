@@ -132,59 +132,102 @@
       const metersEl = document.getElementById("usageMeters");
       const meters = [];
 
+      // Collect raw meter data per platform, then filter
+      const rawMeters = { claude: [], chatgpt: [], gemini: [] };
+
       // Claude: real utilization from API
       if (platformUsage?.claude?.fiveHour || platformUsage?.claude?.sevenDay) {
         const cu = platformUsage.claude;
-        if (cu.fiveHour) {
-          const resetStr = cu.fiveHour.resetsAt
-            ? new Date(cu.fiveHour.resetsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            : "";
-          meters.push({ label: "Claude 5h", pct: Math.round(cu.fiveHour.utilization), color: "#D97706", reset: resetStr });
-        }
-        if (cu.sevenDay) {
-          meters.push({ label: "Claude 7d", pct: Math.round(cu.sevenDay.utilization), color: "#D97706" });
-        }
+        if (cu.fiveHour) rawMeters.claude.push({ label: "Claude 5h", pct: Math.round(cu.fiveHour.utilization), color: "#D97706" });
+        if (cu.sevenDay) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(cu.sevenDay.utilization), color: "#D97706" });
       }
 
-      // ChatGPT: real data from /backend-api/conversation/init (paid users),
-      // or tracked message count fallback (free users)
+      // ChatGPT: per-model rolling-window tracking via our own timestamps.
+      // Known Plus limits: GPT-5.5=160/3h, Thinking=3000/week, o3=50/day, o4-mini=500/day
       const gptUsage = platformUsage?.chatgpt;
-      if (gptUsage?.modelLimits?.length > 0) {
-        for (const ml of gptUsage.modelLimits) {
-          if (!ml.limit || ml.limit <= 0) continue;
-          const used = ml.limit - (ml.remaining || 0);
-          const pct = Math.min(100, Math.round((used / ml.limit) * 100));
-          meters.push({ label: `GPT ${ml.model || ""} (${ml.remaining}/${ml.limit})`, pct, color: "#4285F4" });
+      const gptPlan = subs?.chatgpt?.plan || "free";
+      const { chatgptModelTs } = resp;
+
+      // Rolling window limits per model per plan
+      const GPT_WINDOWS = {
+        plus: [
+          { match: /thinking/i,           label: "Thinking", limit: 3000, windowMs: 7 * 24 * 3600000 },
+          { match: /^o3$/,                label: "o3",       limit: 50,   windowMs: 24 * 3600000 },
+          { match: /o4-mini/i,            label: "o4-mini",  limit: 500,  windowMs: 24 * 3600000 },
+          { match: /.*/,                  label: "GPT",      limit: 160,  windowMs: 3 * 3600000 },
+        ],
+        pro: [
+          { match: /.*/,                  label: "GPT",      limit: 999,  windowMs: 3 * 3600000 },
+        ],
+        free: [
+          { match: /.*/,                  label: "GPT",      limit: 16,   windowMs: 3 * 3600000 },
+        ],
+      };
+      const windows = GPT_WINDOWS[gptPlan] || GPT_WINDOWS.free;
+      const now = Date.now();
+
+      if (chatgptModelTs && Object.keys(chatgptModelTs).length > 0) {
+        // Aggregate timestamps per window rule
+        const windowCounts = windows.map((w) => ({ ...w, count: 0 }));
+        for (const [model, timestamps] of Object.entries(chatgptModelTs)) {
+          for (const w of windowCounts) {
+            if (w.match.test(model)) {
+              w.count += timestamps.filter((t) => (now - t) < w.windowMs).length;
+              break;
+            }
+          }
+        }
+        // Show windows with actual usage, or the general GPT window as fallback
+        const used = windowCounts.filter((w) => w.count > 0);
+        const toShow = used.length > 0 ? used : [windowCounts[windowCounts.length - 1]];
+        for (const w of toShow) {
+          if (w.limit >= 999) continue;
+          const pct = Math.min(100, Math.round((w.count / w.limit) * 100));
+          rawMeters.chatgpt.push({ label: `${w.label} (${w.count}/${w.limit})`, pct, color: "#4285F4" });
         }
       } else {
+        // No model timestamps yet — use simple daily message count
         const gptMsgs = today?.chatgpt?.messageCount || 0;
         if (gptMsgs > 0) {
-          const gptPlan = subs?.chatgpt?.plan || "free";
-          const estLimit = gptPlan === "pro" ? 999 : gptPlan === "plus" ? 80 : 16;
-          const pct = estLimit >= 999 ? 0 : Math.min(100, Math.round((gptMsgs / estLimit) * 100));
-          meters.push({ label: `GPT ~3h (${gptMsgs}/${estLimit})`, pct, color: "#4285F4" });
+          const limit = windows[windows.length - 1].limit;
+          const pct = limit >= 999 ? 0 : Math.min(100, Math.round((gptMsgs / limit) * 100));
+          rawMeters.chatgpt.push({ label: `GPT (${gptMsgs}/${limit})`, pct, color: "#4285F4" });
         }
       }
 
-      // Gemini: real data from qpEbW RPC — show features with actual usage,
-      // plus the main chat feature for context
+      // Feature-specific limits from API (deep research, images, etc.)
+      const GPT_LABELS = { deep_research: "Research", odyssey: "Reasoning", image_gen: "Images" };
+      if (gptUsage?.limits?.length > 0) {
+        for (const lp of gptUsage.limits) {
+          const label = GPT_LABELS[lp.feature];
+          if (!label) continue;
+          rawMeters.chatgpt.push({ label: `${label}: ${lp.remaining}`, pct: 0, color: "#4285F4" });
+        }
+      }
+
+      // Gemini: feature 4 = Pro 3.1, feature 15 = Thinking (confirmed via testing)
       const gemUsage = platformUsage?.gemini;
       if (gemUsage?.features?.length > 0) {
-        const usedFeatures = gemUsage.features.filter((f) => f.remaining < f.limit);
-        const mainChat = gemUsage.mainChat;
-        const shown = new Set();
-        // Show used features first (most relevant to user)
-        for (const f of usedFeatures.slice(0, 2)) {
+        const proChat = gemUsage.features.find((f) => f.id === 4);
+        const thinking = gemUsage.features.find((f) => f.id === 15);
+        for (const f of [proChat, thinking].filter(Boolean)) {
           const used = f.limit - f.remaining;
-          const pct = Math.min(100, Math.round((used / f.limit) * 100));
-          meters.push({ label: `${f.name} (${f.remaining}/${f.limit})`, pct, color: "#10A37F" });
-          shown.add(f.id);
+          const pct = f.limit > 0 ? Math.min(100, Math.round((used / f.limit) * 100)) : 0;
+          rawMeters.gemini.push({ label: `${f.name} (${f.remaining}/${f.limit})`, pct, color: "#10A37F" });
         }
-        // Always show main chat if not already shown
-        if (mainChat && !shown.has(mainChat.id)) {
-          const used = mainChat.limit - mainChat.remaining;
-          const pct = mainChat.limit > 0 ? Math.min(100, Math.round((used / mainChat.limit) * 100)) : 0;
-          meters.push({ label: `${mainChat.name} (${mainChat.remaining}/${mainChat.limit})`, pct, color: "#10A37F" });
+      }
+
+      // Filter: only show meters with >0% usage.
+      // If ALL meters for a platform are 0%, show a single "Platform 0%" fallback.
+      const PLATFORM_FALLBACK = { claude: { label: "Claude", color: "#D97706" }, chatgpt: { label: "ChatGPT", color: "#4285F4" }, gemini: { label: "Gemini", color: "#10A37F" } };
+      for (const p of ["claude", "chatgpt", "gemini"]) {
+        const pm = rawMeters[p];
+        if (pm.length === 0) continue;
+        const used = pm.filter((m) => m.pct > 0);
+        if (used.length > 0) {
+          meters.push(...used);
+        } else {
+          meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color });
         }
       }
 
