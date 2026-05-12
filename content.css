@@ -13,13 +13,12 @@
   unicode-bidi: plaintext !important;
 }
 
-.ProseMirror[data-aleph-rtl="true"],
-.ProseMirror[data-aleph-rtl="true"] p,
-#prompt-textarea[data-aleph-rtl="true"],
-[contenteditable][data-aleph-rtl="true"],
-.ql-editor[data-aleph-rtl="true"] {
-  direction: rtl !important;
-  text-align: right !important;
+.ProseMirror[dir="auto"],
+#prompt-textarea[dir="auto"],
+[contenteditable][dir="auto"],
+.ql-editor[dir="auto"] {
+  text-align: start !important;
+  unicode-bidi: plaintext !important;
 }
 
 /* Math: ALWAYS LTR */

@@ -39,6 +39,10 @@
     solarized: "Solarized",
     rosePine: "Rosé Pine",
     catppuccin: "Catppuccin",
+    gruvbox: "Gruvbox",
+    oneDark: "One Dark",
+    tokyoNight: "Tokyo Night",
+    githubDark: "GitHub Dark",
   };
 
   const CHECKBOXES = [

@@ -69,6 +69,26 @@
       text: "#cdd6f4", textMuted: "#a6adc8", accent: "#cba6f7",
       border: "#363654", codeBg: "#1e1e2e", codeBorder: "#363654", inputBg: "#28283d",
     },
+    gruvbox: {
+      bg: "#282828", bgSecondary: "#3c3836", bgTertiary: "#1d2021",
+      text: "#ebdbb2", textMuted: "#a89984", accent: "#fe8019",
+      border: "#504945", codeBg: "#1d2021", codeBorder: "#504945", inputBg: "#32302f",
+    },
+    oneDark: {
+      bg: "#282c34", bgSecondary: "#2c313a", bgTertiary: "#21252b",
+      text: "#abb2bf", textMuted: "#7f848e", accent: "#61afef",
+      border: "#3e4451", codeBg: "#21252b", codeBorder: "#3e4451", inputBg: "#2c313a",
+    },
+    tokyoNight: {
+      bg: "#1a1b26", bgSecondary: "#24283b", bgTertiary: "#16161e",
+      text: "#c0caf5", textMuted: "#565f89", accent: "#7aa2f7",
+      border: "#3b4261", codeBg: "#16161e", codeBorder: "#3b4261", inputBg: "#24283b",
+    },
+    githubDark: {
+      bg: "#0d1117", bgSecondary: "#161b22", bgTertiary: "#010409",
+      text: "#c9d1d9", textMuted: "#8b949e", accent: "#58a6ff",
+      border: "#30363d", codeBg: "#161b22", codeBorder: "#30363d", inputBg: "#161b22",
+    },
   };
 
   // ── Google Fonts map ───────────────────────────────────────────────────
@@ -422,6 +442,7 @@
     patching = true;
     try {
       if (settings.bidiEnabled) patchBidi();
+      else cleanupEditorDir();
       if (settings.focusMode) applyFocusMode();
       if (settings.latexFix) patchLatex();
       patchMarkdown();
@@ -452,18 +473,38 @@
 
     SEL.editor.forEach((sel) => {
       document.querySelectorAll(sel).forEach((ed) => {
-        const heb = HEB.test(ed.textContent || "");
-        const val = heb ? "true" : "false";
-        if (ed.getAttribute("data-aleph-rtl") !== val) {
-          ed.setAttribute("data-aleph-rtl", val);
+        if (ed.getAttribute("dir") !== "auto") {
+          ed.setAttribute("dir", "auto");
         }
+        ed.querySelectorAll("p, div, li").forEach((child) => {
+          if (child.getAttribute("dir") !== "auto") {
+            child.setAttribute("dir", "auto");
+          }
+        });
         if (!ed.__alephListener) {
           ed.addEventListener("input", () => {
-            const h = HEB.test(ed.textContent || "");
-            ed.setAttribute("data-aleph-rtl", h ? "true" : "false");
+            if (ed.getAttribute("dir") !== "auto") {
+              ed.setAttribute("dir", "auto");
+            }
+            ed.querySelectorAll("p, div, li").forEach((child) => {
+              if (child.getAttribute("dir") !== "auto") {
+                child.setAttribute("dir", "auto");
+              }
+            });
           });
           ed.__alephListener = true;
         }
+      });
+    });
+  }
+
+  function cleanupEditorDir() {
+    SEL.editor.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((ed) => {
+        ed.removeAttribute("dir");
+        ed.querySelectorAll("p, div, li").forEach((child) => {
+          if (child.getAttribute("dir") === "auto") child.removeAttribute("dir");
+        });
       });
     });
   }
