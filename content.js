@@ -1101,7 +1101,7 @@
     applyStyles();
     patchAll();
     updateBadge();
-    setTimeout(patchAll, 1500);
+    setTimeout(() => { applyStyles(); patchAll(); }, 1500);
     setInterval(patchAll, 3000);
   });
 
