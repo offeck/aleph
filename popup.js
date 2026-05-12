@@ -113,6 +113,60 @@
         }
       }
 
+      // Usage meters — real data for Claude, estimated for ChatGPT/Gemini
+      const { platformUsage } = resp;
+      const metersEl = document.getElementById("usageMeters");
+      const meters = [];
+
+      // Claude: real utilization from API
+      if (platformUsage?.claude?.fiveHour || platformUsage?.claude?.sevenDay) {
+        const cu = platformUsage.claude;
+        if (cu.fiveHour) {
+          const resetStr = cu.fiveHour.resetsAt
+            ? new Date(cu.fiveHour.resetsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "";
+          meters.push({ label: "Claude 5h", pct: Math.round(cu.fiveHour.utilization), color: "#D97706", reset: resetStr });
+        }
+        if (cu.sevenDay) {
+          meters.push({ label: "Claude 7d", pct: Math.round(cu.sevenDay.utilization), color: "#D97706" });
+        }
+      }
+
+      // ChatGPT: estimated from message count vs known plan limits
+      const GPT_LIMITS = { free: 16, plus: 80, pro: 999 };
+      const gptPlan = subs?.chatgpt?.plan || "free";
+      const gptMsgs = today?.chatgpt?.messageCount || 0;
+      const gptLimit = GPT_LIMITS[gptPlan] || 16;
+      if (gptMsgs > 0 || gptPlan !== "free") {
+        const gptPct = Math.min(100, Math.round((gptMsgs / gptLimit) * 100));
+        meters.push({ label: "GPT ~3h", pct: gptPct, color: "#4285F4", est: true });
+      }
+
+      // Gemini: estimated from message count vs known limits
+      const GEM_LIMITS = { free: 30, ai_pro: 1500, ai_ultra: 3000 };
+      const gemPlan = subs?.gemini?.plan || "free";
+      const gemMsgs = today?.gemini?.messageCount || 0;
+      const gemLimit = GEM_LIMITS[gemPlan] || 30;
+      if (gemMsgs > 0 || gemPlan !== "free") {
+        const gemPct = Math.min(100, Math.round((gemMsgs / gemLimit) * 100));
+        meters.push({ label: "Gemini ~day", pct: gemPct, color: "#10A37F", est: true });
+      }
+
+      if (meters.length > 0) {
+        metersEl.innerHTML = "";
+        metersEl.style.display = "";
+        for (const m of meters) {
+          const tier = m.pct < 50 ? "low" : m.pct < 80 ? "mid" : "high";
+          const row = document.createElement("div");
+          row.className = "usage-meter";
+          row.innerHTML =
+            `<span class="usage-meter-label">${m.label}</span>` +
+            `<div class="usage-meter-track"><div class="usage-meter-fill" style="width:${m.pct}%;background:${m.pct >= 80 ? "#ff6b6b" : m.pct >= 50 ? "#D97706" : m.color}"></div></div>` +
+            `<span class="usage-meter-pct" style="color:${m.pct >= 80 ? "#ff6b6b" : m.pct >= 50 ? "#D97706" : m.color}">${m.pct}%${m.est ? "*" : ""}</span>`;
+          metersEl.appendChild(row);
+        }
+      }
+
       // Weekly sparkline
       const weekDays = [];
       const now = new Date();

@@ -262,7 +262,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         prevWeekData[wk] = data;
       }
 
-      sendResponse({ subs, today, remark, weekData, prevWeekData });
+      const platformUsage = {};
+      for (const p of ["claude", "chatgpt", "gemini"]) {
+        platformUsage[p] = await readLocal("insights_platform_usage_" + p, null);
+      }
+
+      sendResponse({ subs, today, remark, weekData, prevWeekData, platformUsage });
     })();
     return true;
   }
@@ -329,6 +334,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         manualOverride: false,
       };
       await writeLocal("insights_subscriptions", subs);
+    })();
+  }
+
+  // Insights: real usage data (Claude's /api/organizations/{orgId}/usage)
+  if (msg.type === "insights-usage") {
+    (async () => {
+      await writeLocal("insights_platform_usage_" + msg.platform, {
+        ...msg.usage,
+        fetchedAt: Date.now(),
+      });
     })();
   }
 

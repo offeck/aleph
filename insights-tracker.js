@@ -292,19 +292,28 @@
     let plan = "free";
     let model = null;
 
-    const allBtns = document.querySelectorAll("button");
-    for (const b of allBtns) {
-      const t = b.textContent?.trim();
-      if (!t || t.length > 60) continue;
-      if (/gemini|flash|pro|ultra/i.test(t) && !/setting|prefer|option/i.test(t)) {
-        model = t;
-        break;
+    // Primary: use the mode menu button which shows the current model/tier
+    const modeBtn = document.querySelector('[data-testid="bard-mode-menu-button"]');
+    if (modeBtn) {
+      model = modeBtn.textContent?.trim() || null;
+    }
+
+    // Fallback: scan buttons for model names
+    if (!model) {
+      const allBtns = document.querySelectorAll("button");
+      for (const b of allBtns) {
+        const t = b.textContent?.trim();
+        if (!t || t.length > 60) continue;
+        if (/gemini|flash|pro|ultra/i.test(t) && !/setting|prefer|option/i.test(t)) {
+          model = t;
+          break;
+        }
       }
     }
 
     if (model) {
       if (/ultra|advanced/i.test(model)) plan = "ai_ultra";
-      else if (/pro/i.test(model)) plan = "ai_pro";
+      else if (/\bpro\b/i.test(model)) plan = "ai_pro";
     }
 
     if (plan === "free") {
@@ -336,6 +345,37 @@
     } catch (e) {}
   }
 
+  // ── Claude real usage polling ────────────────────────────
+  // Fetches /api/organizations/{orgId}/usage with session cookie (no API key).
+  // Returns real utilization percentages and reset times.
+  function pollClaudeUsage() {
+    try {
+      const cookies = document.cookie.split(";").reduce((a, c) => {
+        const [k, ...v] = c.trim().split("=");
+        a[k] = v.join("=");
+        return a;
+      }, {});
+      const orgId = cookies["lastActiveOrg"];
+      if (!orgId) return;
+      fetch("/api/organizations/" + orgId + "/usage", { credentials: "same-origin" })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (!data) return;
+          send({
+            type: "insights-usage",
+            platform: "claude",
+            usage: {
+              fiveHour: data.five_hour ? { utilization: data.five_hour.utilization, resetsAt: data.five_hour.resets_at } : null,
+              sevenDay: data.seven_day ? { utilization: data.seven_day.utilization, resetsAt: data.seven_day.resets_at } : null,
+              sonnet: data.seven_day_sonnet ? { utilization: data.seven_day_sonnet.utilization } : null,
+              extraUsage: data.extra_usage || null,
+            },
+          });
+        })
+        .catch(() => {});
+    } catch (e) {}
+  }
+
   // ── Boot ─────────────────────────────────────────────────
   if (PLATFORM === "claude") detectClaudeViaApi();
   if (PLATFORM === "chatgpt") detectChatgptViaApi();
@@ -344,7 +384,9 @@
     detectSubscription();
     scanExistingMessages();
     startMessageObserver();
+    if (PLATFORM === "claude") pollClaudeUsage();
   }, 3000);
 
   setInterval(detectSubscription, 60000);
+  if (PLATFORM === "claude") setInterval(pollClaudeUsage, 60000);
 })();

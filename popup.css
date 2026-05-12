@@ -66,11 +66,15 @@ h2 {
 .insight-card-header h2 { margin-bottom: 0; }
 
 /* Spend card */
+#spendCard {
+  border-top: 1px solid #7c83ff40;
+}
 .spend-amount {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: #fff;
   line-height: 1.2;
+  letter-spacing: -0.5px;
 }
 .spend-breakdown {
   display: flex;
@@ -97,8 +101,8 @@ h2 {
   justify-content: space-between;
   margin-bottom: 6px;
 }
-.stat { font-size: 11px; color: #aaa; }
-.stat strong { font-size: 14px; color: #e2e2e2; display: block; }
+.stat { font-size: 11px; color: #888; text-align: center; }
+.stat strong { font-size: 16px; color: #e2e2e2; display: block; font-weight: 600; }
 .time-bar {
   height: 6px;
   border-radius: 3px;
@@ -110,6 +114,46 @@ h2 {
 .time-bar-seg.claude  { background: #D97706; }
 .time-bar-seg.chatgpt { background: #4285F4; }
 .time-bar-seg.gemini  { background: #10A37F; }
+
+/* Usage meters (Claude real utilization) */
+.usage-meters {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.usage-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #aaa;
+}
+.usage-meter-label {
+  min-width: 50px;
+  color: #888;
+}
+.usage-meter-track {
+  flex: 1;
+  height: 4px;
+  background: #1a1a2e;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.usage-meter-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.usage-meter-fill.low { background: #10A37F; }
+.usage-meter-fill.mid { background: #D97706; }
+.usage-meter-fill.high { background: #ff6b6b; }
+.usage-meter-pct {
+  min-width: 28px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 10px;
+}
 
 /* Sparklines */
 .sparkline {
@@ -174,29 +218,47 @@ h2 {
 .trend-badge.down { color: #ff6b6b; background: #ff6b6b20; }
 .trend-badge.flat { color: #888; background: #88888820; }
 
-/* Remark */
-.remark {
-  font-size: 11px;
+/* Remark card */
+.remark-card {
+  background: linear-gradient(135deg, #2a2a4a 0%, #1e1e3a 100%);
+  border-radius: 8px;
+  border-left: 3px solid #7c83ff;
+  padding: 10px 12px 10px 14px;
+  margin-bottom: 6px;
+  position: relative;
+}
+.remark-quote {
+  position: absolute;
+  top: 4px;
+  left: 10px;
+  font-size: 24px;
+  color: #7c83ff30;
+  font-family: Georgia, serif;
+  line-height: 1;
+}
+.remark-text {
+  font-size: 13px;
   font-style: italic;
-  color: #888;
-  text-align: center;
-  padding: 4px 0 6px;
-  line-height: 1.4;
+  color: #ccc;
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 14px;
 }
 .dashboard-btn {
   width: 100%;
-  padding: 7px;
-  background: transparent;
-  border: 1px solid #7c83ff40;
+  padding: 8px;
+  background: #7c83ff12;
+  border: 1px solid #7c83ff30;
   color: #7c83ff;
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   transition: all 0.2s;
   letter-spacing: 0.3px;
 }
 .dashboard-btn:hover {
-  background: #7c83ff15;
+  background: #7c83ff25;
   border-color: #7c83ff;
 }
 
