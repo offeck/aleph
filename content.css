@@ -13,13 +13,8 @@
   unicode-bidi: plaintext !important;
 }
 
-.ProseMirror[dir="auto"],
-#prompt-textarea[dir="auto"],
-[contenteditable][dir="auto"],
-.ql-editor[dir="auto"] {
-  text-align: start !important;
-  unicode-bidi: plaintext !important;
-}
+/* Editor paragraph children use dir="auto" for per-paragraph direction.
+   No container-level override needed — browser handles it natively. */
 
 /* Math: ALWAYS LTR */
 .katex, .katex-display, span.katex-display,

@@ -473,9 +473,6 @@
 
     SEL.editor.forEach((sel) => {
       document.querySelectorAll(sel).forEach((ed) => {
-        if (ed.getAttribute("dir") !== "auto") {
-          ed.setAttribute("dir", "auto");
-        }
         ed.querySelectorAll("p, div, li").forEach((child) => {
           if (child.getAttribute("dir") !== "auto") {
             child.setAttribute("dir", "auto");
@@ -483,9 +480,6 @@
         });
         if (!ed.__alephListener) {
           ed.addEventListener("input", () => {
-            if (ed.getAttribute("dir") !== "auto") {
-              ed.setAttribute("dir", "auto");
-            }
             ed.querySelectorAll("p, div, li").forEach((child) => {
               if (child.getAttribute("dir") !== "auto") {
                 child.setAttribute("dir", "auto");
@@ -501,7 +495,6 @@
   function cleanupEditorDir() {
     SEL.editor.forEach((sel) => {
       document.querySelectorAll(sel).forEach((ed) => {
-        ed.removeAttribute("dir");
         ed.querySelectorAll("p, div, li").forEach((child) => {
           if (child.getAttribute("dir") === "auto") child.removeAttribute("dir");
         });
