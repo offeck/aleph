@@ -206,9 +206,9 @@
       code: ["code-block", "pre code", ".code-container"],
       message: [".response-content", ".model-response-text", "message-content"],
       chatWidth: [".conversation-container"],
-      themeBg: ["body", "main", ".chat-container", "chat-app", ".conversation-container", ".response-container", ".input-area-container"],
+      themeBg: ["body", "main", ".chat-container", "chat-app", ".conversation-container", ".response-container"],
       themeText: [".response-content", ".model-response-text", "message-content", "p", "li", ".query-content", ".conversation-title"],
-      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea", "input-area-v2"],
+      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea", ".input-area-container"],
       themeCode: ["code-block", "pre", ".code-container"],
       themeSidebar: ["nav", "side-navigation-v2", "side-navigation-content", ".side-navigation-content", "bard-sidenav", "bard-sidenav-container"],
       focusHide: {
@@ -973,12 +973,6 @@
       css += `${buildThemeSelector("", SEL.themeBg)} {
         background-color: var(--aleph-bg) !important;
       }\n`;
-
-      if (PLATFORM === "gemini") {
-        css += `[data-aleph-theme] body, [data-aleph-theme] main.chat-app {
-          background-image: linear-gradient(var(--aleph-bg), var(--aleph-bg)) !important;
-        }\n`;
-      }
 
       css += `${buildThemeSelector("", SEL.themeSidebar)} {
         background-color: var(--aleph-bg2) !important;
