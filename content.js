@@ -208,7 +208,7 @@
       chatWidth: [".conversation-container"],
       themeBg: ["body", "main", ".chat-container", "chat-app", ".conversation-container", ".response-container"],
       themeText: [".response-content", ".model-response-text", "message-content", "p", "li", ".query-content", ".conversation-title"],
-      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea", ".input-area-container"],
+      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea", "input-area-v2"],
       themeCode: ["code-block", "pre", ".code-container"],
       themeSidebar: ["nav", "side-navigation-v2", "side-navigation-content", ".side-navigation-content", "bard-sidenav", "bard-sidenav-container"],
       focusHide: {
