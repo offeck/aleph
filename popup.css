@@ -194,6 +194,10 @@ h2 {
   flex-direction: column-reverse;
   border-radius: 2px 2px 0 0;
   overflow: hidden;
+  background: #1a1a2e;
+}
+.spark-bar.today-bar {
+  background: #252545;
 }
 .spark-seg {
   transition: height 0.3s ease;
@@ -203,10 +207,29 @@ h2 {
 .spark-seg.chatgpt { background: #4285F4; }
 .spark-seg.gemini  { background: #10A37F; }
 
+/* Day labels under sparkline bars */
+.spark-days {
+  display: flex;
+  gap: 3px;
+}
+.spark-day-label {
+  flex: 1;
+  text-align: center;
+  font-size: 8px;
+  color: #555;
+  line-height: 1;
+  padding-top: 2px;
+}
+.spark-day-label.today {
+  color: #7c83ff;
+  font-weight: 700;
+}
+
 .spark-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: 4px;
 }
 .spark-total {
   font-size: 11px;

@@ -162,17 +162,24 @@
     return null;
   }
 
+  // Images cost tokens too — roughly 1600 tokens per image on Claude/ChatGPT,
+  // varies on Gemini. Count <img> tags inside messages and add to estimate.
+  const IMG_TOKEN_COST = { claude: 1600, chatgpt: 1600, gemini: 1200 };
+
   function processNewMessage(el) {
     if (countedMessages.has(el)) return;
     countedMessages.add(el);
     const role = classifyMessage(el);
     if (!role) return;
     const text = el.textContent || "";
+    const imgCount = el.querySelectorAll("img").length;
+    const textTokens = estimateTokens(text);
+    const imgTokens = imgCount * (IMG_TOKEN_COST[PLATFORM] || 1600);
     send({
       type: "insights-message",
       platform: PLATFORM,
       role,
-      estimatedTokens: estimateTokens(text),
+      estimatedTokens: textTokens + imgTokens,
       model: getCurrentModel(),
       timestamp: Date.now(),
     });

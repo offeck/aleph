@@ -164,7 +164,7 @@
         ],
       };
       const windows = GPT_WINDOWS[gptPlan] || GPT_WINDOWS.free;
-      const now = Date.now();
+      const nowMs = Date.now();
 
       if (chatgptModelTs && Object.keys(chatgptModelTs).length > 0) {
         // Aggregate timestamps per window rule
@@ -172,7 +172,7 @@
         for (const [model, timestamps] of Object.entries(chatgptModelTs)) {
           for (const w of windowCounts) {
             if (w.match.test(model)) {
-              w.count += timestamps.filter((t) => (now - t) < w.windowMs).length;
+              w.count += timestamps.filter((t) => (nowMs - t) < w.windowMs).length;
               break;
             }
           }
@@ -271,12 +271,19 @@
         return totals;
       });
 
+      const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"];
+      const todayDow = now.getDay();
+
       const maxDaySeconds = Math.max(...dayTotals.map((d) => d.total), 1);
       const sparkline = document.getElementById("weekSparkline");
       sparkline.innerHTML = "";
-      for (const day of dayTotals) {
+      const dayLabels = document.getElementById("weekDayLabels");
+      dayLabels.innerHTML = "";
+      for (let di = 0; di < dayTotals.length; di++) {
+        const day = dayTotals[di];
+        const isToday = di === 6;
         const bar = document.createElement("div");
-        bar.className = "spark-bar";
+        bar.className = "spark-bar" + (isToday ? " today-bar" : "");
         for (const p of ["gemini", "chatgpt", "claude"]) {
           if (day[p] <= 0) continue;
           const seg = document.createElement("div");
@@ -285,6 +292,12 @@
           bar.appendChild(seg);
         }
         sparkline.appendChild(bar);
+
+        const dayOfWeek = (todayDow - 6 + di + 7) % 7;
+        const lbl = document.createElement("span");
+        lbl.className = "spark-day-label" + (isToday ? " today" : "");
+        lbl.textContent = DAY_NAMES[dayOfWeek];
+        dayLabels.appendChild(lbl);
       }
       document.getElementById("weekTotal").textContent =
         `${(weekTotalSeconds / 3600).toFixed(1)}h total`;
@@ -314,10 +327,14 @@
       let weekTotalTokens = 0;
       const tokenSparkline = document.getElementById("tokenSparkline");
       tokenSparkline.innerHTML = "";
-      for (const day of dayTotals) {
+      const tokenDayLabels = document.getElementById("tokenDayLabels");
+      tokenDayLabels.innerHTML = "";
+      for (let di = 0; di < dayTotals.length; di++) {
+        const day = dayTotals[di];
+        const isToday = di === 6;
         weekTotalTokens += day.tokens;
         const bar = document.createElement("div");
-        bar.className = "spark-bar";
+        bar.className = "spark-bar" + (isToday ? " today-bar" : "");
         if (day.tokens > 0) {
           const seg = document.createElement("div");
           seg.className = "spark-seg";
@@ -325,6 +342,12 @@
           seg.style.background = "#7c83ff";
           bar.appendChild(seg);
         }
+
+        const dayOfWeek = (todayDow - 6 + di + 7) % 7;
+        const lbl = document.createElement("span");
+        lbl.className = "spark-day-label" + (isToday ? " today" : "");
+        lbl.textContent = DAY_NAMES[dayOfWeek];
+        tokenDayLabels.appendChild(lbl);
         tokenSparkline.appendChild(bar);
       }
       document.getElementById("tokenTotal").textContent = formatTokens(weekTotalTokens) + " total";
