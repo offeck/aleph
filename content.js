@@ -150,11 +150,11 @@
       code: ["code.hljs", "pre code", ".code-block__code"],
       message: [".markdown", "[data-message-author-role='assistant']"],
       chatWidth: ["main .group\\/thread", "main [class*='thread-content']", "main .max-w-3xl"],
-      themeBg: ["body", "main", ".bg-token-bg-primary", ".bg-token-bg-secondary", ".bg-token-bg-tertiary", ".bg-token-bg-elevated-primary"],
+      themeBg: ["body", "main", ".bg-token-bg-primary", ".bg-token-main-surface-primary", ".bg-token-bg-tertiary"],
       themeText: [".markdown", ".prose", "p", "li", "h1", "h2", "h3", "h4"],
       themeInput: ["#prompt-textarea", ".bg-token-bg-primary", "[contenteditable='true']"],
       themeCode: ["pre", "code.hljs", ".bg-token-bg-tertiary"],
-      themeSidebar: ["nav", "[class*='sidebar'][class*='shrink']"],
+      themeSidebar: ["nav", "[class*='sidebar'][class*='shrink']", ".bg-\\(--sidebar-surface-primary\\)"],
       focusHide: {
         upgrade: [
           "[data-testid='upgrade-button']",
@@ -186,11 +186,11 @@
       code: ["code-block", "pre code", ".code-container"],
       message: [".response-content", ".model-response-text", "message-content"],
       chatWidth: [".conversation-container"],
-      themeBg: ["body", "main", ".chat-container", "chat-app", "bard-sidenav-container", ".conversation-container"],
-      themeText: [".response-content", ".model-response-text", "message-content", "p", "li", ".query-content"],
-      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea"],
+      themeBg: ["body", "main", ".chat-container", "chat-app", ".conversation-container", ".response-container"],
+      themeText: [".response-content", ".model-response-text", "message-content", "p", "li", ".query-content", ".conversation-title"],
+      themeInput: [".ql-editor", "rich-textarea", "[contenteditable='true']", ".text-input-field_textarea", ".input-area-container"],
       themeCode: ["code-block", "pre", ".code-container"],
-      themeSidebar: ["nav", "side-navigation-v2", "side-navigation-content", ".side-navigation-content"],
+      themeSidebar: ["nav", "side-navigation-v2", "side-navigation-content", ".side-navigation-content", "bard-sidenav", "bard-sidenav-container"],
       focusHide: {
         upgrade: ["[class*='upgrade']"],
         chips: ["intent-card", ".card-container", ".suggestion-chip", ".chip-container"],
@@ -805,27 +805,54 @@
   }
 
   const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()֐-׿]*\)/g;
+  const MATH_PIPE_RE = /\|[^|֐-׿\n]{1,50}\|/g;
+  const MATH_TILDE_RE = /~_?\w+/g;
+
+  function collectRegions(re, text, regions, type) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      regions.push({ start: match.index, end: match.index + match[0].length, text: match[0], type });
+    }
+  }
 
   function isolateMathText(textNode) {
     const text = textNode.textContent;
-    MATH_PAREN_RE.lastIndex = 0;
-    let match;
     const regions = [];
-    while ((match = MATH_PAREN_RE.exec(text)) !== null) {
-      regions.push({ start: match.index, end: match.index + match[0].length, text: match[0] });
-    }
+
+    collectRegions(MATH_PAREN_RE, text, regions);
+    collectRegions(MATH_PIPE_RE, text, regions);
+    collectRegions(MATH_TILDE_RE, text, regions, "tilde");
+
     if (regions.length === 0) return;
+    regions.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const r of regions) {
+      const last = merged[merged.length - 1];
+      if (last && r.start < last.end) continue;
+      merged.push(r);
+    }
+
     const wrapper = document.createElement("span");
     wrapper.setAttribute("data-aleph-math-isolated", "true");
     let lastEnd = 0;
-    for (const r of regions) {
+    for (const r of merged) {
       if (r.start > lastEnd) {
         wrapper.appendChild(document.createTextNode(text.slice(lastEnd, r.start)));
       }
       const ltrSpan = document.createElement("span");
       ltrSpan.dir = "ltr";
       ltrSpan.style.unicodeBidi = "isolate";
-      ltrSpan.textContent = r.text;
+      if (r.type === "tilde" && typeof katex !== "undefined") {
+        const sub = r.text.replace(/^~_?/, "");
+        try {
+          katex.render("\\sim_{" + sub + "}", ltrSpan, { throwOnError: true, displayMode: false, output: "html" });
+        } catch (e) {
+          ltrSpan.textContent = r.text;
+        }
+      } else {
+        ltrSpan.textContent = r.text;
+      }
       wrapper.appendChild(ltrSpan);
       lastEnd = r.end;
     }
@@ -850,7 +877,9 @@
         if (!txt || txt.trim().length === 0) continue;
         if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
           latexNodes.push(node);
-        } else if ((MATH_PAREN_RE.lastIndex = 0, MATH_PAREN_RE.test(txt))) {
+        } else if ((MATH_PAREN_RE.lastIndex = 0, MATH_PAREN_RE.test(txt)) ||
+                   (MATH_PIPE_RE.lastIndex = 0, MATH_PIPE_RE.test(txt)) ||
+                   (MATH_TILDE_RE.lastIndex = 0, MATH_TILDE_RE.test(txt))) {
           mathTextNodes.push(node);
         }
       }
@@ -909,7 +938,6 @@
         border-color: var(--aleph-border) !important;
       }\n`;
 
-      css += `[data-aleph-theme] { color: var(--aleph-text) !important; }\n`;
       css += `${buildThemeSelector("", SEL.themeText)} {
         color: var(--aleph-text) !important;
       }\n`;
@@ -926,8 +954,8 @@
         color: var(--aleph-text) !important;
       }\n`;
 
-      css += `[data-aleph-theme] a { color: var(--aleph-accent) !important; }\n`;
-      css += `[data-aleph-theme] * { border-color: var(--aleph-border); }\n`;
+      const msgLinkSel = SEL.message.map(s => `[data-aleph-theme] ${s.trim()} a`).join(",\n");
+      css += `${msgLinkSel} { color: var(--aleph-accent) !important; }\n`;
       css += `[data-aleph-theme] ::-webkit-scrollbar { width: 8px; }
       [data-aleph-theme] ::-webkit-scrollbar-track { background: var(--aleph-bg); }
       [data-aleph-theme] ::-webkit-scrollbar-thumb { background: var(--aleph-border); border-radius: 4px; }\n`;

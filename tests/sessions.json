@@ -84,6 +84,17 @@
       "status": "active"
     },
     {
+      "id": "claude-bidi-math-004",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Hebrew CS theory (Pumping Lemma, Myhill-Nerode). Absolute value pipes |w|, |xy| garbled by BiDi reordering. Tilde equivalence ~_L rendered as plain text instead of math symbol.",
+      "category": "bidi-math",
+      "checks": ["rtl-direction", "math-ltr-isolation", "no-console-errors"],
+      "source": "conversation:2026-05-12",
+      "addedAt": "2026-05-12",
+      "status": "fixed"
+    },
+    {
       "id": "chatgpt-theme-001",
       "platform": "chatgpt",
       "url": "https://chatgpt.com/c/69efc59b-dbec-83eb-9061-16d1951e435d",
