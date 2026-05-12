@@ -113,6 +113,20 @@
         }
       }
 
+      // Per-platform breakdown (time + msgs per platform)
+      const bdEl = document.getElementById("platformBreakdown");
+      bdEl.innerHTML = "";
+      for (const p of ["claude", "chatgpt", "gemini"]) {
+        const d = today?.[p];
+        const s = d?.totalSeconds || 0;
+        const m = d?.messageCount || 0;
+        if (s <= 0 && m <= 0) continue;
+        const item = document.createElement("span");
+        item.className = `pb-item ${p}`;
+        item.innerHTML = `<span class="pb-dot"></span>${PLATFORM_LABELS[p]}: <span class="pb-value">${formatTime(s)}</span> · <span class="pb-value">${m}</span> msgs`;
+        bdEl.appendChild(item);
+      }
+
       // Usage meters — real data for Claude, estimated for ChatGPT/Gemini
       const { platformUsage } = resp;
       const metersEl = document.getElementById("usageMeters");
@@ -132,24 +146,32 @@
         }
       }
 
-      // ChatGPT: estimated from message count vs known plan limits
-      const GPT_LIMITS = { free: 16, plus: 80, pro: 999 };
-      const gptPlan = subs?.chatgpt?.plan || "free";
-      const gptMsgs = today?.chatgpt?.messageCount || 0;
-      const gptLimit = GPT_LIMITS[gptPlan] || 16;
-      if (gptMsgs > 0 || gptPlan !== "free") {
-        const gptPct = Math.min(100, Math.round((gptMsgs / gptLimit) * 100));
-        meters.push({ label: "GPT ~3h", pct: gptPct, color: "#4285F4", est: true });
+      // ChatGPT: real data from /backend-api/conversation/init
+      const gptUsage = platformUsage?.chatgpt;
+      if (gptUsage?.modelLimits?.length > 0) {
+        for (const ml of gptUsage.modelLimits) {
+          if (!ml.limit || ml.limit <= 0) continue;
+          const used = ml.limit - (ml.remaining || 0);
+          const pct = Math.min(100, Math.round((used / ml.limit) * 100));
+          meters.push({ label: `GPT ${ml.model || ""}`, pct, color: "#4285F4" });
+        }
+      } else if (gptUsage?.limits?.length > 0) {
+        for (const lp of gptUsage.limits) {
+          if (lp.feature === "file_upload" || lp.feature === "paste_text_to_file") continue;
+          meters.push({ label: `GPT ${lp.feature}`, pct: 0, color: "#4285F4", remaining: lp.remaining });
+        }
       }
 
-      // Gemini: estimated from message count vs known limits
-      const GEM_LIMITS = { free: 30, ai_pro: 1500, ai_ultra: 3000 };
-      const gemPlan = subs?.gemini?.plan || "free";
-      const gemMsgs = today?.gemini?.messageCount || 0;
-      const gemLimit = GEM_LIMITS[gemPlan] || 30;
-      if (gemMsgs > 0 || gemPlan !== "free") {
-        const gemPct = Math.min(100, Math.round((gemMsgs / gemLimit) * 100));
-        meters.push({ label: "Gemini ~day", pct: gemPct, color: "#10A37F", est: true });
+      // Gemini: real data from qpEbW RPC — per-feature quota with [limit, remaining]
+      const gemUsage = platformUsage?.gemini;
+      if (gemUsage?.mainChat) {
+        const mc = gemUsage.mainChat;
+        const used = mc.limit - mc.remaining;
+        const pct = mc.limit > 0 ? Math.min(100, Math.round((used / mc.limit) * 100)) : 0;
+        const resetStr = mc.resetsAt
+          ? new Date(mc.resetsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "";
+        meters.push({ label: `Gemini (${mc.remaining}/${mc.limit})`, pct, color: "#10A37F" });
       }
 
       if (meters.length > 0) {
@@ -270,9 +292,11 @@
           : tokenTrend.dir === "down" ? `↓${Math.abs(tokenTrend.pct)}%` : "—";
       }
 
-      // Remark
+      // Remark (right side of header)
+      const remarkEl = document.getElementById("remark");
       if (remark?.text) {
-        document.getElementById("remark").textContent = remark.text;
+        remarkEl.textContent = remark.text;
+        remarkEl.classList.add("active");
       }
     });
   }

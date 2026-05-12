@@ -115,6 +115,30 @@ h2 {
 .time-bar-seg.chatgpt { background: #4285F4; }
 .time-bar-seg.gemini  { background: #10A37F; }
 
+/* Per-platform breakdown */
+.platform-breakdown {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.pb-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #888;
+}
+.pb-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pb-item.claude .pb-dot  { background: #D97706; }
+.pb-item.chatgpt .pb-dot { background: #4285F4; }
+.pb-item.gemini .pb-dot  { background: #10A37F; }
+.pb-value { font-weight: 600; color: #bbb; }
+
 /* Usage meters (Claude real utilization) */
 .usage-meters {
   margin-top: 6px;
@@ -165,11 +189,11 @@ h2 {
 }
 .spark-bar {
   flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column-reverse;
   border-radius: 2px 2px 0 0;
   overflow: hidden;
-  min-height: 0;
 }
 .spark-seg {
   transition: height 0.3s ease;
@@ -218,32 +242,20 @@ h2 {
 .trend-badge.down { color: #ff6b6b; background: #ff6b6b20; }
 .trend-badge.flat { color: #888; background: #88888820; }
 
-/* Remark card */
-.remark-card {
-  background: linear-gradient(135deg, #2a2a4a 0%, #1e1e3a 100%);
-  border-radius: 8px;
-  border-left: 3px solid #7c83ff;
-  padding: 10px 12px 10px 14px;
-  margin-bottom: 6px;
-  position: relative;
-}
-.remark-quote {
-  position: absolute;
-  top: 4px;
-  left: 10px;
-  font-size: 24px;
-  color: #7c83ff30;
-  font-family: Georgia, serif;
-  line-height: 1;
-}
-.remark-text {
-  font-size: 13px;
+/* Remark (right side of header) */
+.remark-header {
+  flex: 1;
+  font-size: 11.5px;
+  color: #c4b5fd;
   font-style: italic;
-  color: #ccc;
-  line-height: 1.5;
+  text-align: left;
+  direction: ltr;
+  line-height: 1.35;
   margin: 0;
-  padding-left: 14px;
+  opacity: 0;
+  transition: opacity 0.3s;
 }
+.remark-header.active { opacity: 1; }
 .dashboard-btn {
   width: 100%;
   padding: 8px;

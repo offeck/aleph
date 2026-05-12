@@ -18,22 +18,22 @@
 
   // ── Message selectors (minimal duplication from content.js) ──
   const MSG_CONTAINER = {
-    claude:  ["main", "[data-testid='chat-messages']"],
+    claude:  [".overflow-y-auto", "[class*='max-w-3xl']"],
     chatgpt: ["main"],
     gemini:  [".conversation-container", "chat-app"],
   };
   const MSG_WRAPPER = {
-    claude:  ["[data-testid='chat-message']"],
+    claude:  ["[data-testid='user-message']", ".font-claude-response"],
     chatgpt: ["[data-testid^='conversation-turn']"],
     gemini:  ["model-response", ".conversation-turn"],
   };
   const ASSISTANT_MARKER = {
-    claude:  [".font-claude-response", "[data-testid='chat-message-content']"],
+    claude:  [".font-claude-response"],
     chatgpt: ["[data-message-author-role='assistant']"],
     gemini:  [".response-content", ".model-response-text", "message-content"],
   };
   const USER_MARKER = {
-    claude:  ["[data-testid='chat-message-user']", ".font-user-message"],
+    claude:  ["[data-testid='user-message']"],
     chatgpt: ["[data-message-author-role='user']"],
     gemini:  [".query-content", ".user-query"],
   };
@@ -166,17 +166,17 @@
     });
   }
 
-  function scanExistingMessages() {
+  function markExistingMessages() {
     for (const sel of MSG_WRAPPER[PLATFORM]) {
-      document.querySelectorAll(sel).forEach(processNewMessage);
+      document.querySelectorAll(sel).forEach((el) => countedMessages.add(el));
     }
   }
 
+  // Observe document.body (not a container that SPAs might replace)
   function startMessageObserver() {
-    const container = q(MSG_CONTAINER[PLATFORM]);
-    if (!container) return;
     new MutationObserver((mutations) => {
       for (const m of mutations) {
+        if (m.target.id === "aleph-dynamic-styles") continue;
         for (const node of m.addedNodes) {
           if (node.nodeType !== 1) continue;
           for (const sel of MSG_WRAPPER[PLATFORM]) {
@@ -185,8 +185,17 @@
           }
         }
       }
-    }).observe(container, { childList: true, subtree: true });
+    }).observe(document.body, { childList: true, subtree: true });
   }
+
+  // Re-mark existing messages on SPA navigation (URL change within same tab)
+  let lastUrl = location.href;
+  setInterval(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      markExistingMessages();
+    }
+  }, 2000);
 
   // ── Subscription & model detection ───────────────────────
 
@@ -376,17 +385,104 @@
     } catch (e) {}
   }
 
+  // ── ChatGPT real usage polling ───────────────────────────
+  // Fetches /backend-api/conversation/init which returns limits_progress
+  // and model_limits with remaining counts and reset times.
+  function pollChatgptUsage() {
+    fetch("/backend-api/conversation/init", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: "{}",
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const usage = { limits: [], modelLimits: [] };
+        if (data.limits_progress) {
+          for (const lp of data.limits_progress) {
+            usage.limits.push({
+              feature: lp.feature_name,
+              remaining: lp.remaining,
+              resetsAt: lp.reset_after,
+            });
+          }
+        }
+        if (data.model_limits) {
+          for (const ml of data.model_limits) {
+            usage.modelLimits.push({
+              model: ml.model_slug || ml.model,
+              remaining: ml.remaining,
+              limit: ml.limit || ml.max,
+              resetsAt: ml.reset_after,
+            });
+          }
+        }
+        send({ type: "insights-usage", platform: "chatgpt", usage });
+      })
+      .catch(() => {});
+  }
+
+  // ── Gemini real usage polling ───────────────────────────
+  // Fetches qpEbW RPC which returns per-feature quota table:
+  // [[category, feature_id, ?], status, ?, [reset_ts_s, reset_ts_ns], limit, remaining]
+  function pollGeminiUsage() {
+    const sid = window.WIZ_global_data?.FdrFJe || "";
+    const at = window.WIZ_global_data?.SNlM0e || "";
+    if (!sid) return;
+    const body = new URLSearchParams();
+    body.append("f.req", JSON.stringify([[["qpEbW", "[]", null, "generic"]]]));
+    body.append("at", at);
+    fetch("/_/BardChatUi/data/batchexecute?rpcids=qpEbW&bl=boq_assistant-bard-web-server_20260511.08_p0&f.sid=" + sid + "&hl=en&_reqid=" + Math.floor(Math.random() * 9999999) + "&rt=c", {
+      method: "POST", credentials: "same-origin", body,
+    })
+      .then((r) => r.text())
+      .then((raw) => {
+        const lines = raw.split("\n").filter((l) => l.trim());
+        let parsed = null;
+        for (const line of lines) {
+          try { const j = JSON.parse(line); if (Array.isArray(j)) { parsed = j; break; } } catch (e) {}
+        }
+        if (!parsed) return;
+        const dataStr = parsed[0]?.[2];
+        if (!dataStr) return;
+        let quotas;
+        try { quotas = JSON.parse(dataStr); } catch (e) { return; }
+        if (!Array.isArray(quotas) || !Array.isArray(quotas[0])) return;
+
+        const features = [];
+        for (const q of quotas[0]) {
+          if (!Array.isArray(q) || q.length < 6) continue;
+          const featureId = q[0]?.[1];
+          const resetTs = q[3]?.[0];
+          const limit = q[4];
+          const remaining = q[5];
+          if (typeof limit !== "number" || typeof remaining !== "number") continue;
+          features.push({ id: featureId, limit, remaining, resetsAt: resetTs ? new Date(resetTs * 1000).toISOString() : null });
+        }
+        // Find the main chat feature — the one with the highest limit (typically 1000 for Pro)
+        features.sort((a, b) => b.limit - a.limit);
+        send({
+          type: "insights-usage", platform: "gemini",
+          usage: { features, mainChat: features[0] || null },
+        });
+      })
+      .catch(() => {});
+  }
+
   // ── Boot ─────────────────────────────────────────────────
   if (PLATFORM === "claude") detectClaudeViaApi();
   if (PLATFORM === "chatgpt") detectChatgptViaApi();
 
   setTimeout(() => {
     detectSubscription();
-    scanExistingMessages();
+    markExistingMessages();
     startMessageObserver();
     if (PLATFORM === "claude") pollClaudeUsage();
+    if (PLATFORM === "chatgpt") pollChatgptUsage();
+    if (PLATFORM === "gemini") pollGeminiUsage();
   }, 3000);
 
   setInterval(detectSubscription, 60000);
   if (PLATFORM === "claude") setInterval(pollClaudeUsage, 60000);
+  if (PLATFORM === "chatgpt") setInterval(pollChatgptUsage, 60000);
+  if (PLATFORM === "gemini") setInterval(pollGeminiUsage, 60000);
 })();

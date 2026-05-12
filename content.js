@@ -474,15 +474,21 @@
     SEL.editor.forEach((sel) => {
       document.querySelectorAll(sel).forEach((ed) => {
         ed.querySelectorAll("p, div, li").forEach((child) => {
-          if (child.getAttribute("dir") !== "auto") {
+          const hasText = child.textContent.trim().length > 0;
+          if (hasText && child.getAttribute("dir") !== "auto") {
             child.setAttribute("dir", "auto");
+          } else if (!hasText && child.getAttribute("dir") === "auto") {
+            child.removeAttribute("dir");
           }
         });
         if (!ed.__alephListener) {
           ed.addEventListener("input", () => {
             ed.querySelectorAll("p, div, li").forEach((child) => {
-              if (child.getAttribute("dir") !== "auto") {
+              const hasText = child.textContent.trim().length > 0;
+              if (hasText && child.getAttribute("dir") !== "auto") {
                 child.setAttribute("dir", "auto");
+              } else if (!hasText && child.getAttribute("dir") === "auto") {
+                child.removeAttribute("dir");
               }
             });
           });
