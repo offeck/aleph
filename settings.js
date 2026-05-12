@@ -193,16 +193,7 @@
       chrome.runtime.sendMessage({ type: "aleph-sync-signout" }, () => loadSyncStatus());
     });
 
-    document.getElementById("syncNowBtn")?.addEventListener("click", () => {
-      const btn = document.getElementById("syncNowBtn");
-      btn.textContent = "Syncing...";
-      btn.disabled = true;
-      chrome.runtime.sendMessage({ type: "aleph-sync-now" }, () => {
-        btn.textContent = "Sync now";
-        btn.disabled = false;
-        loadSyncStatus();
-      });
-    });
+
   }
 
   document.addEventListener("DOMContentLoaded", () => {

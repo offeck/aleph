@@ -5,7 +5,7 @@
   "description": "Hebrew BiDi fix, themes, focus mode & consistent styling across Claude, ChatGPT & Gemini",
   "permissions": ["storage", "activeTab", "identity"],
   "oauth2": {
-    "client_id": "PLACEHOLDER.apps.googleusercontent.com",
+    "client_id": "440163597784-t0bfi7ahtqba6dmlj0iis96d5jklc56e.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/userinfo.email"]
   },
   "background": {
