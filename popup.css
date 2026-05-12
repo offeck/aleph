@@ -30,6 +30,7 @@ h1 { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: 0.5px; }
   line-height: 1;
 }
 .icon-btn:hover { color: #7c83ff; }
+.sync-indicator { color: #4ade80; font-size: 16px; opacity: 0.7; cursor: default; margin-left: 4px; }
 
 /* ── Sections ─────────────────────────────────────────────────────── */
 section { padding: 10px 16px 4px; }

@@ -180,6 +180,40 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* ── Cloud Sync ──────────────────────────────────────────────────── */
+.google-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: #4285f4;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.google-btn:hover { background: #3367d6; }
+.google-btn:disabled { background: #666; cursor: wait; }
+
+.sync-status { font-size: 13px; margin-bottom: 4px; }
+.sync-actions { display: flex; gap: 8px; margin-top: 8px; }
+.sync-actions button {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sync-actions button:hover { color: #e2e2e2; border-color: #5a5a8a; }
+.sync-actions button:disabled { opacity: 0.5; cursor: wait; }
+.danger-btn:hover { color: #ff6b6b !important; border-color: #ff6b6b !important; }
+
 /* ── Reset button ─────────────────────────────────────────────────── */
 #resetBtn {
   width: 100%;

@@ -557,11 +557,19 @@
     });
   }
 
+  function loadSyncIndicator() {
+    chrome.runtime.sendMessage({ type: "aleph-sync-status" }, (state) => {
+      var el = document.getElementById("syncIndicator");
+      if (el && state?.signedIn) el.style.display = "";
+    });
+  }
+
   // ── Init ───────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
     loadUI();
     bindEvents();
     loadInsights();
     detectActivePlatform();
+    loadSyncIndicator();
   });
 })();

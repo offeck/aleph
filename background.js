@@ -1,3 +1,17 @@
+importScripts(
+  "vendor/firebase/firebase-app-compat.js",
+  "vendor/firebase/firebase-auth-compat.js",
+  "vendor/firebase/firebase-firestore-compat.js",
+  "vendor/firebase/firebase-config.js",
+  "sync.js"
+);
+
+if (ALEPH_FIREBASE_CONFIG.apiKey !== "PLACEHOLDER") {
+  firebase.initializeApp(ALEPH_FIREBASE_CONFIG);
+  alephSync.init(firebase);
+  alephSync.restoreAuth();
+}
+
 "use strict";
 
 // ── Helpers ──────────────────────────────────────────────
@@ -16,6 +30,9 @@ async function readLocal(key, fallback) {
 
 async function writeLocal(key, value) {
   await chrome.storage.local.set({ [key]: value });
+  if (key.startsWith("usage_") || key === "insights_subscriptions") {
+    try { alephSync.maybePush(key, value); } catch (e) {}
+  }
 }
 
 // ── Remark engine ────────────────────────────────────────
@@ -342,11 +359,35 @@ async function cleanupOldUsage() {
   if (toRemove.length > 0) await chrome.storage.local.remove(toRemove);
 }
 
-chrome.runtime.onInstalled?.addListener(cleanupOldUsage);
-chrome.runtime.onStartup?.addListener(cleanupOldUsage);
+chrome.runtime.onInstalled?.addListener(() => {
+  cleanupOldUsage();
+  alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
+});
+chrome.runtime.onStartup?.addListener(() => {
+  cleanupOldUsage();
+  alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
+});
 
 // ── Message handlers ─────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Sync handlers — from popup/settings (not content scripts)
+  if (msg.type === "aleph-sync-signin") {
+    alephSync.signIn().then(sendResponse);
+    return true;
+  }
+  if (msg.type === "aleph-sync-signout") {
+    alephSync.signOut().then(sendResponse);
+    return true;
+  }
+  if (msg.type === "aleph-sync-status") {
+    alephSync.getAuthState().then(sendResponse);
+    return true;
+  }
+  if (msg.type === "aleph-sync-now") {
+    alephSync.fullMergeAndSync().then(() => sendResponse({ success: true })).catch((e) => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
   // Insights summary — allowed from any extension context (popup, dashboard)
   if (msg.type === "insights-get-summary") {
     (async () => {

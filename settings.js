@@ -151,8 +151,64 @@
     });
   }
 
+  // ── Cloud Sync UI ────────────────────────────────────────
+  function updateSyncUI(state) {
+    const signedOut = document.getElementById("syncSignedOut");
+    const signedIn = document.getElementById("syncSignedIn");
+    if (!signedOut || !signedIn) return;
+    if (state && state.signedIn) {
+      signedOut.style.display = "none";
+      signedIn.style.display = "";
+      document.getElementById("syncEmail").textContent = state.email || "unknown";
+      const lastTime = document.getElementById("syncLastTime");
+      if (state.lastSyncAt) {
+        lastTime.textContent = "Last sync: " + new Date(state.lastSyncAt).toLocaleString();
+      } else {
+        lastTime.textContent = "Last sync: never";
+      }
+    } else {
+      signedOut.style.display = "";
+      signedIn.style.display = "none";
+    }
+  }
+
+  function loadSyncStatus() {
+    chrome.runtime.sendMessage({ type: "aleph-sync-status" }, updateSyncUI);
+  }
+
+  function bindSyncEvents() {
+    document.getElementById("syncSignInBtn")?.addEventListener("click", () => {
+      const btn = document.getElementById("syncSignInBtn");
+      btn.textContent = "Signing in...";
+      btn.disabled = true;
+      chrome.runtime.sendMessage({ type: "aleph-sync-signin" }, (resp) => {
+        btn.textContent = "Sign in with Google";
+        btn.disabled = false;
+        if (resp?.success) loadSyncStatus();
+        else alert("Sign-in failed: " + (resp?.error || "Unknown error"));
+      });
+    });
+
+    document.getElementById("syncSignOutBtn")?.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "aleph-sync-signout" }, () => loadSyncStatus());
+    });
+
+    document.getElementById("syncNowBtn")?.addEventListener("click", () => {
+      const btn = document.getElementById("syncNowBtn");
+      btn.textContent = "Syncing...";
+      btn.disabled = true;
+      chrome.runtime.sendMessage({ type: "aleph-sync-now" }, () => {
+        btn.textContent = "Sync now";
+        btn.disabled = false;
+        loadSyncStatus();
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     loadUI();
     bindEvents();
+    loadSyncStatus();
+    bindSyncEvents();
   });
 })();
