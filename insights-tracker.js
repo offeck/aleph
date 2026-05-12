@@ -175,15 +175,21 @@
   // Observe document.body (not a container that SPAs might replace)
   function startMessageObserver() {
     new MutationObserver((mutations) => {
+      const newMsgs = [];
       for (const m of mutations) {
         if (m.target.id === "aleph-dynamic-styles") continue;
         for (const node of m.addedNodes) {
           if (node.nodeType !== 1) continue;
           for (const sel of MSG_WRAPPER[PLATFORM]) {
-            if (node.matches?.(sel)) { processNewMessage(node); continue; }
-            node.querySelectorAll?.(sel).forEach(processNewMessage);
+            if (node.matches?.(sel)) { newMsgs.push(node); continue; }
+            node.querySelectorAll?.(sel).forEach((el) => newMsgs.push(el));
           }
         }
+      }
+      if (newMsgs.length > 2) {
+        newMsgs.forEach((el) => countedMessages.add(el));
+      } else {
+        newMsgs.forEach(processNewMessage);
       }
     }).observe(document.body, { childList: true, subtree: true });
   }
@@ -253,43 +259,26 @@
     return { plan: model && /opus/i.test(model) ? "pro" : "free", model };
   }
 
-  // ChatGPT: detect plan from available models.
-  // The accounts/check API is unreliable (returns "guest" for Plus users).
-  // Instead, infer tier from model access: Pro has o3, Plus has gpt-5-5,
-  // Go has gpt-5, Free only has mini models.
+  // ChatGPT: detect plan via /api/auth/session which returns the real plan_type
+  // with just cookies (no bearer token needed for this endpoint).
+  // Also retrieves the access token needed for usage polling.
   let chatgptApiPlan = null;
-
-  function planFromModels(slugs) {
-    const has = (re) => slugs.some((s) => re.test(s));
-    if (has(/^o3$/)) return "pro";
-    if (has(/^gpt-5-5/)) return "plus";
-    if (has(/^gpt-5$/)) return "plus";
-    if (slugs.length > 0) return "free";
-    return null;
-  }
 
   function detectChatgptViaApi() {
     if (chatgptApiPlan) return;
-
-    // 1. Try localStorage models cache (instant, no network)
-    try {
-      const key = Object.keys(localStorage).find((k) => k.endsWith("/models"));
-      if (key) {
-        const raw = JSON.parse(localStorage.getItem(key));
-        const slugs = (raw?.value?.categories || []).map((c) => c.defaultModel).filter(Boolean);
-        const plan = planFromModels(slugs);
-        if (plan) { chatgptApiPlan = plan; return; }
+    refreshChatgptToken().then((token) => {
+      if (!token) {
+        // Fallback: infer from model cookie
+        try {
+          const c = document.cookie.split(";").reduce((a, c) => { const [k,...v] = c.trim().split("="); a[k]=v.join("="); return a; }, {});
+          if (c["oai-last-model-config"]) {
+            const m = JSON.parse(decodeURIComponent(c["oai-last-model-config"])).model || "";
+            if (/^o3$/.test(m)) chatgptApiPlan = "pro";
+            else if (/^gpt-5-[2-9]|^gpt-5-5/.test(m)) chatgptApiPlan = "plus";
+          }
+        } catch (e) {}
       }
-    } catch (e) {}
-
-    // 2. Fallback: fetch models API
-    fetch("/backend-api/models", { credentials: "same-origin" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        const slugs = data?.models?.map((m) => m.slug) || [];
-        chatgptApiPlan = planFromModels(slugs) || "free";
-      })
-      .catch(() => {});
+    });
   }
 
   function detectChatgpt() {
@@ -450,39 +439,64 @@
   }
 
   // ── ChatGPT real usage polling ───────────────────────────
-  // Fetches /backend-api/conversation/init which returns limits_progress
-  // and model_limits with remaining counts and reset times.
-  function pollChatgptUsage() {
-    fetch("/backend-api/conversation/init", {
-      method: "POST", credentials: "same-origin",
-      headers: { "Content-Type": "application/json" }, body: "{}",
-    })
+  // Two-step auth: /api/auth/session returns a bearer token (works with cookies),
+  // then /backend-api/conversation/init with that token returns real limits.
+  // Without the token, the API returns guest data even for Plus users.
+  let chatgptAccessToken = null;
+  function refreshChatgptToken() {
+    return fetch("/api/auth/session", { credentials: "same-origin" })
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (!data) return;
-        const usage = { limits: [], modelLimits: [] };
-        if (data.limits_progress) {
-          for (const lp of data.limits_progress) {
-            usage.limits.push({
-              feature: lp.feature_name,
-              remaining: lp.remaining,
-              resetsAt: lp.reset_after,
-            });
-          }
+      .then((session) => {
+        if (session?.accessToken) chatgptAccessToken = session.accessToken;
+        if (session?.account?.planType && !chatgptApiPlan) {
+          chatgptApiPlan = session.account.planType === "plus" ? "plus"
+            : session.account.planType === "pro" ? "pro" : chatgptApiPlan;
         }
-        if (data.model_limits) {
-          for (const ml of data.model_limits) {
-            usage.modelLimits.push({
-              model: ml.model_slug || ml.model,
-              remaining: ml.remaining,
-              limit: ml.limit || ml.max,
-              resetsAt: ml.reset_after,
-            });
-          }
-        }
-        send({ type: "insights-usage", platform: "chatgpt", usage });
+        return chatgptAccessToken;
       })
-      .catch(() => {});
+      .catch(() => null);
+  }
+
+  function pollChatgptUsage() {
+    const doFetch = (token) => {
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
+      fetch("/backend-api/conversation/init", {
+        method: "POST", credentials: "same-origin", headers, body: "{}",
+      })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (!data) return;
+          const usage = { limits: [], modelLimits: [] };
+          if (data.limits_progress) {
+            for (const lp of data.limits_progress) {
+              usage.limits.push({
+                feature: lp.feature_name,
+                remaining: lp.remaining,
+                resetsAt: lp.reset_after,
+              });
+            }
+          }
+          if (data.model_limits) {
+            for (const ml of data.model_limits) {
+              usage.modelLimits.push({
+                model: ml.model_slug || ml.model,
+                remaining: ml.remaining,
+                limit: ml.limit || ml.max,
+                resetsAt: ml.reset_after,
+              });
+            }
+          }
+          send({ type: "insights-usage", platform: "chatgpt", usage });
+        })
+        .catch(() => {});
+    };
+
+    if (chatgptAccessToken) {
+      doFetch(chatgptAccessToken);
+    } else {
+      refreshChatgptToken().then((token) => { if (token) doFetch(token); });
+    }
   }
 
   // ── Gemini real usage polling ───────────────────────────

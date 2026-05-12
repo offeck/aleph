@@ -146,45 +146,59 @@
         }
       }
 
-      // ChatGPT: real data from /backend-api/conversation/init
+      // ChatGPT: real data from /backend-api/conversation/init (paid users),
+      // or tracked message count fallback (free users)
       const gptUsage = platformUsage?.chatgpt;
       if (gptUsage?.modelLimits?.length > 0) {
         for (const ml of gptUsage.modelLimits) {
           if (!ml.limit || ml.limit <= 0) continue;
           const used = ml.limit - (ml.remaining || 0);
           const pct = Math.min(100, Math.round((used / ml.limit) * 100));
-          meters.push({ label: `GPT ${ml.model || ""}`, pct, color: "#4285F4" });
+          meters.push({ label: `GPT ${ml.model || ""} (${ml.remaining}/${ml.limit})`, pct, color: "#4285F4" });
         }
-      } else if (gptUsage?.limits?.length > 0) {
-        for (const lp of gptUsage.limits) {
-          if (lp.feature === "file_upload" || lp.feature === "paste_text_to_file") continue;
-          meters.push({ label: `GPT ${lp.feature}`, pct: 0, color: "#4285F4", remaining: lp.remaining });
+      } else {
+        const gptMsgs = today?.chatgpt?.messageCount || 0;
+        if (gptMsgs > 0) {
+          const gptPlan = subs?.chatgpt?.plan || "free";
+          const estLimit = gptPlan === "pro" ? 999 : gptPlan === "plus" ? 80 : 16;
+          const pct = estLimit >= 999 ? 0 : Math.min(100, Math.round((gptMsgs / estLimit) * 100));
+          meters.push({ label: `GPT ~3h (${gptMsgs}/${estLimit})`, pct, color: "#4285F4" });
         }
       }
 
-      // Gemini: real data from qpEbW RPC — per-feature quota with [limit, remaining]
+      // Gemini: real data from qpEbW RPC — show features with actual usage,
+      // plus the main chat feature for context
       const gemUsage = platformUsage?.gemini;
-      if (gemUsage?.mainChat) {
-        const mc = gemUsage.mainChat;
-        const used = mc.limit - mc.remaining;
-        const pct = mc.limit > 0 ? Math.min(100, Math.round((used / mc.limit) * 100)) : 0;
-        const resetStr = mc.resetsAt
-          ? new Date(mc.resetsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-          : "";
-        meters.push({ label: `Gemini (${mc.remaining}/${mc.limit})`, pct, color: "#10A37F" });
+      if (gemUsage?.features?.length > 0) {
+        const usedFeatures = gemUsage.features.filter((f) => f.remaining < f.limit);
+        const mainChat = gemUsage.mainChat;
+        const shown = new Set();
+        // Show used features first (most relevant to user)
+        for (const f of usedFeatures.slice(0, 2)) {
+          const used = f.limit - f.remaining;
+          const pct = Math.min(100, Math.round((used / f.limit) * 100));
+          meters.push({ label: `${f.name} (${f.remaining}/${f.limit})`, pct, color: "#10A37F" });
+          shown.add(f.id);
+        }
+        // Always show main chat if not already shown
+        if (mainChat && !shown.has(mainChat.id)) {
+          const used = mainChat.limit - mainChat.remaining;
+          const pct = mainChat.limit > 0 ? Math.min(100, Math.round((used / mainChat.limit) * 100)) : 0;
+          meters.push({ label: `${mainChat.name} (${mainChat.remaining}/${mainChat.limit})`, pct, color: "#10A37F" });
+        }
       }
 
       if (meters.length > 0) {
         metersEl.innerHTML = "";
         metersEl.style.display = "";
         for (const m of meters) {
-          const tier = m.pct < 50 ? "low" : m.pct < 80 ? "mid" : "high";
+          const fillColor = m.pct >= 90 ? "#ff6b6b" : m.color;
           const row = document.createElement("div");
           row.className = "usage-meter";
           row.innerHTML =
             `<span class="usage-meter-label">${m.label}</span>` +
-            `<div class="usage-meter-track"><div class="usage-meter-fill" style="width:${m.pct}%;background:${m.pct >= 80 ? "#ff6b6b" : m.pct >= 50 ? "#D97706" : m.color}"></div></div>` +
-            `<span class="usage-meter-pct" style="color:${m.pct >= 80 ? "#ff6b6b" : m.pct >= 50 ? "#D97706" : m.color}">${m.pct}%${m.est ? "*" : ""}</span>`;
+            `<div class="usage-meter-track"><div class="usage-meter-fill" style="width:${Math.max(m.pct, 2)}%;background:${fillColor}"></div></div>` +
+            `<span class="usage-meter-pct" style="color:${fillColor}">${m.pct}%</span>`;
           metersEl.appendChild(row);
         }
       }
