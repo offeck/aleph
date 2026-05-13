@@ -8,6 +8,9 @@
     "client_id": "440163597784-t0bfi7ahtqba6dmlj0iis96d5jklc56e.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/userinfo.email"]
   },
+  "externally_connectable": {
+    "matches": ["https://claude.ai/*", "https://chatgpt.com/*", "https://chat.openai.com/*", "https://gemini.google.com/*"]
+  },
   "background": {
     "service_worker": "background.js"
   },

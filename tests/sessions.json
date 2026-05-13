@@ -95,6 +95,17 @@
       "status": "fixed"
     },
     {
+      "id": "claude-bidi-math-005",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Hebrew CS theory (Myhill-Nerode, formal languages) with extensive BiDi math issues. 11 bugs reported: (1) a ≁_L b rendered as plain text — U+2241 not matched by MATH_TILDE_RE [fixed]. (2) L* asterisk displaced in RTL set-builder notation [fixed via LRM]. (3) Orphaned * after <em> in LTR paragraph [fixed — absorbed into element]. (4) {a,b}⁰ = {ε} sides swapped in RTL [partially fixed via findEqRegions + bdi]. (5) 0ⁱ · 0ʲ garbled by MATH_EXPR_RE over-matching [fixed — removed MATH_EXPR_RE, now using findEqRegions]. (6) M₁ = (Q₁, Σ, δ₁, s₁, A₁) parentheses misplaced by BiDi [improved via findEqRegions bdi wrapping]. (7) De Morgan L₁ ∩ L₂ = (L̄₁ ∪ L̄₂) sides swapped [improved]. (8) L₁ = {aⁿbⁿ | n ≥ 0} cross-element boundary garbling [partially fixed]. (9) L₁ \\ L₂ = {ab, bb} set difference with Hebrew between expressions [improved]. (10) Complex expression with =, ∩, \\, ⊆, () operators [partially fixed]. (11) L* = Σ* · {#} · L = Kleene star expression [partially fixed].",
+      "category": "bidi-math",
+      "checks": ["rtl-direction", "math-ltr-isolation", "no-console-errors"],
+      "source": "conversation:2026-05-13",
+      "addedAt": "2026-05-13",
+      "status": "active"
+    },
+    {
       "id": "chatgpt-theme-001",
       "platform": "chatgpt",
       "url": "https://chatgpt.com/c/69efc59b-dbec-83eb-9061-16d1951e435d",

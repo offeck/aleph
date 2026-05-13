@@ -377,6 +377,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 // ── Message handlers ─────────────────────────────────────
+chrome.runtime.onMessageExternal.addListener((msg) => {
+  if (msg.type === "aleph-reload") chrome.runtime.reload();
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Sync handlers — from popup/settings (not content scripts)
   if (msg.type === "aleph-sync-signin") {
