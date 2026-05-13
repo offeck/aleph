@@ -490,7 +490,12 @@
       }
     });
     // Fix orphaned * after em/strong — absorb into preceding element (works for both RTL and LTR)
+    // Handles two cases:
+    //   A) Leading *: text node starts with * (e.g. "<em>Σ</em>* rest")
+    //   B) Trailing *: text node ends with * after em whose inner text ends with a letter
+    //      (e.g. "<em>...Σ</em> rest}**" from misparse of "Σ* ... Σ*")
     const messageSel = SEL.message.join(", ");
+    const STAR_OWNER_END = /[\p{L}\p{N}}\)\]⁰¹²³⁴⁵⁶⁷⁸⁹₀-₉]$/u;
     document.querySelectorAll(messageSel).forEach((msg) => {
       const emStrong = msg.querySelectorAll("em, strong");
       for (const el of emStrong) {
@@ -498,10 +503,50 @@
         const next = el.nextSibling;
         if (!next || next.nodeType !== 3) continue;
         const txt = next.textContent;
-        if (!txt || txt[0] !== "*") continue;
-        if (!/[a-zA-Z0-9}\)\]⁰¹²³⁴⁵⁶⁷⁸⁹₀-₉]$/.test(el.textContent)) continue;
-        el.appendChild(document.createTextNode("*"));
-        next.textContent = txt.slice(1);
+        if (!txt) continue;
+        // Case A: leading * — absorb into preceding em/strong
+        if (txt[0] === "*" && STAR_OWNER_END.test(el.textContent)) {
+          el.appendChild(document.createTextNode("*"));
+          next.textContent = txt.slice(1);
+          if (!next.textContent) next.remove();
+          el.setAttribute("data-aleph-star-fixed", "true");
+          continue;
+        }
+        // Case B: trailing ** from misparse — redistribute * into em/strong boundaries
+        // Pattern: <em><em>...Σ</em> ...Σ</em> rest}**
+        // The parser consumed * from "Σ*" as emphasis delimiters; trailing ** is the residue.
+        // Each boundary (closing </em> or </strong> and the outer el's last text) that ends
+        // with a star-owning character gets one * restored.
+        const trailingMatch = txt.match(/\*+$/);
+        if (!trailingMatch) continue;
+        const stars = trailingMatch[0].length;
+        // Find the last text node of each em/strong child boundary + the outer element itself
+        const candidates = [];
+        const boundaries = [el, ...el.querySelectorAll("em, strong")];
+        for (const b of boundaries) {
+          // Get the last direct text node of this element
+          let lastText = null;
+          for (let c = b.lastChild; c; c = c.previousSibling) {
+            if (c.nodeType === 3 && c.textContent.trim()) { lastText = c; break; }
+            if (c.nodeType === 1) break; // stop at element nodes
+          }
+          if (lastText && STAR_OWNER_END.test(lastText.textContent)) {
+            candidates.push(lastText);
+          }
+        }
+        if (candidates.length === 0) continue;
+        const toFix = Math.min(stars, candidates.length);
+        // Insert * after each candidate (last to first to preserve positions)
+        for (let i = candidates.length - 1; i >= candidates.length - toFix; i--) {
+          const cand = candidates[i];
+          const parent = cand.parentNode;
+          const nextSib = cand.nextSibling;
+          const starNode = document.createTextNode("*");
+          if (nextSib) parent.insertBefore(starNode, nextSib);
+          else parent.appendChild(starNode);
+        }
+        // Remove consumed stars from trailing text
+        next.textContent = txt.slice(0, txt.length - toFix);
         if (!next.textContent) next.remove();
         el.setAttribute("data-aleph-star-fixed", "true");
       }
