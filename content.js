@@ -250,6 +250,7 @@
     streamSmooth: true,
     streamAnimation: "platform",
     messageSpacing: 0,
+    miniGame: false,
   };
 
   let settings = { ...DEFAULTS };

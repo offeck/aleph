@@ -26,6 +26,7 @@
     streamSmooth: true,
     streamAnimation: "platform",
     messageSpacing: 0,
+    miniGame: false,
   };
 
   const THEME_NAMES = {
@@ -470,6 +471,7 @@
   function loadUI() {
     chrome.storage.sync.get(DEFAULTS, (s) => {
       document.getElementById("focusMode").checked = s.focusMode;
+      document.getElementById("miniGame").checked = s.miniGame;
       document.getElementById("fontFamily").value = s.fontFamily;
 
       const fsInput = document.getElementById("fontSize");
@@ -516,6 +518,10 @@
   function bindEvents() {
     document.getElementById("focusMode").addEventListener("change", (e) => {
       save("focusMode", e.target.checked);
+    });
+
+    document.getElementById("miniGame").addEventListener("change", (e) => {
+      save("miniGame", e.target.checked);
     });
 
     document.getElementById("fontFamily").addEventListener("change", (e) => {
