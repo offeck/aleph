@@ -15,6 +15,7 @@
   if (!PLATFORM) return;
 
   document.documentElement.setAttribute("data-aleph-platform", PLATFORM);
+  if (chrome?.runtime?.id) document.documentElement.setAttribute("data-aleph-ext-id", chrome.runtime.id);
 
   // ── Theme definitions ──────────────────────────────────────────────────
   const THEMES = {
@@ -553,6 +554,25 @@
     });
   }
 
+  // ── Send hint (set by insights-tracker.js via DOM attribute) ─────────
+  let sendHint = null;
+  const HINT_DELAY = 5000;
+  const HINT_WINDOW = 30000;
+  const hintChecked = new WeakSet();
+
+  function readSendHint() {
+    const raw = document.documentElement.getAttribute("data-aleph-send-hint");
+    if (!raw) { sendHint = null; return; }
+    try {
+      const h = JSON.parse(raw);
+      const elapsed = Date.now() - h.ts;
+      if (elapsed < HINT_DELAY) { sendHint = null; return; }
+      if (elapsed < HINT_DELAY + HINT_WINDOW) { sendHint = h; return; }
+      sendHint = null;
+      document.documentElement.removeAttribute("data-aleph-send-hint");
+    } catch (e) { sendHint = null; }
+  }
+
   // ── BiDi Patcher ───────────────────────────────────────────────────────
   let patching = false;
 
@@ -579,11 +599,19 @@
   }
 
   function patchBidi() {
+    readSendHint();
     const textSel = SEL.text.join(", ");
     document.querySelectorAll(textSel).forEach((el) => {
       if (el.closest(".katex") || el.closest("mjx-container")) return;
-      const need = hasHebrew(el);
       const has = el.getAttribute("data-aleph-rtl");
+      if (!has && sendHint && sendHint.lang === "hebrew" && !hintChecked.has(el)) {
+        hintChecked.add(el);
+        if ((el.textContent || "").trim().length < 200) {
+          el.setAttribute("data-aleph-rtl", "true");
+          el.setAttribute("data-aleph-dir", "rtl");
+        }
+      }
+      const need = hasHebrew(el);
       if (need && has !== "true") {
         el.setAttribute("data-aleph-rtl", "true");
         const dir = detectDir(el) || "rtl";
@@ -1274,7 +1302,20 @@
     patchAll();
     updateBadge();
     setTimeout(() => { applyStyles(); patchAll(); }, 1500);
-    setInterval(patchAll, 3000);
+    let patchIntervalId = setInterval(patchAll, 3000);
+
+    new MutationObserver(() => {
+      setTimeout(() => {
+        clearInterval(patchIntervalId);
+        patchIntervalId = setInterval(patchAll, 500);
+        setTimeout(() => {
+          clearInterval(patchIntervalId);
+          patchIntervalId = setInterval(patchAll, 3000);
+        }, 30000);
+      }, 5000);
+    }).observe(document.documentElement, {
+      attributes: true, attributeFilter: ["data-aleph-send-hint"],
+    });
   });
 
   console.log(

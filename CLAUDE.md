@@ -183,3 +183,14 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 **Updating selectors**: When a platform changes its DOM, update the relevant arrays in `SELECTORS[platform]`. Test by querying `document.querySelectorAll(selector)` in the browser console on that platform.
 
 **Export/import settings**: JSON format matching the `DEFAULTS` keys. Import validates keys against `DEFAULTS` to prevent injection of unknown settings.
+
+**Reloading the extension after code changes**: `content.js` exposes the extension ID as `data-aleph-ext-id` on `<html>`. `background.js` has an `onMessageExternal` listener for `{type: "aleph-reload"}` that calls `chrome.runtime.reload()`. From any supported platform page (Claude, ChatGPT, Gemini), run in the browser console or via `javascript_tool`:
+```javascript
+(() => {
+  const extId = document.documentElement.getAttribute('data-aleph-ext-id');
+  if (!extId) return 'FAIL: extension ID not found';
+  chrome.runtime.sendMessage(extId, {type: 'aleph-reload'});
+  return 'OK: reload triggered for ' + extId;
+})()
+```
+After reload, refresh the page to load the new content scripts.

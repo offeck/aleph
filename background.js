@@ -508,6 +508,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
   }
 
+  if (msg.type === "insights-send-analytics") {
+    (async () => {
+      const key = todayKey();
+      const usage = await readLocal(key, {});
+      const p = msg.platform;
+      if (!usage[p]) usage[p] = emptyPlatformDay();
+      if (!usage[p].sends) usage[p].sends = { total: 0, hebrew: 0, totalWords: 0, totalChars: 0 };
+      usage[p].sends.total++;
+      if (msg.lang === "hebrew") usage[p].sends.hebrew++;
+      usage[p].sends.totalWords += (msg.words || 0);
+      usage[p].sends.totalChars += (msg.length || 0);
+      await writeLocal(key, usage);
+    })();
+  }
+
   // Insights: subscription detection
   if (msg.type === "insights-subscription") {
     (async () => {

@@ -114,15 +114,12 @@ Follow the plan from Step 3. Rules:
 
 ## Step 5: Reload Extension & Verify
 
-Reload the extension via `background.js`. The manifest has `externally_connectable` configured for all supported platforms, so web pages can message the extension directly. Use `javascript_tool` to run:
+Reload the extension via `background.js`. The manifest has `externally_connectable` configured for all supported platforms, and `content.js` exposes the extension ID as `data-aleph-ext-id` on `<html>`. Use `javascript_tool` to run:
 
 ```javascript
 (() => {
-  const link = [...document.querySelectorAll('link[href^="chrome-extension://"]')]
-    .find(l => l.href.includes('content.css'));
-  if (!link) return 'FAIL: Cannot find extension ID — ask user to reload manually';
-  const extId = link.href.match(/chrome-extension:\/\/([^/]+)/)?.[1];
-  if (!extId) return 'FAIL: Cannot parse extension ID';
+  const extId = document.documentElement.getAttribute('data-aleph-ext-id');
+  if (!extId) return 'FAIL: Cannot find extension ID — ask user to reload manually';
   chrome.runtime.sendMessage(extId, {type: 'aleph-reload'});
   return 'OK: Reload triggered for ' + extId;
 })()

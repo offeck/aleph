@@ -145,11 +145,45 @@
   let userSentAt = 0;
 
   const EDITOR_SEL = "[contenteditable], textarea, #prompt-textarea, .ProseMirror, .ql-editor, rich-textarea";
+  const HEB_RE = /[֐-׿]/g;
+  let lastEditorText = "";
+
+  function captureAndSignal(source) {
+    let text = "";
+    for (const sel of [".ProseMirror", "#prompt-textarea", ".ql-editor"]) {
+      const ed = document.querySelector(sel);
+      if (ed) { text = (ed.textContent || "").trim(); break; }
+    }
+    if (!text && lastEditorText) text = lastEditorText;
+    if (!text) {
+      userSentAt = Date.now();
+      return;
+    }
+
+    const stripped = text.replace(/\s/g, "");
+    HEB_RE.lastIndex = 0;
+    const hebCount = (stripped.match(HEB_RE) || []).length;
+    const lang = stripped.length > 0 && hebCount / stripped.length > 0.3 ? "hebrew" : "other";
+    const words = text.split(/\s+/).filter(Boolean).length;
+
+    userSentAt = Date.now();
+
+    document.documentElement.setAttribute("data-aleph-send-hint", JSON.stringify({
+      ts: userSentAt, lang, len: text.length, words,
+    }));
+
+    send({
+      type: "insights-send-analytics",
+      platform: PLATFORM, lang, length: text.length, words, timestamp: userSentAt,
+    });
+
+    console.log("[Aleph] send detected (" + source + ") lang=" + lang + " len=" + text.length);
+  }
+
   window.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       if (e.target.closest?.(EDITOR_SEL)) {
-        userSentAt = Date.now();
-        console.log("[Aleph] send detected (Enter)");
+        captureAndSignal("Enter");
       }
     }
   }, true);
@@ -158,8 +192,7 @@
     if (!btn) return;
     const form = btn.closest("form, fieldset, [class*='composer'], [class*='input-container'], [class*='chat-input']");
     if (form && form.querySelector(EDITOR_SEL)) {
-      userSentAt = Date.now();
-      console.log("[Aleph] send detected (button)");
+      captureAndSignal("button");
     }
   }, true);
 
@@ -169,12 +202,13 @@
     for (const sel of [".ProseMirror", "#prompt-textarea", ".ql-editor"]) {
       const ed = document.querySelector(sel);
       if (!ed) continue;
-      const len = (ed.textContent || "").trim().length;
+      const text = (ed.textContent || "").trim();
+      const len = text.length;
       if (lastEditorLen > 0 && len === 0) {
-        userSentAt = Date.now();
-        console.log("[Aleph] send detected (editor empty)");
+        captureAndSignal("editor empty");
       }
       lastEditorLen = len;
+      if (len > 0) lastEditorText = text;
       break;
     }
   }, 500);
