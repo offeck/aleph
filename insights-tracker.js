@@ -418,30 +418,37 @@
     let plan = "free";
     let model = null;
 
-    // Primary: use the mode menu button which shows the current model/tier
-    const modeBtn = document.querySelector('[data-testid="bard-mode-menu-button"]');
-    if (modeBtn) {
-      model = modeBtn.textContent?.trim() || null;
+    // Primary: the mode switch button in the input area shows the active model
+    const switchBtn = document.querySelector(".input-area-switch");
+    if (switchBtn) {
+      model = switchBtn.textContent?.trim() || null;
     }
 
-    // Fallback: scan buttons for model names
+    // Fallback: old testid (may still exist on some Gemini versions)
     if (!model) {
-      const allBtns = document.querySelectorAll("button");
-      for (const b of allBtns) {
-        const t = b.textContent?.trim();
-        if (!t || t.length > 60) continue;
-        if (/gemini|flash|pro|ultra/i.test(t) && !/setting|prefer|option/i.test(t)) {
-          model = t;
+      const modeBtn = document.querySelector('[data-testid="bard-mode-menu-button"]');
+      if (modeBtn) model = modeBtn.textContent?.trim() || null;
+    }
+
+    // Model name → plan (handles Hebrew UI: "מעמיק"=Deep Research, "Pro" stays English)
+    if (model) {
+      if (/ultra|advanced/i.test(model)) plan = "ai_ultra";
+      else if (/\bpro\b/i.test(model) || model === "מעמיק") plan = "ai_pro";
+    }
+
+    // Tier from mode picker: Pro/Deep modes only available to paid users
+    if (plan === "free") {
+      const modeItems = document.querySelectorAll('[role="menuitem"]');
+      for (const item of modeItems) {
+        const t = item.textContent || "";
+        if (/\bpro\b/i.test(t) || t.includes("מעמיק")) {
+          plan = "ai_pro";
           break;
         }
       }
     }
 
-    if (model) {
-      if (/ultra|advanced/i.test(model)) plan = "ai_ultra";
-      else if (/\bpro\b/i.test(model)) plan = "ai_pro";
-    }
-
+    // Final fallback: no upgrade button means paid user
     if (plan === "free") {
       const hasUpgrade = document.querySelector(
         "[class*='upgrade' i], [class*='premium' i], [aria-label*='upgrade' i]"
