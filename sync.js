@@ -179,7 +179,7 @@ var alephSync = (function () {
     var localSettings = await new Promise(function (r) { chrome.storage.sync.get(null, r); });
     if (settingsSnap.exists) {
       var remoteSettings = settingsSnap.data();
-      var mergedSettings = Object.assign({}, remoteSettings, localSettings);
+      var mergedSettings = Object.assign({}, localSettings, remoteSettings);
       await new Promise(function (r) { chrome.storage.sync.set(mergedSettings, r); });
       await _pushSettings(mergedSettings);
     } else if (Object.keys(localSettings).length > 0) {

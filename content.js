@@ -2,7 +2,7 @@
   "use strict";
 
   const HEB = /[֐-׿]/;
-  const VERSION = "2.4.0";
+  const VERSION = "2.5.0";
 
   // ── Platform detection ─────────────────────────────────────────────────
   const host = location.hostname;
