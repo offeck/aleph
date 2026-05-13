@@ -96,6 +96,8 @@ var alephSync = (function () {
       _pushUsageDay(dateKey, value).catch(function () { _queueRetry(key, value); });
     } else if (key === "insights_subscriptions") {
       _pushSubscriptions(value).catch(function () { _queueRetry(key, value); });
+    } else if (key === "aleph_settings") {
+      _pushSettings(value).catch(function () { _queueRetry(key, value); });
     }
   }
 
@@ -110,6 +112,12 @@ var alephSync = (function () {
 
   async function _pushSubscriptions(data) {
     var docRef = _db.collection("users").doc(_uid).collection("meta").doc("subscriptions");
+    await docRef.set(data, { merge: true });
+    _updateLastSyncTime();
+  }
+
+  async function _pushSettings(data) {
+    var docRef = _db.collection("users").doc(_uid).collection("meta").doc("settings");
     await docRef.set(data, { merge: true });
     _updateLastSyncTime();
   }
@@ -167,6 +175,17 @@ var alephSync = (function () {
       await _pushSubscriptions(mergedSubs);
     }
 
+    var settingsSnap = await _db.collection("users").doc(_uid).collection("meta").doc("settings").get();
+    var localSettings = await new Promise(function (r) { chrome.storage.sync.get(null, r); });
+    if (settingsSnap.exists) {
+      var remoteSettings = settingsSnap.data();
+      var mergedSettings = Object.assign({}, remoteSettings, localSettings);
+      await new Promise(function (r) { chrome.storage.sync.set(mergedSettings, r); });
+      await _pushSettings(mergedSettings);
+    } else if (Object.keys(localSettings).length > 0) {
+      await _pushSettings(localSettings);
+    }
+
     _updateLastSyncTime();
   }
 
@@ -222,6 +241,8 @@ var alephSync = (function () {
             await _pushUsageDay(queue[i].key.replace("usage_", ""), queue[i].value);
           } else if (queue[i].key === "insights_subscriptions") {
             await _pushSubscriptions(queue[i].value);
+          } else if (queue[i].key === "aleph_settings") {
+            await _pushSettings(queue[i].value);
           }
         } catch (e) {
           remaining.push(queue[i]);

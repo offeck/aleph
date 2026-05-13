@@ -37,7 +37,7 @@ jobs:
 
       - name: Lint JavaScript (syntax check)
         run: |
-          for f in background.js content.js popup.js; do
+          for f in background.js content.js popup.js settings.js insights.js insights-tracker.js sync.js; do
             node --check "$f" || exit 1
           done
           echo "No syntax errors"
@@ -65,6 +65,14 @@ jobs:
             popup.html \
             popup.css \
             popup.js \
+            settings.html \
+            settings.css \
+            settings.js \
+            insights.html \
+            insights.css \
+            insights.js \
+            insights-tracker.js \
+            sync.js \
             icons/ \
             vendor/ \
             -x "*.DS_Store"

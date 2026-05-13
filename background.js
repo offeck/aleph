@@ -368,6 +368,14 @@ chrome.runtime.onStartup?.addListener(() => {
   alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
 });
 
+// ── Settings sync to Firestore ───────────────────────────
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "sync") return;
+  chrome.storage.sync.get(null, (all) => {
+    try { alephSync.maybePush("aleph_settings", all); } catch (e) {}
+  });
+});
+
 // ── Message handlers ─────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Sync handlers — from popup/settings (not content scripts)
