@@ -25,7 +25,7 @@
   const MSG_WRAPPER = {
     claude:  ["[data-testid='user-message']", ".font-claude-response"],
     chatgpt: ["[data-testid^='conversation-turn']"],
-    gemini:  ["model-response", ".conversation-turn"],
+    gemini:  ["model-response", ".conversation-turn", ".query-content"],
   };
   const ASSISTANT_MARKER = {
     claude:  [".font-claude-response"],
@@ -141,6 +141,43 @@
 
   // ── Message counting + token estimation ──────────────────
   const countedMessages = new WeakSet();
+  let graceUntil = 0;
+  let userSentAt = 0;
+
+  const EDITOR_SEL = "[contenteditable], textarea, #prompt-textarea, .ProseMirror, .ql-editor, rich-textarea";
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (e.target.closest?.(EDITOR_SEL)) {
+        userSentAt = Date.now();
+        console.log("[Aleph] send detected (Enter)");
+      }
+    }
+  }, true);
+  window.addEventListener("click", (e) => {
+    const btn = e.target.closest?.("button");
+    if (!btn) return;
+    const form = btn.closest("form, fieldset, [class*='composer'], [class*='input-container'], [class*='chat-input']");
+    if (form && form.querySelector(EDITOR_SEL)) {
+      userSentAt = Date.now();
+      console.log("[Aleph] send detected (button)");
+    }
+  }, true);
+
+  // Fallback: detect editor emptying (message was sent)
+  let lastEditorLen = 0;
+  setInterval(() => {
+    for (const sel of [".ProseMirror", "#prompt-textarea", ".ql-editor"]) {
+      const ed = document.querySelector(sel);
+      if (!ed) continue;
+      const len = (ed.textContent || "").trim().length;
+      if (lastEditorLen > 0 && len === 0) {
+        userSentAt = Date.now();
+        console.log("[Aleph] send detected (editor empty)");
+      }
+      lastEditorLen = len;
+      break;
+    }
+  }, 500);
 
   function classifyMessage(el) {
     for (const s of ASSISTANT_MARKER[PLATFORM]) {
@@ -175,6 +212,7 @@
     const imgCount = el.querySelectorAll("img").length;
     const textTokens = estimateTokens(text);
     const imgTokens = imgCount * (IMG_TOKEN_COST[PLATFORM] || 1600);
+    console.log("[Aleph] message counted:", role, "tokens:", textTokens + imgTokens, "preview:", text.substring(0, 60));
     send({
       type: "insights-message",
       platform: PLATFORM,
@@ -186,9 +224,11 @@
   }
 
   function markExistingMessages() {
+    let count = 0;
     for (const sel of MSG_WRAPPER[PLATFORM]) {
-      document.querySelectorAll(sel).forEach((el) => countedMessages.add(el));
+      document.querySelectorAll(sel).forEach((el) => { countedMessages.add(el); count++; });
     }
+    if (count > 0) console.log("[Aleph] marked", count, "existing msgs");
   }
 
   // Observe document.body (not a container that SPAs might replace)
@@ -205,7 +245,11 @@
           }
         }
       }
-      if (newMsgs.length > 2) {
+      if (newMsgs.length === 0) return;
+      const inGrace = Date.now() < graceUntil;
+      const recentSend = (Date.now() - userSentAt) < 30000;
+      if (!recentSend && (newMsgs.length > 2 || inGrace)) {
+        console.log("[Aleph] skipped", newMsgs.length, "msgs (bulk=" + (newMsgs.length > 2) + " grace=" + inGrace + ")");
         newMsgs.forEach((el) => countedMessages.add(el));
       } else {
         newMsgs.forEach(processNewMessage);
@@ -218,7 +262,16 @@
   setInterval(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
-      markExistingMessages();
+      if ((Date.now() - userSentAt) < 15000) {
+        console.log("[Aleph] nav after send — skip marking");
+      } else {
+        graceUntil = Date.now() + 2000;
+        markExistingMessages();
+        setTimeout(markExistingMessages, 500);
+        setTimeout(markExistingMessages, 1000);
+        setTimeout(markExistingMessages, 2000);
+        setTimeout(markExistingMessages, 3000);
+      }
     }
   }, 2000);
 
@@ -605,7 +658,9 @@
   setTimeout(() => {
     detectSubscription();
     markExistingMessages();
+    graceUntil = Date.now() + 5000;
     startMessageObserver();
+    setTimeout(markExistingMessages, 5000);
     pollModelCapabilities();
     if (PLATFORM === "claude") pollClaudeUsage();
     if (PLATFORM === "chatgpt") pollChatgptUsage();

@@ -363,6 +363,40 @@
     return false;
   }
 
+  const STRONG_RTL_RE = /[֐-׿؀-ۿ]/;
+  const LTR_LETTER_RE = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/;
+
+  function detectDir(el) {
+    if (!el) return "rtl";
+    let text = "";
+    const walk = (node) => {
+      if (node.nodeType === 3) {
+        text += node.textContent;
+      } else if (node.nodeType === 1) {
+        const tag = node.tagName?.toLowerCase();
+        if (node.classList?.contains("katex") || tag === "mjx-container" ||
+            tag === "code" || tag === "pre") return;
+        for (const c of node.childNodes) walk(c);
+      }
+    };
+    walk(el);
+    let hebIdx = -1;
+    for (let i = 0; i < text.length; i++) {
+      if (STRONG_RTL_RE.test(text[i])) { hebIdx = i; break; }
+    }
+    if (hebIdx === -1) return "ltr";
+    if (hebIdx === 0) return "rtl";
+    // Check if prefix contains = sign → math definition → LTR
+    // Otherwise count LTR letters: ≥3 = multi-token math → LTR, <3 = label → RTL
+    const prefix = text.slice(0, hebIdx);
+    if (prefix.includes("=")) return "ltr";
+    let letterCount = 0;
+    for (let i = 0; i < hebIdx; i++) {
+      if (LTR_LETTER_RE.test(text[i])) letterCount++;
+    }
+    return letterCount >= 3 ? "ltr" : "rtl";
+  }
+
   // ── Markdown Fixer ──────────────────────────────────────────────────────
   const MD_RE = /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*([^*\s][^*]*?[^*\s])\*|\*([^*\s])\*/g;
 
@@ -434,6 +468,46 @@
     textNode.parentNode.replaceChild(wrapper, textNode);
   }
 
+  const LRM = "‎";
+  const STAR_AFTER_LTR = /([^\s֐-׿؀-ۿ*])\*(?!‎)/g;
+
+  function fixBidiNeutrals() {
+    const rtlEls = document.querySelectorAll("[data-aleph-rtl='true']");
+    rtlEls.forEach((rtlEl) => {
+      const walker = document.createTreeWalker(rtlEl, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.parentElement.closest("code, pre, .katex, .katex-display, mjx-container, [data-aleph-latex-rendered], [data-aleph-math-isolated]")) continue;
+        let text = node.textContent;
+        if (!text) continue;
+        let changed = false;
+        if (text.includes("*")) {
+          STAR_AFTER_LTR.lastIndex = 0;
+          const r = text.replace(STAR_AFTER_LTR, "$1*" + LRM);
+          if (r !== text) { text = r; changed = true; }
+        }
+        if (changed) node.textContent = text;
+      }
+    });
+    // Fix orphaned * after em/strong — absorb into preceding element (works for both RTL and LTR)
+    const messageSel = SEL.message.join(", ");
+    document.querySelectorAll(messageSel).forEach((msg) => {
+      const emStrong = msg.querySelectorAll("em, strong");
+      for (const el of emStrong) {
+        if (el.hasAttribute("data-aleph-star-fixed")) continue;
+        const next = el.nextSibling;
+        if (!next || next.nodeType !== 3) continue;
+        const txt = next.textContent;
+        if (!txt || txt[0] !== "*") continue;
+        if (!/[a-zA-Z0-9}\)\]⁰¹²³⁴⁵⁶⁷⁸⁹₀-₉]$/.test(el.textContent)) continue;
+        el.appendChild(document.createTextNode("*"));
+        next.textContent = txt.slice(1);
+        if (!next.textContent) next.remove();
+        el.setAttribute("data-aleph-star-fixed", "true");
+      }
+    });
+  }
+
   // ── BiDi Patcher ───────────────────────────────────────────────────────
   let patching = false;
 
@@ -446,6 +520,7 @@
       if (settings.focusMode) applyFocusMode();
       if (settings.latexFix) patchLatex();
       patchMarkdown();
+      if (settings.bidiEnabled) fixBidiNeutrals();
       if (settings.streamSmooth) {
         applyStreamSmooth();
         const anim = settings.streamAnimation || "platform";
@@ -466,8 +541,17 @@
       const has = el.getAttribute("data-aleph-rtl");
       if (need && has !== "true") {
         el.setAttribute("data-aleph-rtl", "true");
+        const dir = detectDir(el) || "rtl";
+        el.setAttribute("data-aleph-dir", dir);
+      } else if (need && has === "true") {
+        // Re-check direction in case content changed (e.g. streaming)
+        const dir = detectDir(el) || "rtl";
+        if (el.getAttribute("data-aleph-dir") !== dir) {
+          el.setAttribute("data-aleph-dir", dir);
+        }
       } else if (!need && has === "true") {
         el.removeAttribute("data-aleph-rtl");
+        el.removeAttribute("data-aleph-dir");
       }
     });
 
@@ -557,7 +641,7 @@
 
   const DELIMITED_RE = /\$\$([^$]+)\$\$|\$([^$\n]+)\$|\\\((.+?)\\\)|\\\[(.+?)\\\]/g;
   const LATEX_CMD_RE_G = new RegExp(LATEX_CMD_RE.source, "g");
-  const UNICODE_MATH = "→←↔⇒⇐⇔≠≤≥≈≡∼≅≢±∓∞·×÷∈∉∋⊂⊃⊆⊇⊄⊅∪∩∧∨¬∀∃∄∂∇√∑∏∐∫∬∭∮≪≫∝∅⟨⟩⌈⌉⌊⌋▶◀△▽⊕⊗⊖⊘";
+  const UNICODE_MATH = "→←↔⇒⇐⇔≠≤≥≈≡∼≅≢≁±∓∞·×÷∈∉∋⊂⊃⊆⊇⊄⊅∪∩∧∨¬∀∃∄∂∇√∑∏∐∫∬∭∮≪≫∝∅⟨⟩⌈⌉⌊⌋▶◀△▽⊕⊗⊖⊘";
   const CH_MATH_OP = new RegExp("[0-9.+\\-=<>!,:|/ " + UNICODE_MATH.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "]");
   const CH_ALPHA = /[a-zA-Z]/;
   const SPACE_LOOK_CMD = /^\\[a-zA-Z]/;
@@ -731,7 +815,7 @@
     [/→/g, "\\to "], [/←/g, "\\leftarrow "], [/↔/g, "\\leftrightarrow "],
     [/⇒/g, "\\Rightarrow "], [/⇐/g, "\\Leftarrow "], [/⇔/g, "\\Leftrightarrow "],
     [/≠/g, "\\neq "], [/≤/g, "\\leq "], [/≥/g, "\\geq "],
-    [/≈/g, "\\approx "], [/≡/g, "\\equiv "], [/∼/g, "\\sim "], [/≅/g, "\\cong "],
+    [/≈/g, "\\approx "], [/≡/g, "\\equiv "], [/∼/g, "\\sim "], [/≅/g, "\\cong "], [/≁/g, "\\nsim "],
     [/±/g, "\\pm "], [/∓/g, "\\mp "], [/∞/g, "\\infty "],
     [/·/g, "\\cdot "], [/×/g, "\\times "], [/÷/g, "\\div "],
     [/∈/g, "\\in "], [/∉/g, "\\notin "], [/∋/g, "\\ni "],
@@ -796,6 +880,7 @@
 
     const wrapper = document.createElement("span");
     wrapper.setAttribute("data-aleph-latex-rendered", "true");
+    wrapper.style.unicodeBidi = "isolate";
 
     let lastEnd = 0;
     for (const region of merged) {
@@ -817,9 +902,8 @@
       mathText = mathText.replace(/^\\\[([\s\S]*)\\\]$/, "$1");
       mathText = cleanMathText(mathText);
 
-      const ltrSpan = document.createElement("span");
-      ltrSpan.dir = "ltr";
-      ltrSpan.style.unicodeBidi = "isolate";
+      const ltrSpan = document.createElement("bdi");
+      ltrSpan.setAttribute("dir", "ltr");
 
       try {
         katex.render(mathText.trim(), ltrSpan, {
@@ -846,7 +930,49 @@
 
   const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()֐-׿]*\)/g;
   const MATH_PIPE_RE = /\|[^|֐-׿\n]{1,50}\|/g;
-  const MATH_TILDE_RE = /~_?\w+/g;
+  const MATH_TILDE_RE = /[~∼≁]_?\w+/g;
+  const RTL_CHAR = /[֐-׿؀-ۿ]/;
+
+  function findEqRegions(text) {
+    const regions = [];
+    let start = -1, hasEq = false, hasLetter = false;
+    for (let i = 0; i <= text.length; i++) {
+      const ch = i < text.length ? text[i] : null;
+      if (start === -1) {
+        if (ch && !RTL_CHAR.test(ch) && ch !== '\n' && ch !== ' ') {
+          start = i;
+          hasEq = ch === '=' || ch === '≠';
+          hasLetter = /[a-zA-ZͰ-Ͽ]/.test(ch);
+        }
+      } else {
+        if (!ch || RTL_CHAR.test(ch) || ch === '\n') {
+          if (hasEq && hasLetter) {
+            let end = i;
+            while (end > start && /[\s.,;:!?]/.test(text[end - 1])) end--;
+            let d = 0;
+            for (let j = start; j < end; j++) {
+              const c = text[j];
+              if (c === '(' || c === '{' || c === '[') d++;
+              if (c === ')' || c === '}' || c === ']') { d--; if (d < 0) { end = j; break; } }
+            }
+            d = 0;
+            for (let j = end - 1; j >= start; j--) {
+              const c = text[j];
+              if (c === ')' || c === '}' || c === ']') d++;
+              if (c === '(' || c === '{' || c === '[') { d--; if (d < 0) { start = j + 1; break; } }
+            }
+            while (end > start && /[\s.,;:!?]/.test(text[end - 1])) end--;
+            if (end > start) regions.push({ start, end, text: text.slice(start, end) });
+          }
+          start = -1; hasEq = false; hasLetter = false;
+        } else {
+          if (ch === '=' || ch === '≠') hasEq = true;
+          if (/[a-zA-ZͰ-Ͽ]/.test(ch)) hasLetter = true;
+        }
+      }
+    }
+    return regions;
+  }
 
   function collectRegions(re, text, regions, type) {
     re.lastIndex = 0;
@@ -875,18 +1001,19 @@
 
     const wrapper = document.createElement("span");
     wrapper.setAttribute("data-aleph-math-isolated", "true");
+    wrapper.style.unicodeBidi = "isolate";
     let lastEnd = 0;
     for (const r of merged) {
       if (r.start > lastEnd) {
         wrapper.appendChild(document.createTextNode(text.slice(lastEnd, r.start)));
       }
-      const ltrSpan = document.createElement("span");
-      ltrSpan.dir = "ltr";
-      ltrSpan.style.unicodeBidi = "isolate";
+      const ltrSpan = document.createElement("bdi");
+      ltrSpan.setAttribute("dir", "ltr");
       if (r.type === "tilde" && typeof katex !== "undefined") {
-        const sub = r.text.replace(/^~_?/, "");
+        const cmd = r.text[0] === "≁" ? "\\nsim" : "\\sim";
+        const sub = r.text.replace(/^[~∼≁]_?/, "");
         try {
-          katex.render("\\sim_{" + sub + "}", ltrSpan, { throwOnError: true, displayMode: false, output: "html" });
+          katex.render(cmd + "_{" + sub + "}", ltrSpan, { throwOnError: true, displayMode: false, output: "html" });
         } catch (e) {
           ltrSpan.textContent = r.text;
         }

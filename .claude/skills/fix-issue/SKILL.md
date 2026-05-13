@@ -6,6 +6,12 @@ argument-hint: <url> <description> [image-path]
 
 # Fix Issue Workflow
 
+**GLOBAL RULES — read before doing anything:**
+1. You MUST spawn all three agents (`issue-investigator`, `issue-planner`, `regression-tester`) during this workflow. No exceptions. Do NOT do their work yourself.
+2. **Do NOT use Edit, Write, or any file-modification tools** except in Step 4. Steps 1, 2, 3, 5, 6, and 7 are strictly read-only and browser-only. Step 7 is the only other exception — you may Write to `tests/sessions.json` there.
+
+---
+
 Parse the following from `$ARGUMENTS`:
 - **url** (required): Chat session URL where the bug is visible
 - **description** (required): What's wrong — the visual bug or rendering issue
@@ -56,6 +62,8 @@ Keep this snapshot — you will diff it against the post-fix state in Step 5.
 
 ## Step 2: Investigate Root Cause
 
+**IMPORTANT: You MUST spawn the `issue-investigator` agent for every issue. Do NOT skip this step or investigate the code yourself. Always delegate investigation to the agent.**
+
 Spawn the `issue-investigator` agent using the Agent tool:
 
 ```
@@ -71,6 +79,8 @@ Wait for the investigation results. Read and understand the findings before proc
 ---
 
 ## Step 3: Plan the Fix
+
+**IMPORTANT: You MUST spawn the `issue-planner` agent for every issue. Do NOT skip this step or plan the fix yourself. Always delegate planning to the agent.**
 
 Spawn the `issue-planner` agent using the Agent tool:
 
@@ -90,6 +100,8 @@ Wait for the plan. Review it critically:
 ---
 
 ## Step 4: Implement the Fix
+
+**This is the ONLY step where you may use Edit and Write tools to modify source code.**
 
 Follow the plan from Step 3. Rules:
 1. Read each file before editing
@@ -133,31 +145,26 @@ After reload:
 
 ## Step 6: Regression Testing
 
-Read `tests/sessions.json`. Collect all entries with `"status": "active"`.
+**IMPORTANT: You MUST spawn the `regression-tester` agent. Do NOT run checks yourself or skip this step. Always delegate to the agent.**
 
-For each active entry, grouped by platform:
+Spawn the `regression-tester` agent:
 
-1. Navigate to the session URL
-2. Wait ~5 seconds for page load + extension init
-3. Verify the page loaded (not redirected to login/error)
-4. Run each check from the entry's `checks` array via `javascript_tool`:
+```
+Agent({
+  subagent_type: "regression-tester",
+  description: "Run regression tests after {category} fix",
+  prompt: "Run regression tests.\n\nMode: full\nDiscover: true\nUpdate registry: false\n\nContext: A {category} fix was just applied on {platform}. The fix changed: {list files changed}. Run all active sessions and report results. Pay special attention to {platform} sessions and {category}-related checks."
+})
+```
 
-### Check Implementations
+Wait for the results. Interpret the report:
 
-Run each check using the JavaScript snippets in [checks.md](checks.md). Each returns `PASS:`, `FAIL:`, or `SKIP:` with details. For `no-console-errors`, use `read_console_messages` instead of `javascript_tool`.
-
-5. Read console messages for Aleph errors
-6. Record pass/fail per check per session
-
-### Regression Report
-
-After testing all active sessions:
-
-- **ALL pass**: Report success. Proceed to update `tests/sessions.json`.
-- **ANY fail**: Report which sessions and checks failed. For each failure:
+- **ALL pass, no discoveries**: Proceed to Step 7.
+- **ANY fail**: For each failure:
   1. Determine if it's caused by your fix (a regression) or a pre-existing issue
-  2. If it's a regression: go back to **Step 1**, treating the regression as the new bug. The original URL and the regressed URL are both targets.
-  3. If it's pre-existing and unrelated to your fix: note it in the report but proceed
+  2. If it's a regression: go back to **Step 1**, treating the regression as the new bug
+  3. If it's pre-existing and unrelated: note it in the final report but proceed
+- **New issues discovered**: Note them in the final report. These are pre-existing issues unrelated to your fix — do not attempt to fix them now.
 
 ---
 

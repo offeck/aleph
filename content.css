@@ -8,9 +8,25 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 [data-aleph-rtl="true"] {
+  unicode-bidi: plaintext !important;
+}
+
+/* RTL-classified paragraphs (Hebrew-first): use embed so direction:rtl is
+   enforced as the base direction. This keeps Hebrew words like כי on the
+   correct (right) side inside parentheses. Simple math like w = ε still
+   renders correctly because = between LTR chars resolves as LTR in embed. */
+[data-aleph-rtl="true"][data-aleph-dir="rtl"] {
   direction: rtl !important;
   text-align: right !important;
-  unicode-bidi: plaintext !important;
+  unicode-bidi: embed !important;
+}
+
+/* LTR-classified paragraphs (math-first): use plaintext so the browser
+   auto-detects LTR from the first strong character. This fixes bracket-heavy
+   expressions like {a,b}⁰ = {ε} where embed would misorder neutral chars. */
+[data-aleph-rtl="true"][data-aleph-dir="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
 }
 
 /* Editor paragraph children use dir="auto" for per-paragraph direction.
@@ -50,18 +66,26 @@ mjx-container[display="true"], .math-display {
   text-align: left !important;
 }
 
-/* Paragraph-level RTL: use embed so direction:rtl is respected as the base
-   direction. plaintext (the default above) picks direction from the first
-   strong character, which breaks paragraphs that start with LTR text like
-   "NP-completeness" but are predominantly Hebrew. */
-p[data-aleph-rtl="true"],
-li[data-aleph-rtl="true"],
-h1[data-aleph-rtl="true"],
-h2[data-aleph-rtl="true"],
-h3[data-aleph-rtl="true"],
-h4[data-aleph-rtl="true"],
-blockquote[data-aleph-rtl="true"] {
-  unicode-bidi: embed !important;
+/* Paragraph-level RTL: plaintext (from generic rule above) auto-detects
+   base direction from content. This lets math expressions like {a,b}⁰ = {ε}
+   render correctly — neutral chars (=, parentheses) resolve naturally
+   within LTR runs instead of being forced RTL by embed. */
+
+/* Inline elements inside RTL paragraphs: use plaintext so each element
+   auto-detects its own direction from content. Prevents BiDi neutral chars
+   (=, (, ), {, }) from leaking RTL direction across element boundaries.
+   E.g. <strong>{a,b}⁰</strong> detects LTR from 'a', renders correctly. */
+[data-aleph-rtl="true"] strong,
+[data-aleph-rtl="true"] em {
+  unicode-bidi: plaintext !important;
+}
+
+/* Inside math regions, strong/em should inherit isolation, not get plaintext */
+[data-aleph-math-isolated] strong,
+[data-aleph-math-isolated] em,
+[data-aleph-latex-rendered] strong,
+[data-aleph-latex-rendered] em {
+  unicode-bidi: inherit !important;
 }
 
 /* RTL lists */
@@ -363,15 +387,7 @@ ol:has(> [data-aleph-rtl="true"]) {
   float: left;
 }
 
-/* ChatGPT */
-[data-aleph-platform="chatgpt"] [data-aleph-rtl="true"] {
-  unicode-bidi: embed !important;
-}
-
-/* Gemini */
-[data-aleph-platform="gemini"] [data-aleph-rtl="true"] {
-  unicode-bidi: embed !important;
-}
+/* ChatGPT / Gemini: no embed override — plaintext handles all cases */
 
 [data-aleph-platform="gemini"] [data-aleph-rtl="true"] code-block {
   direction: ltr !important;

@@ -2,7 +2,9 @@
 name: issue-planner
 description: Plans general, non-monkey-patch fixes for Aleph Chrome extension bugs. Researches how competing tools handle similar issues, then produces a step-by-step implementation plan targeting the root cause.
 tools: Read, Grep, Glob, WebSearch, WebFetch
+disallowedTools: Edit, Write, Bash
 model: opus
+permissionMode: plan
 color: green
 ---
 

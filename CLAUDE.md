@@ -141,37 +141,38 @@ Hides upgrade banners, promos, and UI clutter via `data-aleph-hidden` attribute 
 
 ## Pre-Push Regression Tests
 
-When the user asks to push commits:
+When the user asks to push commits, spawn the `regression-tester` agent:
 
-1. Read `tests/sessions.json` and collect all entries with `"status": "active"`
-2. For each entry, grouped by platform:
-   a. Navigate to the session URL via `mcp__claude-in-chrome__navigate`
-   b. Wait ~5 seconds for page load + extension initialization (patchAll runs at 0ms, 1.5s, then every 3s)
-   c. Verify the URL loaded correctly (not redirected to login/404)
-   d. Run each check from the entry's `checks` array using `mcp__claude-in-chrome__javascript_tool`
-   e. Read console messages for Aleph errors via `mcp__claude-in-chrome__read_console_messages`
-   f. Record pass/fail per check
-3. Report summary:
-   - If ALL pass: proceed with `git push`
-   - If ANY fail: report which sessions/checks failed, ask user whether to push anyway or investigate
+```
+Agent({
+  subagent_type: "regression-tester",
+  description: "Pre-push regression sweep",
+  prompt: "Run regression tests.\n\nMode: full\nDiscover: false\nUpdate registry: false\n\nContext: Pre-push validation. Report pass/fail only."
+})
+```
 
-### Check implementations
+- If ALL pass: proceed with `git push`
+- If ANY fail: report which sessions/checks failed, ask user whether to push anyway or investigate
 
-**`rtl-direction`** — Verify Hebrew elements have `data-aleph-rtl="true"` and computed `direction: rtl`. Also check for missed Hebrew elements without the attribute, scoped to message containers only (not sidebar/navigation). Use `SELECTORS[platform].message` to find containers.
+### Check reference
 
-**`math-ltr-isolation`** — Verify `.katex` and `mjx-container` elements maintain `direction: ltr` inside RTL containers.
+Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 
-**`no-console-errors`** — Use `read_console_messages` with pattern `Aleph|aleph` at error level.
+**`rtl-direction`** — Hebrew elements have `data-aleph-rtl="true"` and computed `direction: rtl`.
 
-**`latex-rendered`** — Verify `.katex` elements exist and no `.katex-error` spans are present.
+**`math-ltr-isolation`** — `.katex` and `mjx-container` maintain `direction: ltr` inside RTL containers.
 
-**`theme-applied`** — When `data-aleph-theme` is set, verify `--aleph-bg`, `--aleph-text`, `--aleph-accent`, `--aleph-border` CSS custom properties are present.
+**`no-console-errors`** — No Aleph-related error-level console messages.
 
-**`focus-hidden`** — Verify `[data-aleph-hidden]` elements have `display: none`.
+**`latex-rendered`** — `.katex` elements exist, no `.katex-error` spans.
 
-**`streaming-attrs`** — Verify `data-aleph-stream-enabled` and `data-aleph-stream-anim` attributes on `<html>`.
+**`theme-applied`** — CSS custom properties (`--aleph-bg`, `--aleph-text`, `--aleph-accent`, `--aleph-border`) present when theme is set.
 
-**`selectors-match`** — Verify `[data-aleph-platform]`, `[data-aleph-rtl]`, `[data-aleph-theme]` selectors find DOM elements.
+**`focus-hidden`** — `[data-aleph-hidden]` elements have `display: none`.
+
+**`streaming-attrs`** — `data-aleph-stream-enabled` and `data-aleph-stream-anim` attributes on `<html>`.
+
+**`selectors-match`** — `[data-aleph-platform]`, `[data-aleph-rtl]`, `[data-aleph-theme]` selectors find DOM elements.
 
 ## Common Tasks
 
