@@ -2,6 +2,7 @@
 name: issue-investigator
 description: Investigates visual bugs in the Aleph Chrome extension. Performs root cause analysis on BiDi, LaTeX, theme, focus mode, and streaming issues. Generalizes the problem and identifies all affected locations in the codebase.
 tools: Read, Grep, Glob, WebSearch
+disallowedTools: Edit, Write, Bash
 model: opus
 color: blue
 ---
