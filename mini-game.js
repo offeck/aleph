@@ -24,33 +24,29 @@
     gemini: '.send-button.stop',
   };
 
-  // Detect when actual response text has started streaming (NOT chain-of-thought)
+  const ASSISTANT_SEL = '[data-message-author-role="assistant"], .font-claude-response, .response-content';
+
   function hasVisibleResponse() {
+    const msgs = document.querySelectorAll(ASSISTANT_SEL);
+
     if (PLATFORM === "claude") {
-      // Claude's response container has multiple children during extended thinking:
-      //   child 0 = thinking section (CoT)
-      //   child 1+ = actual response (with .progressive-markdown or .standard-markdown)
-      // Only count as "visible response" when the SECOND child appears with real text
-      const resp = document.querySelector(".font-claude-response");
-      if (!resp || resp.children.length < 2) return false;
-      const secondChild = resp.children[1];
-      const md = secondChild.querySelector(".progressive-markdown p, .standard-markdown p, p");
-      return md ? md.textContent.trim().length > 5 : false;
+      const streaming = document.querySelector('.progressive-markdown p');
+      return streaming ? streaming.textContent.trim().length > 5 : false;
     }
+
+    if (msgs.length <= gameSpawnMsgCount) return false;
+    const last = msgs[msgs.length - 1];
+    if (!last) return false;
+
     if (PLATFORM === "chatgpt") {
-      // ChatGPT Extended mode doesn't use .result-streaming
-      // Check if a NEW assistant message appeared since game spawned with substantial text
-      const msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
-      if (msgs.length <= gameSpawnMsgCount) return false;
-      const last = msgs[msgs.length - 1];
-      const p = last ? last.querySelector('.markdown p') : null;
+      const markdowns = last.querySelectorAll('.markdown');
+      const lastMd = markdowns.length ? markdowns[markdowns.length - 1] : null;
+      const p = lastMd ? lastMd.querySelector('p') : null;
       return p ? p.textContent.trim().length > 30 : false;
     }
-    if (PLATFORM === "gemini") {
-      const el = document.querySelector(".response-content p, .model-response-text p");
-      return el ? el.textContent.trim().length > 10 : false;
-    }
-    return false;
+
+    const p = last.querySelector('p');
+    return p ? p.textContent.trim().length > 10 : false;
   }
 
   function isThinking() {
@@ -78,7 +74,7 @@
       thinkingDetected = false;
     }
     wasThinking = thinking;
-  }, 1000);
+  }, 300);
 
   // Watch for thinking indicators appearing in the DOM
   new MutationObserver(() => {
@@ -87,9 +83,14 @@
     if (!isThinking()) return;
     if (thinkingDetected) return;
     thinkingDetected = true;
+    console.log("[Aleph MiniGame] thinking detected!");
     setTimeout(() => {
-      if (gameActive || hasVisibleResponse()) return;
-      if (!isThinking()) return;
+      const stillThinking = isThinking();
+      const nowVisible = hasVisibleResponse();
+      console.log("[Aleph MiniGame] after 500ms: stillThinking=" + stillThinking + " visResp=" + nowVisible + " gameActive=" + gameActive);
+      if (gameActive || nowVisible) return;
+      if (!stillThinking) return;
+      console.log("[Aleph MiniGame] spawning game!");
       spawnGame();
     }, 500);
   }).observe(document.body, {
@@ -100,7 +101,7 @@
 
   function spawnGame() {
     gameActive = true;
-    gameSpawnMsgCount = document.querySelectorAll('[data-message-author-role="assistant"], .font-claude-response, .response-content').length;
+    gameSpawnMsgCount = document.querySelectorAll(ASSISTANT_SEL).length;
     const game = Math.random() < 0.5 ? "snake" : "minesweeper";
 
     const overlay = document.createElement("div");
@@ -121,26 +122,42 @@
     document.body.appendChild(overlay);
     requestAnimationFrame(() => { overlay.style.opacity = "1"; });
 
+    let paused = false;
     if (game === "snake") {
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
       overlay.appendChild(canvas);
-      startSnake(canvas, dismiss);
+      startSnake(canvas, dismiss, () => paused);
     } else {
       startMinesweeper(overlay, dismiss);
     }
 
     const escHandler = (e) => { if (e.key === "Escape") dismiss(); };
     document.addEventListener("keydown", escHandler);
-    const streamPoll = setInterval(() => { if (hasVisibleResponse()) dismiss(); }, 500);
+    const streamPoll = setInterval(() => {
+      if (hasVisibleResponse()) {
+        console.log("[Aleph MiniGame] response streaming — dismissing");
+        dismiss();
+      }
+    }, 500);
 
     let mouseEntered = false;
-    overlay.addEventListener("mouseenter", () => { mouseEntered = true; });
-    overlay.addEventListener("mouseleave", () => { if (mouseEntered) dismiss(); });
+    overlay.addEventListener("mouseenter", () => {
+      console.log("[Aleph MiniGame] mouse enter");
+      mouseEntered = true;
+      paused = false;
+    });
+    overlay.addEventListener("mouseleave", () => {
+      if (!mouseEntered) return;
+      console.log("[Aleph MiniGame] mouse exit");
+      if (game === "snake") { paused = true; }
+      else { dismiss(); }
+    });
 
     function dismiss() {
       if (!gameActive) return;
+      console.log("[Aleph MiniGame] dismiss called");
       gameActive = false;
       clearInterval(streamPoll);
       document.removeEventListener("keydown", escHandler);
@@ -150,7 +167,7 @@
   }
 
   // ── Snake (adapted from straker's gist, CC0 1.0) ─────────────────────
-  function startSnake(canvas, onGameOver) {
+  function startSnake(canvas, onGameOver, isPaused) {
     const ctx = canvas.getContext("2d");
     const grid = 10;
     const cols = canvas.width / grid;
@@ -167,6 +184,7 @@
     function loop() {
       if (dead) return;
       requestAnimationFrame(loop);
+      if (isPaused()) return;
       if (++count < 6) return;
       count = 0;
 
@@ -283,6 +301,7 @@
       if (sq.getAttribute("data-checked") || sq.getAttribute("data-flag")) return;
       if (sq.getAttribute("data-type") === "bomb") {
         isGameOver = true;
+        console.log("[Aleph MiniGame] minesweeper: bomb hit!");
         squares.forEach((s) => {
           if (s.getAttribute("data-type") === "bomb") {
             s.textContent = "💣";
@@ -341,6 +360,7 @@
       }
       if (matches === bombAmount) {
         isGameOver = true;
+        console.log("[Aleph MiniGame] minesweeper: you won!");
         setTimeout(onGameOver, 600);
       }
     }

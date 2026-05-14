@@ -18,25 +18,25 @@
       "id": "claude-bidi-math-002",
       "platform": "claude",
       "url": "https://claude.ai/chat/503afebb-7775-4fda-9056-a34290a46974",
-      "description": "Hebrew math (Jacobian matrix, Question 4b). dxdy renders on wrong side, parenthesized ranges not rendered, integral symbol problematic, comma-semicolon artifacts.",
+      "description": "Hebrew math (Jacobian matrix, Question 4b). Had 3 elements with LTR direction from math-expression-leading paragraphs (f(0,0)=, etc). Fixed by detectDir() ratio analysis.",
       "category": "bidi-math",
       "precedingMessage": "The dxdy should on the left instead of on the right",
       "checks": ["rtl-direction", "math-ltr-isolation", "latex-rendered", "no-console-errors"],
       "source": "backfill:82847070",
       "addedAt": "2026-05-07",
-      "status": "active"
+      "status": "fixed"
     },
     {
       "id": "claude-latex-001",
       "platform": "claude",
       "url": "https://claude.ai/chat/93741b2d-7dd3-4343-9c0c-d25f07e80706",
-      "description": "Hebrew financial text with dollar amounts and stock tickers. LaTeX fixer treated currency $ as math delimiters, garbling Hebrew text and stripping dollar signs.",
+      "description": "Hebrew financial text with stock tickers (ACATS, IBKR, CSV). Had 5 elements with LTR direction from English abbreviation-leading paragraphs. Fixed by detectDir() ratio analysis.",
       "category": "latex-rendering",
       "precedingMessage": "the hebrew text with the numbers looks fumbled",
       "checks": ["rtl-direction", "latex-rendered", "no-console-errors"],
       "source": "backfill:61196eb7",
       "addedAt": "2026-05-07",
-      "status": "active"
+      "status": "fixed"
     },
     {
       "id": "claude-bidi-math-003",
@@ -53,24 +53,24 @@
       "id": "claude-bidi-text-001",
       "platform": "claude",
       "url": "https://claude.ai/chat/8623be72-91bc-4d7e-a412-415c37fa1d67",
-      "description": "Hebrew computer science topics list. Item 10 (NP-completeness) rendered LTR because unicode-bidi:plaintext picked English 'N' as first strong character.",
+      "description": "Hebrew computer science topics list. Items starting with English terms (Machine Learning, Data Structures, Operating Systems) rendered LTR. Fixed by replacing detectDir() prefix-based heuristic with full-text character ratio analysis (0.40 RTL threshold, modeled after Google Closure Library).",
       "category": "bidi-text",
       "precedingMessage": "Please check why 10 shows incorrectly (ltr)",
       "checks": ["rtl-direction", "no-console-errors"],
       "source": "backfill:13f565e1",
       "addedAt": "2026-05-07",
-      "status": "active"
+      "status": "fixed"
     },
     {
       "id": "claude-bidi-text-002",
       "platform": "claude",
       "url": "https://claude.ai/chat/fd656f57-6ef2-4f57-a698-5f9c199e8498",
-      "description": "Hebrew exam material analysis. Used for regression testing of RTL paragraph-level unicode-bidi:embed fix.",
+      "description": "Hebrew exam material analysis. Had 1 element with LTR direction from English-leading paragraph. Fixed by detectDir() ratio analysis.",
       "category": "bidi-text",
       "checks": ["rtl-direction", "no-console-errors"],
       "source": "backfill:13f565e1",
       "addedAt": "2026-05-07",
-      "status": "active"
+      "status": "fixed"
     },
     {
       "id": "claude-general-001",
@@ -98,12 +98,34 @@
       "id": "claude-bidi-math-005",
       "platform": "claude",
       "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
-      "description": "Hebrew CS theory (Myhill-Nerode, formal languages) with extensive BiDi math issues. 11 bugs reported: (1) a ≁_L b rendered as plain text — U+2241 not matched by MATH_TILDE_RE [fixed]. (2) L* asterisk displaced in RTL set-builder notation [fixed via LRM]. (3) Orphaned * after <em> in LTR paragraph [fixed — absorbed into element]. (4) {a,b}⁰ = {ε} sides swapped in RTL [partially fixed via findEqRegions + bdi]. (5) 0ⁱ · 0ʲ garbled by MATH_EXPR_RE over-matching [fixed — removed MATH_EXPR_RE, now using findEqRegions]. (6) M₁ = (Q₁, Σ, δ₁, s₁, A₁) parentheses misplaced by BiDi [improved via findEqRegions bdi wrapping]. (7) De Morgan L₁ ∩ L₂ = (L̄₁ ∪ L̄₂) sides swapped [improved]. (8) L₁ = {aⁿbⁿ | n ≥ 0} cross-element boundary garbling [partially fixed]. (9) L₁ \\ L₂ = {ab, bb} set difference with Hebrew between expressions [improved]. (10) Complex expression with =, ∩, \\, ⊆, () operators [partially fixed]. (11) L* = Σ* · {#} · L = Kleene star expression [partially fixed].",
+      "description": "Hebrew CS theory (Myhill-Nerode, formal languages) with extensive BiDi math issues. Direction detection improved: detectDir() replaced prefix heuristic with character-ratio analysis (0.20 RTL threshold, run-based LTR counting skipping single-letter math variables). Reduced LTR-misclassified elements from 37 to 18. Remaining 18 are genuinely math/English-dominant content at the classification boundary.",
       "category": "bidi-math",
       "checks": ["rtl-direction", "math-ltr-isolation", "no-console-errors"],
       "source": "conversation:2026-05-13",
       "addedAt": "2026-05-13",
       "status": "active"
+    },
+    {
+      "id": "claude-bidi-text-003",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Hebrew CS theory with regex notation. Asterisks stripped by patchMarkdown() and fixBidiNeutrals() star absorber — (0∪1)*10(0∪1)* lost both asterisks, r₁=(10)* had asterisk relocated into <strong>. Fixed by removing patchMarkdown() and orphaned-star logic entirely; platforms already render markdown to HTML.",
+      "category": "bidi-text",
+      "checks": ["rtl-direction", "no-console-errors"],
+      "source": "conversation:2026-05-14",
+      "addedAt": "2026-05-14",
+      "status": "fixed"
+    },
+    {
+      "id": "claude-bidi-text-004",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Non-Hebrew LIs in RTL lists had asterisks visually displaced by BiDi reordering. r₁: 10 ∈ (10)* showed * before r₁ instead of after (10). Fixed by adding unicode-bidi:plaintext CSS for non-RTL LIs in RTL lists and expanding fixBidiNeutrals() to inject LRM in those elements.",
+      "category": "bidi-text",
+      "checks": ["rtl-direction", "no-console-errors"],
+      "source": "conversation:2026-05-14",
+      "addedAt": "2026-05-14",
+      "status": "fixed"
     },
     {
       "id": "chatgpt-theme-001",
@@ -115,6 +137,28 @@
       "source": "backfill:82847070",
       "addedAt": "2026-05-07",
       "status": "active"
+    },
+    {
+      "id": "chatgpt-general-001",
+      "platform": "chatgpt",
+      "url": "https://chatgpt.com/c/6a05e957-e0d4-83eb-8c15-5de38f10860e",
+      "description": "ChatGPT Extended thinking TTFT tracking. detectFirstToken() false-positived on chain-of-thought text inside .markdown p, prematurely clearing data-aleph-thinking. Fixed by querying the last .markdown block (actual response) instead of the first (CoT section). Also removed stale stopGoneCount reference that crashed 120s timeout under strict mode.",
+      "category": "general",
+      "checks": ["selectors-match", "no-console-errors"],
+      "source": "conversation:2026-05-14",
+      "addedAt": "2026-05-14",
+      "status": "fixed"
+    },
+    {
+      "id": "claude-general-002",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Mini-game did not appear on follow-up messages in existing conversations. hasVisibleResponse() used page-global querySelector matching old responses (always true after first message). Fixed by unifying all platforms to use count-based ASSISTANT_SEL detection (snapshot message count at spawn, only check new messages). Also reduced wasThinking poll from 1000ms to 300ms to catch rapid stop-button transitions.",
+      "category": "general",
+      "checks": ["rtl-direction", "no-console-errors"],
+      "source": "conversation:2026-05-14",
+      "addedAt": "2026-05-14",
+      "status": "fixed"
     }
   ]
 }

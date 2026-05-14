@@ -351,14 +351,18 @@
   }
 
   // ── BiDi Detection ─────────────────────────────────────────────────────
+  function isMathNode(node) {
+    const tag = node.tagName?.toLowerCase();
+    return node.classList?.contains("katex") || node.classList?.contains("katex-display") ||
+      tag === "mjx-container" || tag === "code" || tag === "pre";
+  }
+
   function hasHebrew(el) {
     if (!el) return false;
     for (const c of el.childNodes) {
       if (c.nodeType === 3 && HEB.test(c.textContent)) return true;
       if (c.nodeType === 1) {
-        const tag = c.tagName?.toLowerCase();
-        if (c.classList?.contains("katex") || tag === "mjx-container" ||
-            tag === "code" || tag === "pre") continue;
+        if (isMathNode(c)) continue;
         if (hasHebrew(c)) return true;
       }
     }
@@ -366,7 +370,7 @@
   }
 
   const STRONG_RTL_RE = /[֐-׿؀-ۿ]/;
-  const LTR_LETTER_RE = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/;
+  const LTR_RUN_RE = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]{2,}/g;
 
   function detectDir(el) {
     if (!el) return "rtl";
@@ -375,200 +379,66 @@
       if (node.nodeType === 3) {
         text += node.textContent;
       } else if (node.nodeType === 1) {
-        const tag = node.tagName?.toLowerCase();
-        if (node.classList?.contains("katex") || tag === "mjx-container" ||
-            tag === "code" || tag === "pre") return;
+        if (isMathNode(node) ||
+            node.hasAttribute?.("data-aleph-math-isolated")) return;
         for (const c of node.childNodes) walk(c);
       }
     };
     walk(el);
-    let hebIdx = -1;
+    let rtlCount = 0, ltrCount = 0;
     for (let i = 0; i < text.length; i++) {
-      if (STRONG_RTL_RE.test(text[i])) { hebIdx = i; break; }
+      if (STRONG_RTL_RE.test(text[i])) rtlCount++;
     }
-    if (hebIdx === -1) return "ltr";
-    if (hebIdx === 0) return "rtl";
-    // Check if prefix contains = sign → math definition → LTR
-    // Otherwise count LTR letters: ≥3 = multi-token math → LTR, <3 = label → RTL
-    const prefix = text.slice(0, hebIdx);
-    if (prefix.includes("=")) return "ltr";
-    let letterCount = 0;
-    for (let i = 0; i < hebIdx; i++) {
-      if (LTR_LETTER_RE.test(text[i])) letterCount++;
+    LTR_RUN_RE.lastIndex = 0;
+    for (const m of text.matchAll(LTR_RUN_RE)) {
+      ltrCount += m[0].length;
     }
-    return letterCount >= 3 ? "ltr" : "rtl";
-  }
-
-  // ── Markdown Fixer ──────────────────────────────────────────────────────
-  const MD_RE = /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*([^*\s][^*]*?[^*\s])\*|\*([^*\s])\*/g;
-
-  function patchMarkdown() {
-    const messageSel = SEL.message.join(", ");
-    document.querySelectorAll(messageSel).forEach((msg) => {
-      const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-      const nodes = [];
-      let node;
-      while ((node = walker.nextNode())) {
-        const el = node.parentElement;
-        if (!el) continue;
-        if (el.closest("code, pre, style, script, .katex, .katex-display, mjx-container, [data-aleph-md-fixed]")) continue;
-        if (el.tagName === "STRONG" || el.tagName === "EM" || el.tagName === "STYLE" || el.tagName === "SCRIPT") continue;
-        const txt = node.textContent;
-        if (txt && /\*{1,3}[^*]+\*{1,3}/.test(txt)) {
-          nodes.push(node);
-        }
-      }
-      nodes.forEach(fixMarkdownInNode);
-    });
-  }
-
-  function fixMarkdownInNode(textNode) {
-    const text = textNode.textContent;
-    if (!text) return;
-    MD_RE.lastIndex = 0;
-    let match;
-    const regions = [];
-    while ((match = MD_RE.exec(text)) !== null) {
-      if (match[1] !== undefined) {
-        regions.push({ start: match.index, end: match.index + match[0].length, content: match[1], type: "bolditalic" });
-      } else if (match[2] !== undefined) {
-        regions.push({ start: match.index, end: match.index + match[0].length, content: match[2], type: "bold" });
-      } else {
-        const content = match[3] !== undefined ? match[3] : match[4];
-        regions.push({ start: match.index, end: match.index + match[0].length, content, type: "italic" });
-      }
-    }
-    if (regions.length === 0) return;
-
-    const wrapper = document.createElement("span");
-    wrapper.setAttribute("data-aleph-md-fixed", "true");
-    let lastEnd = 0;
-    for (const r of regions) {
-      if (r.start > lastEnd) {
-        wrapper.appendChild(document.createTextNode(text.slice(lastEnd, r.start)));
-      }
-      if (r.type === "bolditalic") {
-        const strong = document.createElement("strong");
-        const em = document.createElement("em");
-        em.textContent = r.content;
-        strong.appendChild(em);
-        wrapper.appendChild(strong);
-      } else if (r.type === "bold") {
-        const strong = document.createElement("strong");
-        strong.textContent = r.content;
-        wrapper.appendChild(strong);
-      } else {
-        const em = document.createElement("em");
-        em.textContent = r.content;
-        wrapper.appendChild(em);
-      }
-      lastEnd = r.end;
-    }
-    if (lastEnd < text.length) {
-      wrapper.appendChild(document.createTextNode(text.slice(lastEnd)));
-    }
-    textNode.parentNode.replaceChild(wrapper, textNode);
+    if (rtlCount === 0) return "ltr";
+    if (ltrCount === 0) return "rtl";
+    return rtlCount / (rtlCount + ltrCount) > 0.2 ? "rtl" : "ltr";
   }
 
   const LRM = "‎";
   const STAR_AFTER_LTR = /([^\s֐-׿؀-ۿ*])\*(?!‎)/g;
 
+  function fixNeutralsInEl(el) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.parentElement.closest("code, pre, .katex, .katex-display, mjx-container, [data-aleph-latex-rendered], [data-aleph-math-isolated]")) continue;
+      let text = node.textContent;
+      if (!text) continue;
+      let changed = false;
+      if (text.includes("*")) {
+        STAR_AFTER_LTR.lastIndex = 0;
+        const r = text.replace(STAR_AFTER_LTR, "$1*" + LRM);
+        if (r !== text) { text = r; changed = true; }
+      }
+      if (changed) node.textContent = text;
+    }
+  }
+
   function fixBidiNeutrals() {
-    const rtlEls = document.querySelectorAll("[data-aleph-rtl='true']");
-    rtlEls.forEach((rtlEl) => {
-      const walker = document.createTreeWalker(rtlEl, NodeFilter.SHOW_TEXT);
-      let node;
-      while ((node = walker.nextNode())) {
-        if (node.parentElement.closest("code, pre, .katex, .katex-display, mjx-container, [data-aleph-latex-rendered], [data-aleph-math-isolated]")) continue;
-        let text = node.textContent;
-        if (!text) continue;
-        let changed = false;
-        if (text.includes("*")) {
-          STAR_AFTER_LTR.lastIndex = 0;
-          const r = text.replace(STAR_AFTER_LTR, "$1*" + LRM);
-          if (r !== text) { text = r; changed = true; }
-        }
-        if (changed) node.textContent = text;
-      }
-    });
-    // Fix orphaned * after em/strong — absorb into preceding element (works for both RTL and LTR)
-    // Handles two cases:
-    //   A) Leading *: text node starts with * (e.g. "<em>Σ</em>* rest")
-    //   B) Trailing *: text node ends with * after em whose inner text ends with a letter
-    //      (e.g. "<em>...Σ</em> rest}**" from misparse of "Σ* ... Σ*")
-    const messageSel = SEL.message.join(", ");
-    const STAR_OWNER_END = /[\p{L}\p{N}}\)\]⁰¹²³⁴⁵⁶⁷⁸⁹₀-₉]$/u;
-    document.querySelectorAll(messageSel).forEach((msg) => {
-      const emStrong = msg.querySelectorAll("em, strong");
-      for (const el of emStrong) {
-        if (el.hasAttribute("data-aleph-star-fixed")) continue;
-        const next = el.nextSibling;
-        if (!next || next.nodeType !== 3) continue;
-        const txt = next.textContent;
-        if (!txt) continue;
-        // Case A: leading * — absorb into preceding em/strong
-        if (txt[0] === "*" && STAR_OWNER_END.test(el.textContent)) {
-          el.appendChild(document.createTextNode("*"));
-          next.textContent = txt.slice(1);
-          if (!next.textContent) next.remove();
-          el.setAttribute("data-aleph-star-fixed", "true");
-          continue;
-        }
-        // Case B: trailing ** from misparse — redistribute * into em/strong boundaries
-        // Pattern: <em><em>...Σ</em> ...Σ</em> rest}**
-        // The parser consumed * from "Σ*" as emphasis delimiters; trailing ** is the residue.
-        // Each boundary (closing </em> or </strong> and the outer el's last text) that ends
-        // with a star-owning character gets one * restored.
-        const trailingMatch = txt.match(/\*+$/);
-        if (!trailingMatch) continue;
-        const stars = trailingMatch[0].length;
-        // Find the last text node of each em/strong child boundary + the outer element itself
-        const candidates = [];
-        const boundaries = [el, ...el.querySelectorAll("em, strong")];
-        for (const b of boundaries) {
-          // Get the last direct text node of this element
-          let lastText = null;
-          for (let c = b.lastChild; c; c = c.previousSibling) {
-            if (c.nodeType === 3 && c.textContent.trim()) { lastText = c; break; }
-            if (c.nodeType === 1) break; // stop at element nodes
-          }
-          if (lastText && STAR_OWNER_END.test(lastText.textContent)) {
-            candidates.push(lastText);
-          }
-        }
-        if (candidates.length === 0) continue;
-        const toFix = Math.min(stars, candidates.length);
-        // Insert * after each candidate (last to first to preserve positions)
-        for (let i = candidates.length - 1; i >= candidates.length - toFix; i--) {
-          const cand = candidates[i];
-          const parent = cand.parentNode;
-          const nextSib = cand.nextSibling;
-          const starNode = document.createTextNode("*");
-          if (nextSib) parent.insertBefore(starNode, nextSib);
-          else parent.appendChild(starNode);
-        }
-        // Remove consumed stars from trailing text
-        next.textContent = txt.slice(0, txt.length - toFix);
-        if (!next.textContent) next.remove();
-        el.setAttribute("data-aleph-star-fixed", "true");
-      }
-    });
+    document.querySelectorAll("[data-aleph-rtl='true']").forEach(fixNeutralsInEl);
+    document.querySelectorAll(
+      "ul:has(> [data-aleph-rtl='true']) > li:not([data-aleph-rtl]), " +
+      "ol:has(> [data-aleph-rtl='true']) > li:not([data-aleph-rtl])"
+    ).forEach(fixNeutralsInEl);
   }
 
   // ── Send hint (set by insights-tracker.js via DOM attribute) ─────────
   let sendHint = null;
-  const HINT_DELAY = 5000;
   const HINT_WINDOW = 30000;
   const hintChecked = new WeakSet();
 
   function readSendHint() {
     const raw = document.documentElement.getAttribute("data-aleph-send-hint");
     if (!raw) { sendHint = null; return; }
+    if (!document.documentElement.hasAttribute("data-aleph-thinking")) { sendHint = null; return; }
     try {
       const h = JSON.parse(raw);
       const elapsed = Date.now() - h.ts;
-      if (elapsed < HINT_DELAY) { sendHint = null; return; }
-      if (elapsed < HINT_DELAY + HINT_WINDOW) { sendHint = h; return; }
+      if (elapsed < HINT_WINDOW) { sendHint = h; return; }
       sendHint = null;
       document.documentElement.removeAttribute("data-aleph-send-hint");
     } catch (e) { sendHint = null; }
@@ -585,7 +455,6 @@
       else cleanupEditorDir();
       if (settings.focusMode) applyFocusMode();
       if (settings.latexFix) patchLatex();
-      patchMarkdown();
       if (settings.bidiEnabled) fixBidiNeutrals();
       if (settings.streamSmooth) {
         applyStreamSmooth();
@@ -1306,16 +1175,14 @@
     let patchIntervalId = setInterval(patchAll, 3000);
 
     new MutationObserver(() => {
+      clearInterval(patchIntervalId);
+      patchIntervalId = setInterval(patchAll, 500);
       setTimeout(() => {
         clearInterval(patchIntervalId);
-        patchIntervalId = setInterval(patchAll, 500);
-        setTimeout(() => {
-          clearInterval(patchIntervalId);
-          patchIntervalId = setInterval(patchAll, 3000);
-        }, 30000);
-      }, 5000);
+        patchIntervalId = setInterval(patchAll, 3000);
+      }, 30000);
     }).observe(document.documentElement, {
-      attributes: true, attributeFilter: ["data-aleph-send-hint"],
+      attributes: true, attributeFilter: ["data-aleph-thinking"],
     });
   });
 

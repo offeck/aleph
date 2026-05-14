@@ -523,6 +523,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
   }
 
+  if (msg.type === "insights-response-timing") {
+    (async () => {
+      const key = todayKey();
+      const usage = await readLocal(key, {});
+      const p = msg.platform;
+      if (!usage[p]) usage[p] = emptyPlatformDay();
+      if (!usage[p].timing) usage[p].timing = { count: 0, totalTTFT: 0, totalThinking: 0, totalSendToThinking: 0 };
+      usage[p].timing.count++;
+      usage[p].timing.totalTTFT += (msg.totalTTFT || 0);
+      usage[p].timing.totalThinking += (msg.thinkingToFirstToken || 0);
+      usage[p].timing.totalSendToThinking += (msg.sendToThinking || 0);
+      await writeLocal(key, usage);
+    })();
+  }
+
   // Insights: subscription detection
   if (msg.type === "insights-subscription") {
     (async () => {

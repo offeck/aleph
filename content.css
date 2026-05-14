@@ -95,6 +95,10 @@ ol:has(> [data-aleph-rtl="true"]) {
   padding-right: 2rem !important;
   padding-left: 0 !important;
 }
+ul:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]),
+ol:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]) {
+  unicode-bidi: plaintext !important;
+}
 
 /* RTL tables */
 [data-aleph-rtl="true"] table { direction: rtl !important; }
