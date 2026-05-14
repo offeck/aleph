@@ -11,14 +11,14 @@
   unicode-bidi: plaintext !important;
 }
 
-/* RTL-classified paragraphs (Hebrew-first): use embed so direction:rtl is
-   enforced as the base direction. This keeps Hebrew words like כי on the
-   correct (right) side inside parentheses. Simple math like w = ε still
-   renders correctly because = between LTR chars resolves as LTR in embed. */
+/* RTL-classified paragraphs (Hebrew-first): use isolate so direction:rtl
+   establishes the RTL base while creating a directional isolation boundary.
+   Neutrals between LTR runs (e.g. "2k", "|Σ|") resolve within their local
+   context instead of being forced RTL by the embedding level. */
 [data-aleph-rtl="true"][data-aleph-dir="rtl"] {
   direction: rtl !important;
   text-align: right !important;
-  unicode-bidi: embed !important;
+  unicode-bidi: isolate !important;
 }
 
 /* LTR-classified paragraphs (math-first): use plaintext so the browser
@@ -391,7 +391,7 @@ ol:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]) {
   float: left;
 }
 
-/* ChatGPT / Gemini: no embed override — plaintext handles all cases */
+/* ChatGPT / Gemini: no additional override — plaintext handles all cases */
 
 [data-aleph-platform="gemini"] [data-aleph-rtl="true"] code-block {
   direction: ltr !important;

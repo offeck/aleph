@@ -379,8 +379,7 @@
       if (node.nodeType === 3) {
         text += node.textContent;
       } else if (node.nodeType === 1) {
-        if (isMathNode(node) ||
-            node.hasAttribute?.("data-aleph-math-isolated")) return;
+        if (isMathNode(node)) return;
         for (const c of node.childNodes) walk(c);
       }
     };

@@ -17,7 +17,21 @@
     });
   }
 
-  // Detect when the model starts thinking (before any text streams)
+  // ── Constants ────────────────────────────────────────────────────────
+  const DISMISS_DELAY_MS  = 3000;
+  const BLINK_COUNT       = 3;
+  const BLINK_INTERVAL_MS = 200;
+  const DRAG_HOLD_MS      = 1500;
+
+  // Game types:
+  //   active   — continuous loop (e.g. snake). Pauses on mouse exit, waits for first input.
+  //   reactive — event-driven (e.g. minesweeper). Dismisses on mouse exit.
+  const GAMES = {
+    snake:       { type: "active",   width: 200, height: 200, start: startSnake },
+    minesweeper: { type: "reactive", width: 180, height: 210, start: startMinesweeper },
+  };
+
+  // ── Detection ────────────────────────────────────────────────────────
   const THINKING_SEL = {
     claude: '[aria-label="Stop response"]',
     chatgpt: '[aria-label="Stop streaming"], [aria-label*="Stop" i]',
@@ -26,27 +40,32 @@
 
   const ASSISTANT_SEL = '[data-message-author-role="assistant"], .font-claude-response, .response-content';
 
+  let gameSpawnMsgCount = 0;
+
   function hasVisibleResponse() {
     const msgs = document.querySelectorAll(ASSISTANT_SEL);
-
-    if (PLATFORM === "claude") {
-      const streaming = document.querySelector('.progressive-markdown p');
-      return streaming ? streaming.textContent.trim().length > 5 : false;
+    if (msgs.length > gameSpawnMsgCount) {
+      const last = msgs[msgs.length - 1];
+      if (!last) return false;
+      if (PLATFORM === "chatgpt") {
+        const markdowns = last.querySelectorAll('.markdown');
+        const lastMd = markdowns.length ? markdowns[markdowns.length - 1] : null;
+        const p = lastMd ? lastMd.querySelector('p') : null;
+        return p ? p.textContent.trim().length > 30 : false;
+      }
+      const p = last.querySelector('p');
+      const threshold = PLATFORM === "gemini" ? 10 : 5;
+      return p ? p.textContent.trim().length > threshold : false;
     }
-
-    if (msgs.length <= gameSpawnMsgCount) return false;
-    const last = msgs[msgs.length - 1];
-    if (!last) return false;
-
-    if (PLATFORM === "chatgpt") {
-      const markdowns = last.querySelectorAll('.markdown');
-      const lastMd = markdowns.length ? markdowns[markdowns.length - 1] : null;
-      const p = lastMd ? lastMd.querySelector('p') : null;
-      return p ? p.textContent.trim().length > 30 : false;
+    if (PLATFORM === "claude" && msgs.length > 0) {
+      const last = msgs[msgs.length - 1];
+      const grid = last.querySelector('[class*="grid-rows-"]');
+      if (!grid || grid.children.length < 2) return false;
+      const responseRow = grid.children[grid.children.length - 1];
+      const p = responseRow.querySelector('p');
+      return p ? p.textContent.trim().length > 5 : false;
     }
-
-    const p = last.querySelector('p');
-    return p ? p.textContent.trim().length > 10 : false;
+    return false;
   }
 
   function isThinking() {
@@ -54,29 +73,17 @@
     return sel ? !!document.querySelector(sel) : false;
   }
 
+  // ── Global state ─────────────────────────────────────────────────────
   let gameActive = false;
   let thinkingDetected = false;
-  let lastMouseX = window.innerWidth / 2;
-  let lastMouseY = window.innerHeight / 2;
 
-  document.addEventListener("mousemove", (e) => {
-    lastMouseX = e.clientX;
-    lastMouseY = e.clientY;
-  }, { passive: true });
-
-  // Reset thinkingDetected when stop button disappears (response finished)
-  // so the game can trigger again on the next send in the same conversation.
-  // Also reset when game was dismissed (streaming started) — allows re-triggering.
   let wasThinking = false;
   setInterval(() => {
     const thinking = isThinking();
-    if (wasThinking && !thinking) {
-      thinkingDetected = false;
-    }
+    if (wasThinking && !thinking) thinkingDetected = false;
     wasThinking = thinking;
   }, 300);
 
-  // Watch for thinking indicators appearing in the DOM
   new MutationObserver(() => {
     if (!miniGameEnabled) return;
     if (gameActive) return;
@@ -93,114 +100,198 @@
       console.log("[Aleph MiniGame] spawning game!");
       spawnGame();
     }, 500);
-  }).observe(document.body, {
-    childList: true, subtree: true,
-  });
+  }).observe(document.body, { childList: true, subtree: true });
 
-  let gameSpawnMsgCount = 0;
-
+  // ── spawnGame ────────────────────────────────────────────────────────
   function spawnGame() {
     gameActive = true;
     gameSpawnMsgCount = document.querySelectorAll(ASSISTANT_SEL).length;
-    const game = Math.random() < 0.5 ? "snake" : "minesweeper";
+
+    const keys = Object.keys(GAMES);
+    const gameName = keys[Math.floor(Math.random() * keys.length)];
+    const gameDef = GAMES[gameName];
 
     const overlay = document.createElement("div");
     overlay.id = "aleph-mini-game";
-    const w = game === "snake" ? 200 : 180;
-    const h = game === "snake" ? 200 : 210;
-    const left = Math.round((window.innerWidth - w) / 2);
-    const top = Math.round((window.innerHeight - h) / 2);
+    const w = gameDef.width;
+    const h = gameDef.height;
     overlay.style.cssText =
       "position:fixed;z-index:999999;" +
-      "left:" + left + "px;top:" + top + "px;" +
+      "left:" + Math.round((window.innerWidth - w) / 2) + "px;" +
+      "top:" + Math.round((window.innerHeight - h) / 2) + "px;" +
       "width:" + w + "px;height:" + h + "px;" +
       "border:2px solid #7c83ff;border-radius:12px;" +
       "box-shadow:0 8px 32px rgba(0,0,0,0.6);" +
       "background:#1a1a2e;overflow:hidden;" +
       "opacity:0;transition:opacity 0.3s;";
-
     document.body.appendChild(overlay);
     requestAnimationFrame(() => { overlay.style.opacity = "1"; });
 
-    let paused = false;
-    if (game === "snake") {
+    // Start game via standardized interface
+    const callbacks = { onGameOver: dismiss };
+
+    let container = overlay;
+    if (gameName === "snake") {
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
       overlay.appendChild(canvas);
-      startSnake(canvas, dismiss, () => paused);
-    } else {
-      startMinesweeper(overlay, dismiss);
+      container = canvas;
     }
+    const cleanup = gameDef.start(container, callbacks);
 
+    // ── ESC handler
     const escHandler = (e) => { if (e.key === "Escape") dismiss(); };
     document.addEventListener("keydown", escHandler);
-    const streamPoll = setInterval(() => {
-      if (hasVisibleResponse()) {
-        console.log("[Aleph MiniGame] response streaming — dismissing");
-        dismiss();
-      }
-    }, 500);
 
+    // ── Stream poll → delayed dismiss
+    // Two signals: visible response text OR stop button disappeared (response cycle done)
+    let streamPollId = setInterval(pollForDismiss, 500);
+
+    let dismissTimer = null;
+    let blinkIntervalId = null;
+
+    function pollForDismiss() {
+      const thinking = isThinking();
+      const visible = hasVisibleResponse();
+      if (visible) {
+        console.log("[Aleph MiniGame] response visible — scheduling dismiss");
+        scheduleDismiss();
+      } else if (!thinking) {
+        console.log("[Aleph MiniGame] not thinking anymore — scheduling dismiss");
+        scheduleDismiss();
+      }
+    }
+
+    function scheduleDismiss() {
+      if (dismissTimer) return;
+      clearInterval(streamPollId);
+      streamPollId = null;
+      dismissTimer = setTimeout(() => {
+        if (isThinking()) {
+          console.log("[Aleph MiniGame] re-engaged (thinking again) — cancelling dismiss");
+          dismissTimer = null;
+          streamPollId = setInterval(pollForDismiss, 500);
+          return;
+        }
+        blinkThenDismiss();
+      }, DISMISS_DELAY_MS);
+    }
+
+    function blinkThenDismiss() {
+      let blinks = 0;
+      overlay.style.transition = "none";
+      console.log("[Aleph MiniGame] blinking before dismiss");
+      blinkIntervalId = setInterval(() => {
+        overlay.style.opacity = overlay.style.opacity === "0.3" ? "1" : "0.3";
+        blinks++;
+        if (blinks >= BLINK_COUNT * 2) {
+          clearInterval(blinkIntervalId);
+          blinkIntervalId = null;
+          overlay.style.transition = "opacity 0.3s";
+          overlay.style.opacity = "1";
+          setTimeout(dismiss, 100);
+        }
+      }, BLINK_INTERVAL_MS);
+    }
+
+    // ── Mouse enter/leave — reactive games dismiss on leave
     let mouseEntered = false;
     overlay.addEventListener("mouseenter", () => {
       console.log("[Aleph MiniGame] mouse enter");
       mouseEntered = true;
-      paused = false;
     });
     overlay.addEventListener("mouseleave", () => {
       if (!mouseEntered) return;
       console.log("[Aleph MiniGame] mouse exit");
-      if (game === "snake") { paused = true; }
-      else { dismiss(); }
+      if (gameDef.type === "reactive") dismiss();
     });
 
+    // ── Drag to reposition
+    let dragState = null;
+    let holdTimer = null;
+    let dragOffsetX, dragOffsetY;
+
+    overlay.addEventListener("mousedown", (e) => {
+      dragState = "holding";
+      const startX = e.clientX;
+      const startY = e.clientY;
+      holdTimer = setTimeout(() => {
+        if (dragState !== "holding") return;
+        dragState = "dragging";
+        overlay.style.cursor = "grabbing";
+        const rect = overlay.getBoundingClientRect();
+        dragOffsetX = startX - rect.left;
+        dragOffsetY = startY - rect.top;
+        console.log("[Aleph MiniGame] drag mode activated");
+      }, DRAG_HOLD_MS);
+    });
+
+    function dragMove(e) {
+      if (dragState !== "dragging") return;
+      e.preventDefault();
+      const maxLeft = window.innerWidth - overlay.offsetWidth;
+      const maxTop = window.innerHeight - overlay.offsetHeight;
+      overlay.style.left = Math.max(0, Math.min(e.clientX - dragOffsetX, maxLeft)) + "px";
+      overlay.style.top = Math.max(0, Math.min(e.clientY - dragOffsetY, maxTop)) + "px";
+    }
+
+    function dragEnd() {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      if (dragState === "dragging") {
+        overlay.style.cursor = "";
+        console.log("[Aleph MiniGame] drag ended");
+      }
+      dragState = null;
+    }
+
+    document.addEventListener("mousemove", dragMove);
+    document.addEventListener("mouseup", dragEnd);
+
+    // ── Dismiss
     function dismiss() {
       if (!gameActive) return;
-      console.log("[Aleph MiniGame] dismiss called");
+      console.log("[Aleph MiniGame] dismiss");
       gameActive = false;
-      clearInterval(streamPoll);
+      if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
+      if (blinkIntervalId) { clearInterval(blinkIntervalId); blinkIntervalId = null; }
+      if (streamPollId) { clearInterval(streamPollId); streamPollId = null; }
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
       document.removeEventListener("keydown", escHandler);
+      document.removeEventListener("mousemove", dragMove);
+      document.removeEventListener("mouseup", dragEnd);
+      if (cleanup) cleanup();
+      overlay.style.transition = "opacity 0.3s";
       overlay.style.opacity = "0";
-      setTimeout(() => overlay.remove(), 200);
+      setTimeout(() => overlay.remove(), 300);
     }
   }
 
-  // ── Snake (adapted from straker's gist, CC0 1.0) ─────────────────────
-  function startSnake(canvas, onGameOver, isPaused) {
+  // ── Snake ────────────────────────────────────────────────────────────
+  function startSnake(canvas, callbacks) {
     const ctx = canvas.getContext("2d");
     const grid = 10;
     const cols = canvas.width / grid;
     const rows = canvas.height / grid;
     let count = 0;
     let dead = false;
+    let started = false;
 
-    const snake = { x: grid * 5, y: grid * 5, dx: grid, dy: 0, cells: [], maxCells: 4 };
+    const snake = { x: grid * 5, y: grid * 5, dx: 0, dy: 0, cells: [], maxCells: 4 };
     const apple = {
       x: Math.floor(Math.random() * cols) * grid,
       y: Math.floor(Math.random() * rows) * grid,
     };
 
-    function loop() {
-      if (dead) return;
-      requestAnimationFrame(loop);
-      if (isPaused()) return;
-      if (++count < 6) return;
-      count = 0;
+    snake.cells = [{ x: snake.x, y: snake.y }];
+    for (let i = 1; i < snake.maxCells; i++) {
+      snake.cells.push({ x: snake.x - i * grid, y: snake.y });
+    }
+    drawFrame();
 
+    function drawFrame() {
       ctx.fillStyle = "#1a1a2e";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      snake.x += snake.dx;
-      snake.y += snake.dy;
-
-      if (snake.x < 0) snake.x = canvas.width - grid;
-      else if (snake.x >= canvas.width) snake.x = 0;
-      if (snake.y < 0) snake.y = canvas.height - grid;
-      else if (snake.y >= canvas.height) snake.y = 0;
-
-      snake.cells.unshift({ x: snake.x, y: snake.y });
-      if (snake.cells.length > snake.maxCells) snake.cells.pop();
 
       ctx.fillStyle = "#f87171";
       ctx.beginPath();
@@ -212,37 +303,75 @@
         const brightness = 1 - i / (snake.cells.length + 2) * 0.5;
         ctx.fillStyle = "rgba(74,222,128," + brightness + ")";
         ctx.fillRect(cell.x + 1, cell.y + 1, grid - 2, grid - 2);
+      }
+    }
 
-        if (cell.x === apple.x && cell.y === apple.y) {
-          snake.maxCells++;
-          apple.x = Math.floor(Math.random() * cols) * grid;
-          apple.y = Math.floor(Math.random() * rows) * grid;
-        }
+    function loop() {
+      if (dead) return;
+      requestAnimationFrame(loop);
+      if (++count < 6) return;
+      count = 0;
 
-        for (let j = i + 1; j < snake.cells.length; j++) {
-          if (cell.x === snake.cells[j].x && cell.y === snake.cells[j].y) {
-            dead = true;
-            document.removeEventListener("keydown", keyHandler);
-            setTimeout(onGameOver, 300);
-            return;
-          }
+      snake.x += snake.dx;
+      snake.y += snake.dy;
+
+      if (snake.x < 0 || snake.x >= canvas.width || snake.y < 0 || snake.y >= canvas.height) {
+        dead = true;
+        document.removeEventListener("keydown", keyHandler);
+        setTimeout(callbacks.onGameOver, 300);
+        return;
+      }
+
+      snake.cells.unshift({ x: snake.x, y: snake.y });
+      if (snake.cells.length > snake.maxCells) snake.cells.pop();
+
+      drawFrame();
+
+      if (snake.cells[0].x === apple.x && snake.cells[0].y === apple.y) {
+        snake.maxCells++;
+        apple.x = Math.floor(Math.random() * cols) * grid;
+        apple.y = Math.floor(Math.random() * rows) * grid;
+      }
+
+      for (let j = 1; j < snake.cells.length; j++) {
+        if (snake.cells[0].x === snake.cells[j].x && snake.cells[0].y === snake.cells[j].y) {
+          dead = true;
+          document.removeEventListener("keydown", keyHandler);
+          setTimeout(callbacks.onGameOver, 300);
+          return;
         }
       }
     }
 
     const keyHandler = (e) => {
-      if (e.key === "ArrowLeft" && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; e.preventDefault(); }
-      else if (e.key === "ArrowUp" && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; e.preventDefault(); }
-      else if (e.key === "ArrowRight" && snake.dx === 0) { snake.dx = grid; snake.dy = 0; e.preventDefault(); }
-      else if (e.key === "ArrowDown" && snake.dy === 0) { snake.dy = grid; snake.dx = 0; e.preventDefault(); }
+      if (!["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(e.key)) return;
+      e.preventDefault();
+
+      if (!started) {
+        started = true;
+        if (e.key === "ArrowLeft")       { snake.dx = -grid; snake.dy = 0; }
+        else if (e.key === "ArrowUp")    { snake.dx = 0; snake.dy = -grid; }
+        else if (e.key === "ArrowRight") { snake.dx = grid; snake.dy = 0; }
+        else if (e.key === "ArrowDown")  { snake.dx = 0; snake.dy = grid; }
+        requestAnimationFrame(loop);
+        return;
+      }
+
+      if (e.key === "ArrowLeft" && snake.dx === 0)       { snake.dx = -grid; snake.dy = 0; }
+      else if (e.key === "ArrowUp" && snake.dy === 0)    { snake.dy = -grid; snake.dx = 0; }
+      else if (e.key === "ArrowRight" && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
+      else if (e.key === "ArrowDown" && snake.dy === 0)  { snake.dy = grid; snake.dx = 0; }
     };
     document.addEventListener("keydown", keyHandler);
 
-    requestAnimationFrame(loop);
+    return function cleanup() {
+      dead = true;
+      document.removeEventListener("keydown", keyHandler);
+    };
   }
 
-  // ── Minesweeper (adapted from kubowania/minesweeper, MIT) ─────────────
-  function startMinesweeper(container, onGameOver) {
+  // ── Minesweeper ──────────────────────────────────────────────────────
+  function startMinesweeper(container, callbacks) {
     const width = 6;
     const bombAmount = 5;
     const cellSize = 28;
@@ -308,7 +437,7 @@
             s.style.background = "#4a1a1a";
           }
         });
-        setTimeout(onGameOver, 800);
+        setTimeout(callbacks.onGameOver, 800);
         return;
       }
       const total = parseInt(sq.getAttribute("data-count") || "0");
@@ -361,8 +490,12 @@
       if (matches === bombAmount) {
         isGameOver = true;
         console.log("[Aleph MiniGame] minesweeper: you won!");
-        setTimeout(onGameOver, 600);
+        setTimeout(callbacks.onGameOver, 600);
       }
     }
+
+    return function cleanup() {
+      isGameOver = true;
+    };
   }
 })();

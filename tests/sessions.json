@@ -128,6 +128,17 @@
       "status": "fixed"
     },
     {
+      "id": "claude-bidi-text-005",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Mixed Hebrew/math text had characters displaced. 'k' in '2k' and Greek Σ rendered in wrong positions due to unicode-bidi:embed splitting LTR runs. Also detectDir() skipped data-aleph-math-isolated spans, misclassifying Hebrew-dominant paragraphs as LTR. Fixed by changing embed to isolate in content.css and removing math-isolated skip from detectDir().",
+      "category": "bidi-text",
+      "checks": ["rtl-direction", "no-console-errors"],
+      "source": "conversation:2026-05-14",
+      "addedAt": "2026-05-14",
+      "status": "fixed"
+    },
+    {
       "id": "chatgpt-theme-001",
       "platform": "chatgpt",
       "url": "https://chatgpt.com/c/69efc59b-dbec-83eb-9061-16d1951e435d",
@@ -156,6 +167,17 @@
       "description": "Mini-game did not appear on follow-up messages in existing conversations. hasVisibleResponse() used page-global querySelector matching old responses (always true after first message). Fixed by unifying all platforms to use count-based ASSISTANT_SEL detection (snapshot message count at spawn, only check new messages). Also reduced wasThinking poll from 1000ms to 300ms to catch rapid stop-button transitions.",
       "category": "general",
       "checks": ["rtl-direction", "no-console-errors"],
+      "source": "conversation:2026-05-14",
+      "addedAt": "2026-05-14",
+      "status": "fixed"
+    },
+    {
+      "id": "claude-general-003",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Mini-game dismissed too soon or never on Claude. hasVisibleResponse() count-based check failed because .font-claude-response exists at spawn time (during thinking). Fixed by adding Claude fallback that checks if the response grid gained a 2nd row child (row-start-2 appears only when actual response text starts streaming, not during thinking).",
+      "category": "general",
+      "checks": ["no-console-errors"],
       "source": "conversation:2026-05-14",
       "addedAt": "2026-05-14",
       "status": "fixed"
