@@ -74,7 +74,7 @@ Agent({
 })
 ```
 
-Wait for the investigation results. Read and understand the findings before proceeding.
+Wait for the investigation results. Read and understand the findings before proceeding. **You will pass the investigation agent's full output into the planner agent's prompt in the next step.**
 
 ---
 
@@ -82,13 +82,15 @@ Wait for the investigation results. Read and understand the findings before proc
 
 **IMPORTANT: You MUST spawn the `issue-planner` agent for every issue. Do NOT skip this step or plan the fix yourself. Always delegate planning to the agent.**
 
+Take the investigation agent's full output from Step 2 and include it verbatim in the planner agent's prompt under `## Investigation Findings`. This is how the planner learns the root cause and affected locations.
+
 Spawn the `issue-planner` agent using the Agent tool:
 
 ```
 Agent({
   subagent_type: "issue-planner",
   description: "Plan general fix for {category} bug",
-  prompt: "Plan a fix for this Aleph extension bug:\n\n- Platform: {platform}\n- Category: {category}\n- Bug: {description}\n- Visual observation: {what was observed}\n\n## Investigation Findings\n{paste the full investigation agent output here}\n\nDesign a general solution that fixes ALL instances of this bug class. No monkey patches. Research how competing tools handle this. Produce a step-by-step implementation plan with specific file and line changes."
+  prompt: "Plan a fix for this Aleph extension bug:\n\n- Platform: {platform}\n- Category: {category}\n- Bug: {description}\n- Visual observation: {what was observed}\n\n## Investigation Findings\n{paste the full investigation agent output from Step 2 here — include root cause, code locations, generalization, affected locations, and key insight}\n\nDesign a general solution that fixes ALL instances of this bug class. No monkey patches. Research how competing tools handle this. Produce a step-by-step implementation plan with specific file and line changes."
 })
 ```
 
