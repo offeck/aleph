@@ -30,14 +30,14 @@ jobs:
 
       - name: Check required files exist
         run: |
-          for f in background.js content.js content.css popup.html popup.css popup.js icons/icon16.png icons/icon48.png icons/icon128.png; do
+          for f in background.js content.js content.css popup.html popup.css popup.js mini-game.js icons/icon16.png icons/icon48.png icons/icon128.png; do
             [ -f "$f" ] || { echo "Missing: $f"; exit 1; }
           done
           echo "All required files present"
 
       - name: Lint JavaScript (syntax check)
         run: |
-          for f in background.js content.js popup.js settings.js insights.js insights-tracker.js sync.js; do
+          for f in background.js content.js popup.js settings.js insights.js insights-tracker.js mini-game.js sync.js; do
             node --check "$f" || exit 1
           done
           echo "No syntax errors"
@@ -72,6 +72,7 @@ jobs:
             insights.css \
             insights.js \
             insights-tracker.js \
+            mini-game.js \
             sync.js \
             icons/ \
             vendor/ \

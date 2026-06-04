@@ -12,7 +12,7 @@
   // ── Pricing ──────────────────────────────────────────────
   const PRICING = {
     claude:  { free: { price: 0, label: "Free" }, pro: { price: 20, label: "Pro" }, max5x: { price: 100, label: "Max 5x" }, max20x: { price: 200, label: "Max 20x" } },
-    chatgpt: { free: { price: 0, label: "Free" }, plus: { price: 20, label: "Plus" }, pro: { price: 200, label: "Pro" } },
+    chatgpt: { free: { price: 0, label: "Free" }, plus: { price: 20, label: "Plus" }, pro5x: { price: 100, label: "Pro 5x" }, pro20x: { price: 200, label: "Pro 20x" } },
     gemini:  { free: { price: 0, label: "Free" }, ai_pro: { price: 19.99, label: "AI Pro" }, ai_ultra: { price: 249.99, label: "AI Ultra" } },
   };
 
@@ -442,6 +442,47 @@
   // Also retrieves the access token needed for usage polling.
   let chatgptApiPlan = null;
 
+  function collectChatgptPlanSignals(value, depth = 0) {
+    if (!value || depth > 3) return [];
+    if (typeof value !== "object") return [String(value)];
+    const signals = [];
+    for (const [key, child] of Object.entries(value)) {
+      if (!/plan|tier|billing|subscription|price|amount|product|sku|seat|license|account|workspace/i.test(key)) continue;
+      if (child && typeof child === "object") {
+        signals.push(...collectChatgptPlanSignals(child, depth + 1));
+      } else if (child != null) {
+        signals.push(key + ":" + String(child));
+      }
+    }
+    return signals;
+  }
+
+  function normalizeChatgptPlan(raw, context = {}) {
+    const text = [raw, context.text, ...(context.signals || [])].filter(Boolean).join(" ").toLowerCase();
+    const price = Number(context.price);
+    if (Number.isFinite(price)) {
+      if (price >= 190) return "pro20x";
+      if (price >= 90) return "pro5x";
+    }
+    if (/\$[\s\u00a0]*200\b|\b200\s*usd\b|\b20x\b|\bpro[_ -]?20x?\b|\b(?:price|amount|cost|monthly|billing|subscription)[a-z0-9_:= -]{0,80}200\b/.test(text)) return "pro20x";
+    if (/\$[\s\u00a0]*100\b|\b100\s*usd\b|\b5x\b|\bpro[_ -]?5x?\b|\b(?:price|amount|cost|monthly|billing|subscription)[a-z0-9_:= -]{0,80}100\b/.test(text)) return "pro5x";
+    if (/\bplus\b/.test(text)) return "plus";
+    if (/\bpro\b/.test(text)) return "pro5x";
+    if (/\bfree\b|\bgo\b/.test(text)) return "free";
+    return null;
+  }
+
+  function detectChatgptDomPlan() {
+    const profileText = Array.from(document.querySelectorAll('[data-testid="accounts-profile-button"]'))
+      .map((profile) => [profile.textContent, profile.getAttribute("aria-label")].filter(Boolean).join(" "))
+      .join(" ");
+    if (!profileText) return null;
+    if (/\bpro\b/i.test(profileText)) {
+      return normalizeChatgptPlan(profileText) || "pro5x";
+    }
+    return normalizeChatgptPlan(profileText);
+  }
+
   function detectChatgptViaApi() {
     if (chatgptApiPlan) return;
     refreshChatgptToken().then((token) => {
@@ -451,7 +492,7 @@
           const c = document.cookie.split(";").reduce((a, c) => { const [k,...v] = c.trim().split("="); a[k]=v.join("="); return a; }, {});
           if (c["oai-last-model-config"]) {
             const m = JSON.parse(decodeURIComponent(c["oai-last-model-config"])).model || "";
-            if (/^o3$/.test(m)) chatgptApiPlan = "pro";
+            if (/^o3$/.test(m)) chatgptApiPlan = "pro5x";
             else if (/^gpt-5-[2-9]|^gpt-5-5/.test(m)) chatgptApiPlan = "plus";
           }
         } catch (e) {}
@@ -476,9 +517,12 @@
 
     if (chatgptApiPlan) return { plan: chatgptApiPlan, model };
 
+    const domPlan = detectChatgptDomPlan();
+    if (domPlan) return { plan: domPlan, model };
+
     // Cookie-based fallback: infer tier from the selected model
     if (model) {
-      if (/^o3$/.test(model)) return { plan: "pro", model };
+      if (/^o3$/.test(model)) return { plan: "pro5x", model };
       if (/^gpt-5-5|^gpt-5-[2-9]/.test(model)) return { plan: "plus", model };
       if (/^gpt-5$|^gpt-5-1$/.test(model)) return { plan: "plus", model };
     }
@@ -633,9 +677,11 @@
       .then((r) => r.ok ? r.json() : null)
       .then((session) => {
         if (session?.accessToken) chatgptAccessToken = session.accessToken;
-        if (session?.account?.planType && !chatgptApiPlan) {
-          chatgptApiPlan = session.account.planType === "plus" ? "plus"
-            : session.account.planType === "pro" ? "pro" : chatgptApiPlan;
+        if (session?.account && !chatgptApiPlan) {
+          const plan = normalizeChatgptPlan(session.account.planType, {
+            signals: collectChatgptPlanSignals(session.account),
+          });
+          if (plan) chatgptApiPlan = plan;
         }
         return chatgptAccessToken;
       })

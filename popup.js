@@ -146,7 +146,10 @@
       // ChatGPT: per-model rolling-window tracking via our own timestamps.
       // Known Plus limits: GPT-5.5=160/3h, Thinking=3000/week, o3=50/day, o4-mini=500/day
       const gptUsage = platformUsage?.chatgpt;
-      const gptPlan = subs?.chatgpt?.plan || "free";
+      const chatgptSub = subs?.chatgpt || {};
+      const gptPlan = chatgptSub.plan === "pro"
+        ? (chatgptSub.price === 200 ? "pro20x" : "pro5x")
+        : (chatgptSub.plan || "free");
       const { chatgptModelTs } = resp;
 
       // Rolling window limits per model per plan
@@ -156,6 +159,12 @@
           { match: /^o3$/,                label: "o3",       limit: 50,   windowMs: 24 * 3600000 },
           { match: /o4-mini/i,            label: "o4-mini",  limit: 500,  windowMs: 24 * 3600000 },
           { match: /.*/,                  label: "GPT",      limit: 160,  windowMs: 3 * 3600000 },
+        ],
+        pro5x: [
+          { match: /.*/,                  label: "GPT",      limit: 999,  windowMs: 3 * 3600000 },
+        ],
+        pro20x: [
+          { match: /.*/,                  label: "GPT",      limit: 999,  windowMs: 3 * 3600000 },
         ],
         pro: [
           { match: /.*/,                  label: "GPT",      limit: 999,  windowMs: 3 * 3600000 },

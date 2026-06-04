@@ -2,7 +2,7 @@
   "use strict";
 
   const HEB = /[֐-׿]/;
-  const VERSION = "2.5.0";
+  const VERSION = "2.6.0";
 
   // ── Platform detection ─────────────────────────────────────────────────
   const host = location.hostname;
@@ -14,8 +14,12 @@
 
   if (!PLATFORM) return;
 
-  document.documentElement.setAttribute("data-aleph-platform", PLATFORM);
-  if (chrome?.runtime?.id) document.documentElement.setAttribute("data-aleph-ext-id", chrome.runtime.id);
+  function ensureRootAttributes() {
+    document.documentElement.setAttribute("data-aleph-platform", PLATFORM);
+    if (chrome?.runtime?.id) document.documentElement.setAttribute("data-aleph-ext-id", chrome.runtime.id);
+  }
+
+  ensureRootAttributes();
 
   // ── Theme definitions ──────────────────────────────────────────────────
   const THEMES = {
@@ -369,62 +373,6 @@
     return false;
   }
 
-  const STRONG_RTL_RE = /[֐-׿؀-ۿ]/;
-  const LTR_RUN_RE = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]{2,}/g;
-
-  function detectDir(el) {
-    if (!el) return "rtl";
-    let text = "";
-    const walk = (node) => {
-      if (node.nodeType === 3) {
-        text += node.textContent;
-      } else if (node.nodeType === 1) {
-        if (isMathNode(node)) return;
-        for (const c of node.childNodes) walk(c);
-      }
-    };
-    walk(el);
-    let rtlCount = 0, ltrCount = 0;
-    for (let i = 0; i < text.length; i++) {
-      if (STRONG_RTL_RE.test(text[i])) rtlCount++;
-    }
-    LTR_RUN_RE.lastIndex = 0;
-    for (const m of text.matchAll(LTR_RUN_RE)) {
-      ltrCount += m[0].length;
-    }
-    if (rtlCount === 0) return "ltr";
-    if (ltrCount === 0) return "rtl";
-    return rtlCount / (rtlCount + ltrCount) > 0.2 ? "rtl" : "ltr";
-  }
-
-  const LRM = "‎";
-  const STAR_AFTER_LTR = /([^\s֐-׿؀-ۿ*])\*(?!‎)/g;
-
-  function fixNeutralsInEl(el) {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      if (node.parentElement.closest("code, pre, .katex, .katex-display, mjx-container, [data-aleph-latex-rendered], [data-aleph-math-isolated]")) continue;
-      let text = node.textContent;
-      if (!text) continue;
-      let changed = false;
-      if (text.includes("*")) {
-        STAR_AFTER_LTR.lastIndex = 0;
-        const r = text.replace(STAR_AFTER_LTR, "$1*" + LRM);
-        if (r !== text) { text = r; changed = true; }
-      }
-      if (changed) node.textContent = text;
-    }
-  }
-
-  function fixBidiNeutrals() {
-    document.querySelectorAll("[data-aleph-rtl='true']").forEach(fixNeutralsInEl);
-    document.querySelectorAll(
-      "ul:has(> [data-aleph-rtl='true']) > li:not([data-aleph-rtl]), " +
-      "ol:has(> [data-aleph-rtl='true']) > li:not([data-aleph-rtl])"
-    ).forEach(fixNeutralsInEl);
-  }
-
   // ── Send hint (set by insights-tracker.js via DOM attribute) ─────────
   let sendHint = null;
   const HINT_WINDOW = 30000;
@@ -447,6 +395,7 @@
   let patching = false;
 
   function patchAll() {
+    ensureRootAttributes();
     if (patching || !isPlatformEnabled()) return;
     patching = true;
     try {
@@ -454,7 +403,7 @@
       else cleanupEditorDir();
       if (settings.focusMode) applyFocusMode();
       if (settings.latexFix) patchLatex();
-      if (settings.bidiEnabled) fixBidiNeutrals();
+      if (settings.bidiEnabled) patchMathText();
       if (settings.streamSmooth) {
         applyStreamSmooth();
         const anim = settings.streamAnimation || "platform";
@@ -477,20 +426,15 @@
         hintChecked.add(el);
         if ((el.textContent || "").trim().length < 200) {
           el.setAttribute("data-aleph-rtl", "true");
-          el.setAttribute("data-aleph-dir", "rtl");
+          el.removeAttribute("data-aleph-dir");
         }
       }
       const need = hasHebrew(el);
       if (need && has !== "true") {
         el.setAttribute("data-aleph-rtl", "true");
-        const dir = detectDir(el) || "rtl";
-        el.setAttribute("data-aleph-dir", dir);
+        el.removeAttribute("data-aleph-dir");
       } else if (need && has === "true") {
-        // Re-check direction in case content changed (e.g. streaming)
-        const dir = detectDir(el) || "rtl";
-        if (el.getAttribute("data-aleph-dir") !== dir) {
-          el.setAttribute("data-aleph-dir", dir);
-        }
+        el.removeAttribute("data-aleph-dir");
       } else if (!need && has === "true") {
         el.removeAttribute("data-aleph-rtl");
         el.removeAttribute("data-aleph-dir");
@@ -873,6 +817,7 @@
   const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()֐-׿]*\)/g;
   const MATH_PIPE_RE = /\|[^|֐-׿\n]{1,50}\|/g;
   const MATH_TILDE_RE = /[~∼≁]_?\w+/g;
+  const MATH_REPEAT_RE = /(?<![A-Za-z0-9_'])(?:\([^()\n֐-׿]{1,40}\)[*+?]|[A-Za-z][0-9_']{0,3}[*+]|[0-9]+[*+])/g;
   const RTL_CHAR = /[֐-׿؀-ۿ]/;
 
   function findEqRegions(text) {
@@ -928,9 +873,11 @@
     const text = textNode.textContent;
     const regions = [];
 
+    regions.push(...findEqRegions(text).map(r => ({ ...r, type: "eq" })));
     collectRegions(MATH_PAREN_RE, text, regions);
     collectRegions(MATH_PIPE_RE, text, regions);
     collectRegions(MATH_TILDE_RE, text, regions, "tilde");
+    collectRegions(MATH_REPEAT_RE, text, regions, "repeat");
 
     if (regions.length === 0) return;
     regions.sort((a, b) => a.start - b.start);
@@ -971,13 +918,19 @@
     textNode.parentNode.replaceChild(wrapper, textNode);
   }
 
-  function patchLatex() {
-    if (typeof katex === "undefined" || !settings.latexFix) return;
+  function shouldIsolateMathText(txt) {
+    return (MATH_PAREN_RE.lastIndex = 0, MATH_PAREN_RE.test(txt)) ||
+           (MATH_PIPE_RE.lastIndex = 0, MATH_PIPE_RE.test(txt)) ||
+           (MATH_TILDE_RE.lastIndex = 0, MATH_TILDE_RE.test(txt)) ||
+           (MATH_REPEAT_RE.lastIndex = 0, MATH_REPEAT_RE.test(txt)) ||
+           findEqRegions(txt).length > 0;
+  }
+
+  function patchMathText() {
     const messageSel = SEL.message.join(", ");
     document.querySelectorAll(messageSel).forEach((msg) => {
       if (isMessageStreaming(msg)) return;
       const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-      const latexNodes = [];
       const mathTextNodes = [];
       let node;
       while ((node = walker.nextNode())) {
@@ -985,15 +938,33 @@
         const txt = node.textContent;
         if (!txt || txt.trim().length === 0) continue;
         if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
-          latexNodes.push(node);
-        } else if ((MATH_PAREN_RE.lastIndex = 0, MATH_PAREN_RE.test(txt)) ||
-                   (MATH_PIPE_RE.lastIndex = 0, MATH_PIPE_RE.test(txt)) ||
-                   (MATH_TILDE_RE.lastIndex = 0, MATH_TILDE_RE.test(txt))) {
+          continue;
+        }
+        if (shouldIsolateMathText(txt)) {
           mathTextNodes.push(node);
         }
       }
-      latexNodes.forEach(renderLatexInNode);
       mathTextNodes.forEach(isolateMathText);
+    });
+  }
+
+  function patchLatex() {
+    if (typeof katex === "undefined" || !settings.latexFix) return;
+    const messageSel = SEL.message.join(", ");
+    document.querySelectorAll(messageSel).forEach((msg) => {
+      if (isMessageStreaming(msg)) return;
+      const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
+      const latexNodes = [];
+      let node;
+      while ((node = walker.nextNode())) {
+        if (isInsideSkip(node)) continue;
+        const txt = node.textContent;
+        if (!txt || txt.trim().length === 0) continue;
+        if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
+          latexNodes.push(node);
+        }
+      }
+      latexNodes.forEach(renderLatexInNode);
     });
   }
 

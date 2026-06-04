@@ -98,12 +98,12 @@
       "id": "claude-bidi-math-005",
       "platform": "claude",
       "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
-      "description": "Hebrew CS theory (Myhill-Nerode, formal languages) with extensive BiDi math issues. Direction detection improved: detectDir() replaced prefix heuristic with character-ratio analysis (0.20 RTL threshold, run-based LTR counting skipping single-letter math variables). Reduced LTR-misclassified elements from 37 to 18. Remaining 18 are genuinely math/English-dominant content at the classification boundary.",
+      "description": "Hebrew CS theory (Myhill-Nerode, formal languages) with extensive BiDi math issues. Fixed by restoring the invariant that Hebrew-bearing containers stay RTL and isolating LTR math/regex fragments inside them instead of classifying whole Hebrew paragraphs as LTR.",
       "category": "bidi-math",
       "checks": ["rtl-direction", "math-ltr-isolation", "no-console-errors"],
       "source": "conversation:2026-05-13",
       "addedAt": "2026-05-13",
-      "status": "active"
+      "status": "fixed"
     },
     {
       "id": "claude-bidi-text-003",
@@ -181,6 +181,17 @@
       "source": "conversation:2026-05-14",
       "addedAt": "2026-05-14",
       "status": "fixed"
+    },
+    {
+      "id": "claude-general-004",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Mini-game should persist after thinking ends. Removes response-visible, stop-button disappearance, and thinking-ended dismissal paths; games should close only via Escape, game over, or win. Pending live persistence verification.",
+      "category": "general",
+      "checks": ["no-console-errors"],
+      "source": "conversation:2026-06-04",
+      "addedAt": "2026-06-04",
+      "status": "active"
     }
   ]
 }

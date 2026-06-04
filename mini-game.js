@@ -18,17 +18,11 @@
   }
 
   // ── Constants ────────────────────────────────────────────────────────
-  const DISMISS_DELAY_MS  = 3000;
-  const BLINK_COUNT       = 3;
-  const BLINK_INTERVAL_MS = 200;
   const DRAG_HOLD_MS      = 1500;
 
-  // Game types:
-  //   active   — continuous loop (e.g. snake). Pauses on mouse exit, waits for first input.
-  //   reactive — event-driven (e.g. minesweeper). Dismisses on mouse exit.
   const GAMES = {
-    snake:       { type: "active",   width: 200, height: 200, start: startSnake },
-    minesweeper: { type: "reactive", width: 180, height: 210, start: startMinesweeper },
+    snake:       { width: 200, height: 200, start: startSnake },
+    minesweeper: { width: 180, height: 210, start: startMinesweeper },
   };
 
   // ── Detection ────────────────────────────────────────────────────────
@@ -38,36 +32,6 @@
     gemini: '.send-button.stop',
   };
 
-  const ASSISTANT_SEL = '[data-message-author-role="assistant"], .font-claude-response, .response-content';
-
-  let gameSpawnMsgCount = 0;
-
-  function hasVisibleResponse() {
-    const msgs = document.querySelectorAll(ASSISTANT_SEL);
-    if (msgs.length > gameSpawnMsgCount) {
-      const last = msgs[msgs.length - 1];
-      if (!last) return false;
-      if (PLATFORM === "chatgpt") {
-        const markdowns = last.querySelectorAll('.markdown');
-        const lastMd = markdowns.length ? markdowns[markdowns.length - 1] : null;
-        const p = lastMd ? lastMd.querySelector('p') : null;
-        return p ? p.textContent.trim().length > 30 : false;
-      }
-      const p = last.querySelector('p');
-      const threshold = PLATFORM === "gemini" ? 10 : 5;
-      return p ? p.textContent.trim().length > threshold : false;
-    }
-    if (PLATFORM === "claude" && msgs.length > 0) {
-      const last = msgs[msgs.length - 1];
-      const grid = last.querySelector('[class*="grid-rows-"]');
-      if (!grid || grid.children.length < 2) return false;
-      const responseRow = grid.children[grid.children.length - 1];
-      const p = responseRow.querySelector('p');
-      return p ? p.textContent.trim().length > 5 : false;
-    }
-    return false;
-  }
-
   function isThinking() {
     const sel = THINKING_SEL[PLATFORM];
     return sel ? !!document.querySelector(sel) : false;
@@ -75,27 +39,20 @@
 
   // ── Global state ─────────────────────────────────────────────────────
   let gameActive = false;
-  let thinkingDetected = false;
-
-  let wasThinking = false;
-  setInterval(() => {
-    const thinking = isThinking();
-    if (wasThinking && !thinking) thinkingDetected = false;
-    wasThinking = thinking;
-  }, 300);
+  let spawnPending = false;
 
   new MutationObserver(() => {
     if (!miniGameEnabled) return;
     if (gameActive) return;
     if (!isThinking()) return;
-    if (thinkingDetected) return;
-    thinkingDetected = true;
+    if (spawnPending) return;
+    spawnPending = true;
     console.log("[Aleph MiniGame] thinking detected!");
     setTimeout(() => {
       const stillThinking = isThinking();
-      const nowVisible = hasVisibleResponse();
-      console.log("[Aleph MiniGame] after 500ms: stillThinking=" + stillThinking + " visResp=" + nowVisible + " gameActive=" + gameActive);
-      if (gameActive || nowVisible) return;
+      console.log("[Aleph MiniGame] after 500ms: stillThinking=" + stillThinking + " gameActive=" + gameActive);
+      spawnPending = false;
+      if (gameActive) return;
       if (!stillThinking) return;
       console.log("[Aleph MiniGame] spawning game!");
       spawnGame();
@@ -105,7 +62,6 @@
   // ── spawnGame ────────────────────────────────────────────────────────
   function spawnGame() {
     gameActive = true;
-    gameSpawnMsgCount = document.querySelectorAll(ASSISTANT_SEL).length;
 
     const keys = Object.keys(GAMES);
     const gameName = keys[Math.floor(Math.random() * keys.length)];
@@ -144,58 +100,7 @@
     const escHandler = (e) => { if (e.key === "Escape") dismiss(); };
     document.addEventListener("keydown", escHandler);
 
-    // ── Stream poll → delayed dismiss
-    // Two signals: visible response text OR stop button disappeared (response cycle done)
-    let streamPollId = setInterval(pollForDismiss, 500);
-
-    let dismissTimer = null;
-    let blinkIntervalId = null;
-
-    function pollForDismiss() {
-      const thinking = isThinking();
-      const visible = hasVisibleResponse();
-      if (visible) {
-        console.log("[Aleph MiniGame] response visible — scheduling dismiss");
-        scheduleDismiss();
-      } else if (!thinking) {
-        console.log("[Aleph MiniGame] not thinking anymore — scheduling dismiss");
-        scheduleDismiss();
-      }
-    }
-
-    function scheduleDismiss() {
-      if (dismissTimer) return;
-      clearInterval(streamPollId);
-      streamPollId = null;
-      dismissTimer = setTimeout(() => {
-        if (isThinking()) {
-          console.log("[Aleph MiniGame] re-engaged (thinking again) — cancelling dismiss");
-          dismissTimer = null;
-          streamPollId = setInterval(pollForDismiss, 500);
-          return;
-        }
-        blinkThenDismiss();
-      }, DISMISS_DELAY_MS);
-    }
-
-    function blinkThenDismiss() {
-      let blinks = 0;
-      overlay.style.transition = "none";
-      console.log("[Aleph MiniGame] blinking before dismiss");
-      blinkIntervalId = setInterval(() => {
-        overlay.style.opacity = overlay.style.opacity === "0.3" ? "1" : "0.3";
-        blinks++;
-        if (blinks >= BLINK_COUNT * 2) {
-          clearInterval(blinkIntervalId);
-          blinkIntervalId = null;
-          overlay.style.transition = "opacity 0.3s";
-          overlay.style.opacity = "1";
-          setTimeout(dismiss, 100);
-        }
-      }, BLINK_INTERVAL_MS);
-    }
-
-    // ── Mouse enter/leave — reactive games dismiss on leave
+    // ── Mouse enter/leave
     let mouseEntered = false;
     overlay.addEventListener("mouseenter", () => {
       console.log("[Aleph MiniGame] mouse enter");
@@ -204,7 +109,6 @@
     overlay.addEventListener("mouseleave", () => {
       if (!mouseEntered) return;
       console.log("[Aleph MiniGame] mouse exit");
-      if (gameDef.type === "reactive") dismiss();
     });
 
     // ── Drag to reposition
@@ -253,9 +157,6 @@
       if (!gameActive) return;
       console.log("[Aleph MiniGame] dismiss");
       gameActive = false;
-      if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
-      if (blinkIntervalId) { clearInterval(blinkIntervalId); blinkIntervalId = null; }
-      if (streamPollId) { clearInterval(streamPollId); streamPollId = null; }
       if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
       document.removeEventListener("keydown", escHandler);
       document.removeEventListener("mousemove", dragMove);

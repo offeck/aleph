@@ -8,25 +8,9 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 [data-aleph-rtl="true"] {
-  unicode-bidi: plaintext !important;
-}
-
-/* RTL-classified paragraphs (Hebrew-first): use isolate so direction:rtl
-   establishes the RTL base while creating a directional isolation boundary.
-   Neutrals between LTR runs (e.g. "2k", "|Σ|") resolve within their local
-   context instead of being forced RTL by the embedding level. */
-[data-aleph-rtl="true"][data-aleph-dir="rtl"] {
   direction: rtl !important;
   text-align: right !important;
   unicode-bidi: isolate !important;
-}
-
-/* LTR-classified paragraphs (math-first): use plaintext so the browser
-   auto-detects LTR from the first strong character. This fixes bracket-heavy
-   expressions like {a,b}⁰ = {ε} where embed would misorder neutral chars. */
-[data-aleph-rtl="true"][data-aleph-dir="ltr"] {
-  direction: ltr !important;
-  text-align: left !important;
 }
 
 /* Editor paragraph children use dir="auto" for per-paragraph direction.
@@ -86,6 +70,11 @@ mjx-container[display="true"], .math-display {
 [data-aleph-latex-rendered] strong,
 [data-aleph-latex-rendered] em {
   unicode-bidi: inherit !important;
+}
+
+[data-aleph-math-isolated] bdi {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
 }
 
 /* RTL lists */

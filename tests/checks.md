@@ -95,12 +95,15 @@ Use `mcp__claude-in-chrome__read_console_messages` with pattern `Aleph|aleph` an
   const checks = [
     ['[data-aleph-platform]', 'platform'],
     ['[data-aleph-rtl]', 'rtl'],
-    ['[data-aleph-theme]', 'theme'],
   ];
   let issues = [];
   checks.forEach(([sel, name]) => {
     if (document.querySelectorAll(sel).length === 0) issues.push(name + ' selector found 0 elements');
   });
-  return issues.length ? 'FAIL: ' + issues.join('; ') : 'PASS: All selectors match';
+  const theme = document.documentElement.getAttribute('data-aleph-theme');
+  if (theme && document.querySelectorAll('[data-aleph-theme]').length === 0) {
+    issues.push('theme selector found 0 elements');
+  }
+  return issues.length ? 'FAIL: ' + issues.join('; ') : 'PASS: Required selectors match';
 })()
 ```

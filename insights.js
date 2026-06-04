@@ -9,7 +9,7 @@
   };
   const PRICING = {
     claude:  { free: { price: 0, label: "Free" }, pro: { price: 20, label: "Pro" }, max5x: { price: 100, label: "Max 5x" }, max20x: { price: 200, label: "Max 20x" } },
-    chatgpt: { free: { price: 0, label: "Free" }, plus: { price: 20, label: "Plus" }, pro: { price: 200, label: "Pro" } },
+    chatgpt: { free: { price: 0, label: "Free" }, plus: { price: 20, label: "Plus" }, pro5x: { price: 100, label: "Pro 5x" }, pro20x: { price: 200, label: "Pro 20x" } },
     gemini:  { free: { price: 0, label: "Free" }, ai_pro: { price: 19.99, label: "AI Pro" }, ai_ultra: { price: 249.99, label: "AI Ultra" } },
   };
   const PLATFORMS = ["claude", "chatgpt", "gemini"];
@@ -27,6 +27,14 @@
     return "~" + n;
   }
 
+  function normalizeStoredPlan(platform, sub) {
+    var plan = (sub && sub.plan) || "free";
+    if (platform === "chatgpt" && plan === "pro") {
+      return sub && sub.price === 200 ? "pro20x" : "pro5x";
+    }
+    return plan;
+  }
+
   // ── Subscriptions ───────────────────────────────────────
   function loadSubscriptions(subs, today) {
     var totalSpend = 0;
@@ -37,12 +45,12 @@
       var card = document.getElementById(cardId);
       if (!card) continue;
 
-      var plan = sub.plan || "free";
+      var plan = normalizeStoredPlan(p, sub);
       var pricing = PRICING[p][plan] || PRICING[p].free;
       var price = sub.price != null ? sub.price : pricing.price;
       totalSpend += price;
 
-      card.querySelector(".plan-badge").textContent = sub.label || pricing.label;
+      card.querySelector(".plan-badge").textContent = sub.plan === plan && sub.label ? sub.label : pricing.label;
       card.querySelector(".sub-price").textContent = price > 0 ? "$" + price + "/mo" : "Free";
       card.querySelector(".model-name").textContent = sub.model || "Default model";
 
@@ -239,8 +247,9 @@
 
         // Set current value
         var sub = subs[p] || {};
-        if (sub.plan && select.querySelector('option[value="' + sub.plan + '"]')) {
-          select.value = sub.plan;
+        var plan = normalizeStoredPlan(p, sub);
+        if (plan && select.querySelector('option[value="' + plan + '"]')) {
+          select.value = plan;
         }
 
         select.addEventListener("change", function () {
@@ -295,8 +304,9 @@
         var sub = subs[p] || {};
         var selectId = "override" + p.charAt(0).toUpperCase() + p.slice(1);
         var select = document.getElementById(selectId);
-        if (select && sub.plan && select.querySelector('option[value="' + sub.plan + '"]')) {
-          select.value = sub.plan;
+        var plan = normalizeStoredPlan(p, sub);
+        if (select && plan && select.querySelector('option[value="' + plan + '"]')) {
+          select.value = plan;
         }
       }
     });
