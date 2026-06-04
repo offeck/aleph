@@ -1,0 +1,5 @@
+*.sh text eol=lf
+.claude/skills/* symlink=dir
+.codex/skills/* symlink=dir
+.gemini/skills/* symlink=dir
+.opencode/skills/* symlink=dir
