@@ -99,13 +99,13 @@ Discriminated union on `type`: content/tracker→bg fire-and-forget (`disabled`,
 
 Add package.json/tsconfig/vitest.config/build.mjs (+eslint placeholder); `npm install`, commit lockfile. Seed `src/` by moving each current file essentially verbatim to its entry (`src/content/index.ts`, `src/tracker/index.ts`, `src/mini-game/index.ts`, `src/background/index.ts`, `src/popup/index.ts`, `src/settings/index.ts`, `src/insights/index.ts`); `sync.js` → `src/background/sync.ts` with `var alephSync = (...)()` → `export const alephSync = (...)()`; background `index.ts` opens with `importScripts(` the 4 vendor firebase files `)` (drops `importScripts("sync.js")`) + `import { alephSync }`. Update manifest/HTML paths to `dist/`; gitignore `dist/`; update publish.yml; add additive CLAUDE.md dev-loop note (source in `src/`, `npm run dev`, never edit `dist/`, repo root stays the unpacked dir).
 
-- [ ] build emits all 7 bundles; typecheck runs (errors tracked); test runs
-- [ ] unpacked reload at repo root → **extension ID unchanged**, settings + history intact
-- [ ] all 3 platforms load with `[Aleph v2.7.7]` banner, no new errors
-- [ ] SW console: firebase inits, no `importScripts`/`firebase`/`ALEPH_FIREBASE_CONFIG` errors
-- [ ] popup/settings/insights pages render and read storage
-- [ ] `aleph-reload` round-trip works
-- [ ] full `checks.md` sweep on one RTL Claude session
+- [x] build emits all 7 bundles; typecheck runs (**tsc baseline: 623 errors**, tracked); test runs
+- [x] unpacked reload at repo root → **extension ID unchanged** (`odaeo…` before/after), settings + history intact
+- [x] all 3 platforms load (`data-aleph-*` attributes set; tracker logs from `dist/insights-tracker.js`), no new errors
+- [x] SW healthy: firebase importScripts (root-absolute paths) boots; verified via second `aleph-reload` round-trip handled by the NEW background bundle + live insights message flow
+- [ ] popup/settings/insights pages render and read storage *(extension pages are blocked to browser automation — needs a 5s human glance; bundles built, paths verified, SW message path alive)*
+- [x] `aleph-reload` round-trip works (twice; second through the new bundle)
+- [x] full `checks.md` sweep on RTL Claude session `claude-bidi-math-001`: rtl-direction PASS (51), math-ltr-isolation PASS (48), latex-rendered PASS (48/0 errors), streaming-attrs PASS, no-console-errors PASS
 
 **Rollback:** revert → manifest/HTML point back at root JS; original files run as before.
 

@@ -1,4 +1,4 @@
-var alephSync = (function () {
+export const alephSync = (function () {
   "use strict";
 
   var _db = null;

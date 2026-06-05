@@ -10,6 +10,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Validate manifest.json
         run: |
           node -e "
@@ -28,19 +36,21 @@ jobs:
             console.log('Manifest OK — ' + manifest.name + ' v' + manifest.version);
           "
 
+      - name: Typecheck (advisory until migration Phase 6)
+        run: npm run typecheck || echo "::warning::typecheck has known errors during the TS migration"
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
       - name: Check required files exist
         run: |
-          for f in background.js content.js content.css popup.html popup.css popup.js mini-game.js icons/icon16.png icons/icon48.png icons/icon128.png; do
+          for f in dist/background.js dist/content.js dist/insights-tracker.js dist/mini-game.js dist/popup.js dist/settings.js dist/insights.js content.css popup.html popup.css icons/icon16.png icons/icon48.png icons/icon128.png; do
             [ -f "$f" ] || { echo "Missing: $f"; exit 1; }
           done
           echo "All required files present"
-
-      - name: Lint JavaScript (syntax check)
-        run: |
-          for f in background.js content.js popup.js settings.js insights.js insights-tracker.js mini-game.js sync.js; do
-            node --check "$f" || exit 1
-          done
-          echo "No syntax errors"
 
   publish:
     needs: test
@@ -51,6 +61,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
 
       - name: Install chrome-webstore-upload-cli
         run: npm install -g chrome-webstore-upload-cli@3
@@ -59,21 +76,14 @@ jobs:
         run: |
           zip -r extension.zip \
             manifest.json \
-            background.js \
-            content.js \
+            dist/ \
             content.css \
             popup.html \
             popup.css \
-            popup.js \
             settings.html \
             settings.css \
-            settings.js \
             insights.html \
             insights.css \
-            insights.js \
-            insights-tracker.js \
-            mini-game.js \
-            sync.js \
             icons/ \
             vendor/ \
             -x "*.DS_Store"

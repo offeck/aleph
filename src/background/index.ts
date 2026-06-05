@@ -1,9 +1,16 @@
+import { alephSync } from "./sync";
+
+declare function importScripts(...urls: string[]): void;
+declare const firebase: any;
+declare const ALEPH_FIREBASE_CONFIG: { apiKey: string; [key: string]: unknown };
+
+// The bundled service worker lives in dist/, so vendor paths must be
+// root-absolute (relative paths would resolve against dist/).
 importScripts(
-  "vendor/firebase/firebase-app-compat.js",
-  "vendor/firebase/firebase-auth-compat.js",
-  "vendor/firebase/firebase-firestore-compat.js",
-  "vendor/firebase/firebase-config.js",
-  "sync.js"
+  "/vendor/firebase/firebase-app-compat.js",
+  "/vendor/firebase/firebase-auth-compat.js",
+  "/vendor/firebase/firebase-firestore-compat.js",
+  "/vendor/firebase/firebase-config.js"
 );
 
 if (ALEPH_FIREBASE_CONFIG.apiKey !== "PLACEHOLDER") {

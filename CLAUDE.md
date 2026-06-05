@@ -64,14 +64,19 @@ Chrome extension (Manifest V3) that provides Hebrew and Arabic-script BiDi text 
 
 ## Architecture
 
-**Extension structure** — no build step, plain JS/CSS/HTML:
+> **TypeScript migration in progress** (see `MIGRATION.md` + PR #2). Source now lives in `src/` as TypeScript, bundled by esbuild (`node build.mjs`, or `npm run dev` for watch mode) into `dist/` — one IIFE bundle per entry. `manifest.json` and the HTML pages stay at the **repo root** and point into `dist/`; the repo root remains the unpacked-extension directory (moving the manifest would change the extension ID and orphan user storage). **Never edit `dist/`** — it's gitignored build output. After editing `src/`, rebuild (or have watch running), then reload via the `aleph-reload` flow below.
 
-- `manifest.json` — MV3 manifest with commands (keyboard shortcut) and service worker
-- `background.js` — Service worker for toolbar badge updates and keyboard shortcut handling
-- `content.js` — Main content script. Platform detection, BiDi engine, theme injection, focus mode, streaming smoothing, font loading, color-scheme, style injector. Runs at `document_idle`.
+**Extension structure:**
+
+- `manifest.json` — MV3 manifest with commands (keyboard shortcut) and service worker; script paths point into `dist/`
+- `src/background/` (→ `dist/background.js`) — Service worker: badge updates, keyboard shortcut, insights storage, cloud sync (firebase via `importScripts` of `vendor/firebase/`)
+- `src/content/` (→ `dist/content.js`) — Main content script. Platform detection, BiDi engine, theme injection, focus mode, streaming smoothing, font loading, color-scheme, style injector. Runs at `document_idle`.
+- `src/tracker/` (→ `dist/insights-tracker.js`) — usage/insights tracking content script
+- `src/mini-game/`, `src/popup/`, `src/settings/`, `src/insights/` — remaining entries, same pattern
 - `content.css` — Static CSS rules for BiDi, streaming animations, focus mode hiding, theme transitions, platform-specific structural fixes
-- `popup.html` / `popup.css` / `popup.js` — Settings popup UI with toggle switches, theme grid, per-platform theme overrides, focus mode categories, range sliders, export/import
+- `popup.html` / `popup.css` — Settings popup UI with toggle switches, theme grid, per-platform theme overrides, focus mode categories, range sliders, export/import
 - `tests/sessions.json` — Visual regression test registry. Stores known problematic chat sessions with platform, URL, bug description, and checks to run.
+- Commands: `npm run build` / `npm run dev` (watch) / `npm test` (vitest) / `npm run typecheck`
 
 ## Key Patterns
 
