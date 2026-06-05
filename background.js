@@ -23,6 +23,16 @@ function emptyPlatformDay() {
   return { totalSeconds: 0, messageCount: 0, hours: {}, tokensIn: 0, tokensOut: 0 };
 }
 
+function normalizeSends(sends) {
+  const s = sends || {};
+  return {
+    total: s.total || 0,
+    rtl: s.rtl ?? s.hebrew ?? 0,
+    totalWords: s.totalWords || 0,
+    totalChars: s.totalChars || 0,
+  };
+}
+
 async function readLocal(key, fallback) {
   const result = await chrome.storage.local.get({ [key]: fallback });
   return result[key];
@@ -514,9 +524,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const usage = await readLocal(key, {});
       const p = msg.platform;
       if (!usage[p]) usage[p] = emptyPlatformDay();
-      if (!usage[p].sends) usage[p].sends = { total: 0, hebrew: 0, totalWords: 0, totalChars: 0 };
+      usage[p].sends = normalizeSends(usage[p].sends);
       usage[p].sends.total++;
-      if (msg.lang === "hebrew") usage[p].sends.hebrew++;
+      if (msg.lang === "rtl" || msg.lang === "hebrew") usage[p].sends.rtl++;
       usage[p].sends.totalWords += (msg.words || 0);
       usage[p].sends.totalChars += (msg.length || 0);
       await writeLocal(key, usage);

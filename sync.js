@@ -202,9 +202,19 @@ var alephSync = (function () {
         tokensIn: Math.max(l.tokensIn || 0, r.tokensIn || 0),
         tokensOut: Math.max(l.tokensOut || 0, r.tokensOut || 0),
         hours: _mergeHours(l.hours || {}, r.hours || {}),
+        sends: _mergeSends(l.sends || {}, r.sends || {}),
       };
     }
     return merged;
+  }
+
+  function _mergeSends(localS, remoteS) {
+    return {
+      total: Math.max(localS.total || 0, remoteS.total || 0),
+      rtl: Math.max(localS.rtl || localS.hebrew || 0, remoteS.rtl || remoteS.hebrew || 0),
+      totalWords: Math.max(localS.totalWords || 0, remoteS.totalWords || 0),
+      totalChars: Math.max(localS.totalChars || 0, remoteS.totalChars || 0),
+    };
   }
 
   function _mergeHours(localH, remoteH) {

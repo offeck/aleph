@@ -1,6 +1,6 @@
 # Aleph (א) — AI Chat Styler
 
-A Chrome extension that fixes Hebrew/English/Math bidirectional text rendering and gives you consistent styling controls across **Claude**, **ChatGPT**, and **Gemini**.
+A Chrome extension that fixes Hebrew, Arabic-script, English, and math bidirectional text rendering and gives you consistent styling controls across **Claude**, **ChatGPT**, and **Gemini**.
 
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue?logo=googlechrome&logoColor=white)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)
@@ -8,17 +8,17 @@ A Chrome extension that fixes Hebrew/English/Math bidirectional text rendering a
 
 ## The problem
 
-AI chat platforms render Hebrew text poorly. When Hebrew mixes with English words or math expressions, the bidirectional text algorithm breaks — words appear in the wrong order, math equations flip, and lists point the wrong way. Each platform (Claude, ChatGPT, Gemini) has different DOM structures, making a universal fix non-trivial.
+AI chat platforms render RTL text poorly. When Hebrew, Arabic, Persian, or Urdu mixes with English words or math expressions, the bidirectional text algorithm breaks — words appear in the wrong order, math equations flip, and lists point the wrong way. Each platform (Claude, ChatGPT, Gemini) has different DOM structures, making a universal fix non-trivial.
 
 On top of that, each platform uses different fonts, sizes, and spacing — making it jarring to switch between them.
 
 ## What Aleph does
 
-**BiDi fixing** — Automatically detects Hebrew content in AI responses and input boxes, applies correct RTL direction while keeping math (KaTeX, MathJax) and code blocks in LTR. Works in real-time as responses stream in.
+**BiDi fixing** — Automatically detects Hebrew and Arabic-script content in AI responses and input boxes, applies correct RTL direction while keeping math (KaTeX, MathJax) and code blocks in LTR. Works in real-time as responses stream in.
 
 **Style unification** — A popup settings panel lets you override typography, code block appearance, and layout width across all three platforms:
 
-- **Font family** — Choose a Hebrew-friendly font (Rubik, Heebo, Assistant, Noto Sans Hebrew, etc.) that applies everywhere
+- **Font family** — Choose an RTL-friendly font (Rubik, Heebo, Assistant, Noto Sans Hebrew, Noto Sans Arabic, Cairo, Vazirmatn, Noto Nastaliq Urdu, etc.) that applies everywhere
 - **Font size & line height** — Adjust readability to your preference
 - **Paragraph spacing** — Control density of response text
 - **Code block font & size** — Pick your preferred monospace font
@@ -50,8 +50,8 @@ The extension injects a content script on each supported platform. It:
 
 1. **Detects the platform** from the hostname and loads platform-specific DOM selectors
 2. **Observes DOM mutations** via `MutationObserver` to catch streaming responses in real-time
-3. **Scans text nodes** for Hebrew characters (Unicode range `U+0590–U+05FF`)
-4. **Applies `data-aleph-rtl="true"`** to elements containing Hebrew, which triggers CSS rules for RTL direction
+3. **Scans text nodes** for Hebrew and Arabic-script letters using Unicode script properties
+4. **Applies `data-aleph-rtl="true"`** to elements containing RTL-script letters, which triggers CSS rules for RTL direction
 5. **Injects dynamic CSS** based on your saved settings for fonts, sizes, and layout
 
 Math containers (`.katex`, `mjx-container`) and code blocks are explicitly isolated to stay LTR regardless of surrounding text direction.
@@ -77,7 +77,7 @@ aleph/
 | Setting | Range | Default | What it does |
 |---------|-------|---------|--------------|
 | Platform toggles | on/off | all on | Enable/disable per platform |
-| BiDi fix | on/off | on | Hebrew RTL auto-detection |
+| BiDi fix | on/off | on | Hebrew and Arabic-script RTL auto-detection |
 | Font family | dropdown | platform default | Override response text font |
 | Font size | 0–24 px | 0 (no override) | Override response text size |
 | Line height | 0–2.4 | 0 (no override) | Override line spacing |

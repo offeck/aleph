@@ -13,8 +13,16 @@
   unicode-bidi: isolate !important;
 }
 
-/* Editor paragraph children use dir="auto" for per-paragraph direction.
-   No container-level override needed — browser handles it natively. */
+/* Editors use dir="auto" plus plaintext fallback so each paragraph can resolve
+   its base direction even when a host editor strips child dir attributes. */
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"],
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"] p,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"] div,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"] li,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] textarea,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] input[type="text"] {
+  unicode-bidi: plaintext !important;
+}
 
 /* Math: ALWAYS LTR */
 .katex, .katex-display, span.katex-display,
