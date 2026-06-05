@@ -121,6 +121,7 @@ function collectUsageMetricValues(platform, usage) {
 
   if (platform === "chatgpt") {
     const chat = usage.chat || usage;
+    // KEEP IN SYNC with popup.js usage meter metric keys.
     for (const ml of (chat?.modelLimits || [])) {
       const id = ml?.model || ml?.name || ml?.feature;
       if (id != null) addUsageMetricValue(values, "chatgpt:model:" + id, ml?.remaining ?? ml?.used);
@@ -135,6 +136,7 @@ function collectUsageMetricValues(platform, usage) {
   }
 
   if (platform === "gemini") {
+    addUsageMetricValue(values, "gemini:credits", usage.credits?.remaining);
     for (const feature of (usage.features || [])) {
       if (feature?.id != null) addUsageMetricValue(values, "gemini:feature:" + feature.id, feature?.remaining ?? feature?.used);
     }
@@ -505,7 +507,9 @@ async function cleanupOldUsage() {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 90);
   const cutoffStr = usageKeyForDate(cutoff);
-  const toRemove = Object.keys(all).filter((k) => k.startsWith("usage_") && k < cutoffStr);
+  const toRemove = Object.keys(all).filter((k) => (
+    k === "insights_chatgpt_model_ts" || (k.startsWith("usage_") && k < cutoffStr)
+  ));
   if (toRemove.length > 0) await chrome.storage.local.remove(toRemove);
 }
 
@@ -630,9 +634,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "insights-message") {
     (async () => {
       const p = msg.platform;
+      const role = msg.role;
+      if (role !== "user" && role !== "assistant") return;
       await updateUsageDay(async (usage) => {
         const day = ensurePlatformDay(usage, p);
-        const roleSuffix = msg.role === "user" ? "In" : "Out";
+        const roleSuffix = role === "user" ? "In" : "Out";
         const totalDelta = msg.isUpdate ? numberOrZero(msg.tokenDelta) : numberOrZero(msg.estimatedTokens);
         const textDelta = msg.isUpdate ? numberOrZero(msg.textTokenDelta) : numberOrZero(msg.estimatedTextTokens ?? msg.textTokens);
         const imageDelta = msg.isUpdate ? numberOrZero(msg.imageTokenDelta) : numberOrZero(msg.estimatedImageTokens ?? msg.imageTokens);

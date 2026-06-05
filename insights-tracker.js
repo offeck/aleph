@@ -345,12 +345,30 @@
     return !w || !h || (w * h) >= 4096;
   }
 
+  function countFileAttachments(el) {
+    const selector = '[data-testid*="file" i], [aria-label*="file" i], a[href*="/backend-api/files/"], a[href*="attachment"], [class*="attachment" i]';
+    const candidates = Array.from(el.querySelectorAll(selector));
+    const identities = new Set();
+    const noHrefCandidates = [];
+    for (const node of candidates) {
+      const link = node.matches?.('a[href*="/backend-api/files/"], a[href*="attachment"]')
+        ? node
+        : node.querySelector?.('a[href*="/backend-api/files/"], a[href*="attachment"]');
+      if (link?.href) identities.add("href:" + link.href);
+      else noHrefCandidates.push(node);
+    }
+    for (const node of noHrefCandidates) {
+      if (!noHrefCandidates.some((other) => other !== node && other.contains?.(node))) {
+        identities.add(node);
+      }
+    }
+    return identities.size;
+  }
+
   function estimateMessage(el) {
     const text = el.textContent || "";
     const images = Array.from(el.querySelectorAll("img")).filter(isContentImage);
-    const fileCount = el.querySelectorAll(
-      '[data-testid*="file" i], [aria-label*="file" i], a[href*="/backend-api/files/"], a[href*="attachment"], [class*="attachment" i]'
-    ).length;
+    const fileCount = countFileAttachments(el);
     const textTokens = estimateTokens(text);
     const imageTokens = images.length * (IMG_TOKEN_COST[PLATFORM] || 1600);
     const fileTokens = 0;
@@ -409,7 +427,7 @@
       payload.fileCountDelta = delta.fileCount;
     }
 
-    console.log("[Aleph] message " + (isUpdate ? "updated" : "counted") + ":", role, "tokens:", next.totalTokens, "preview:", next.text.substring(0, 60));
+    if (!isUpdate) console.log("[Aleph] message counted:", role, "tokens:", next.totalTokens, "preview:", next.text.substring(0, 60));
     send(payload);
   }
 
@@ -554,15 +572,25 @@
   // with just cookies (no bearer token needed for this endpoint).
   // Also retrieves the access token needed for usage polling.
   let chatgptApiPlan = null;
+  const CHATGPT_PLAN_RANK = { free: 0, plus: 1, pro5x: 2, pro20x: 3 };
 
-  function collectChatgptPlanSignals(value, depth = 0) {
+  function setChatgptApiPlan(plan) {
+    if (!plan) return;
+    if (!chatgptApiPlan || (CHATGPT_PLAN_RANK[plan] || 0) > (CHATGPT_PLAN_RANK[chatgptApiPlan] || 0)) {
+      chatgptApiPlan = plan;
+    }
+  }
+
+  function collectChatgptPlanSignals(value, depth = 0, includeChildren = false) {
     if (!value || depth > 3) return [];
     if (typeof value !== "object") return [String(value)];
     const signals = [];
     for (const [key, child] of Object.entries(value)) {
-      if (!/plan|tier|billing|subscription|price|amount|product|sku|seat|license|account|workspace/i.test(key)) continue;
+      const relevantKey = /plan|tier|billing|subscription|price|amount|product|sku|seat|license|account|workspace/i.test(key);
+      if (!includeChildren && !relevantKey) continue;
       if (child && typeof child === "object") {
-        signals.push(...collectChatgptPlanSignals(child, depth + 1));
+        const isPlanContainer = /plan|tier|billing|subscription|product|sku|seat|license/i.test(key);
+        signals.push(...collectChatgptPlanSignals(child, depth + 1, includeChildren || isPlanContainer));
       } else if (child != null) {
         signals.push(key + ":" + String(child));
       }
@@ -570,17 +598,37 @@
     return signals;
   }
 
+  function normalizeChatgptPriceValue(value) {
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return n >= 1000 ? n / 100 : n;
+  }
+
+  function extractChatgptPlanPrice(text) {
+    const prices = [];
+    const re = /(?:price|amount|cost|monthly)[a-z0-9_.:= -]{0,40}?(\d+(?:\.\d+)?)/gi;
+    let match;
+    while ((match = re.exec(text))) {
+      const price = normalizeChatgptPriceValue(match[1]);
+      if (price != null) prices.push(price);
+    }
+    return prices.length ? Math.max(...prices) : null;
+  }
+
   function normalizeChatgptPlan(raw, context = {}) {
     const text = [raw, context.text, ...(context.signals || [])].filter(Boolean).join(" ").toLowerCase();
-    const price = Number(context.price);
+    const contextPrice = normalizeChatgptPriceValue(context.price);
+    const signalPrice = extractChatgptPlanPrice(text);
+    const price = Math.max(contextPrice ?? -Infinity, signalPrice ?? -Infinity);
     if (Number.isFinite(price)) {
       if (price >= 190) return "pro20x";
       if (price >= 90) return "pro5x";
     }
     if (/\$[\s\u00a0]*200\b|\b200\s*usd\b|\b20x\b|\bpro[_ -]?20x?\b|\b(?:price|amount|cost|monthly|billing|subscription)[a-z0-9_:= -]{0,80}200\b/.test(text)) return "pro20x";
     if (/\$[\s\u00a0]*100\b|\b100\s*usd\b|\b5x\b|\bpro[_ -]?5x?\b|\b(?:price|amount|cost|monthly|billing|subscription)[a-z0-9_:= -]{0,80}100\b/.test(text)) return "pro5x";
-    if (/\bplus\b/.test(text)) return "plus";
     if (/\bpro\b/.test(text)) return "pro5x";
+    if (/\bplus\b/.test(text)) return "plus";
     if (/\bfree\b|\bgo\b/.test(text)) return "free";
     return null;
   }
@@ -605,8 +653,8 @@
           const c = document.cookie.split(";").reduce((a, c) => { const [k,...v] = c.trim().split("="); a[k]=v.join("="); return a; }, {});
           if (c["oai-last-model-config"]) {
             const m = JSON.parse(decodeURIComponent(c["oai-last-model-config"])).model || "";
-            if (/^o3$/.test(m)) chatgptApiPlan = "pro5x";
-            else if (/^gpt-5-[2-9]|^gpt-5-5/.test(m)) chatgptApiPlan = "plus";
+            if (/^o3$/.test(m)) setChatgptApiPlan("pro5x");
+            else if (/^gpt-5-[2-9]|^gpt-5-5/.test(m)) setChatgptApiPlan("plus");
           }
         } catch (e) {}
       }
@@ -795,7 +843,7 @@
           const plan = normalizeChatgptPlan(session.account.planType, {
             signals: collectChatgptPlanSignals(session.account),
           });
-          if (plan) chatgptApiPlan = plan;
+          setChatgptApiPlan(plan);
         }
         return chatgptAccessToken;
       })
@@ -881,12 +929,26 @@
     return null;
   }
 
-  function boundedPct(value) {
+  function boundedPercent(value) {
     if (value == null || value === "") return null;
     const n = Number(value);
     if (!Number.isFinite(n)) return null;
-    const pct = n >= 0 && n <= 1 ? n * 100 : n;
-    return Math.max(0, Math.min(100, pct));
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function boundedRatio(value) {
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(0, Math.min(100, n >= 0 && n <= 1 ? n * 100 : n));
+  }
+
+  function findFirstPercent(obj, names) {
+    return boundedPercent(findFirstValue(obj, names));
+  }
+
+  function findFirstRatio(obj, names) {
+    return boundedRatio(findFirstValue(obj, names));
   }
 
   function textFromValues(obj) {
@@ -906,26 +968,28 @@
     const text = (textFromValues(obj) + " " + (context?.text || "")).trim();
     if (!/(codex|agentic|usage|limit|quota|weekly|week|hour|5h|spark)/i.test(text + " " + Object.keys(obj).join(" "))) return null;
 
-    const remainingPct = boundedPct(findFirstValue(obj, [
+    const remainingPct = findFirstPercent(obj, [
       "remainingPct", "remaining_pct", "remainingPercent", "remaining_percent", "percentRemaining", "percent_remaining", "percentageRemaining", "percentage_remaining", "remainingPercentage", "remaining_percentage",
-      "remainingRatio", "remaining_ratio", "fractionRemaining", "fraction_remaining", "remainingFraction", "remaining_fraction",
       "availablePercent", "available_percent", "remainingQuotaPercent", "remaining_quota_percent", "usageRemainingPercent", "usage_remaining_percent",
-    ]));
-    const usedPct = boundedPct(findFirstValue(obj, [
+    ]) ?? findFirstRatio(obj, [
+      "remainingRatio", "remaining_ratio", "fractionRemaining", "fraction_remaining", "remainingFraction", "remaining_fraction",
+    ]);
+    const usedPct = findFirstPercent(obj, [
       "usedPct", "used_pct", "usagePct", "usage_pct", "usedPercent", "used_percent", "usagePercent", "usage_percent", "percentageUsed", "percentage_used",
-      "usedRatio", "used_ratio", "usageRatio", "usage_ratio", "usedFraction", "used_fraction", "usageFraction", "usage_fraction",
-      "utilization", "utilizationPct", "utilization_pct", "consumedPercent", "consumed_percent", "percentUsed", "percent_used",
-    ]));
+      "utilizationPct", "utilization_pct", "consumedPercent", "consumed_percent", "percentUsed", "percent_used",
+    ]) ?? findFirstRatio(obj, [
+      "usedRatio", "used_ratio", "usageRatio", "usage_ratio", "usedFraction", "used_fraction", "usageFraction", "usage_fraction", "utilization",
+    ]);
     const remainingRaw = findFirstValue(obj, ["remaining", "remainingAmount", "remaining_amount", "remainingCredits", "remaining_credits", "available", "availableAmount", "available_amount"]);
     const usedRaw = findFirstValue(obj, ["used", "usedAmount", "used_amount", "current", "currentUsage", "current_usage", "consumed", "consumedAmount", "consumed_amount", "usedCredits", "used_credits"]);
     const limitRaw = findFirstValue(obj, ["limit", "limitAmount", "limit_amount", "max", "maximum", "total", "quota", "allowed", "allowedAmount", "allowed_amount"]);
     const remaining = remainingRaw != null ? Number(remainingRaw) : NaN;
     const used = usedRaw != null ? Number(usedRaw) : NaN;
     const limit = limitRaw != null ? Number(limitRaw) : NaN;
-    const computedRemainingPct = Number.isFinite(remaining) && Number.isFinite(limit) && limit > 0 ? boundedPct((remaining / limit) * 100) : null;
-    const computedUsedPct = Number.isFinite(used) && Number.isFinite(limit) && limit > 0 ? boundedPct((used / limit) * 100) : null;
-    const normalizedRemainingPct = remainingPct ?? (usedPct != null ? boundedPct(100 - usedPct) : (computedRemainingPct ?? (computedUsedPct != null ? boundedPct(100 - computedUsedPct) : null)));
-    const normalizedUsedPct = usedPct ?? computedUsedPct ?? (normalizedRemainingPct != null ? boundedPct(100 - normalizedRemainingPct) : null);
+    const computedRemainingPct = Number.isFinite(remaining) && Number.isFinite(limit) && limit > 0 ? boundedPercent((remaining / limit) * 100) : null;
+    const computedUsedPct = Number.isFinite(used) && Number.isFinite(limit) && limit > 0 ? boundedPercent((used / limit) * 100) : null;
+    const normalizedRemainingPct = remainingPct ?? (usedPct != null ? boundedPercent(100 - usedPct) : (computedRemainingPct ?? (computedUsedPct != null ? boundedPercent(100 - computedUsedPct) : null)));
+    const normalizedUsedPct = usedPct ?? computedUsedPct ?? (normalizedRemainingPct != null ? boundedPercent(100 - normalizedRemainingPct) : null);
     if (normalizedRemainingPct == null && normalizedUsedPct == null) return null;
 
     const periodText = text + " " + Object.entries(obj).map(([k, v]) => (typeof v === "string" ? k + " " + v : k)).join(" ");
@@ -1010,16 +1074,16 @@
   }
 
   function normalizeCodexScalarLimit(key, value, context) {
-    const pct = boundedPct(value);
-    if (pct == null) return null;
     const text = String(key || "") + " " + (context?.text || "");
+    const pct = /ratio|fraction/i.test(text) ? boundedRatio(value) : boundedPercent(value);
+    if (pct == null) return null;
     const isRemaining = /remaining|left|available/i.test(text);
-    const isUsed = /used|usage|utilization|consumed/i.test(text);
+    const isUsed = !isRemaining && /used|usage|utilization|consumed/i.test(text);
     if (!isRemaining && !isUsed) return null;
     const period = /5\s*(?:hour|hr|h)|five[_ -]?hour|5h|pt5h/i.test(text) ? "5h" : (/weekly|week|7d|seven[_ -]?day|p7d/i.test(text) ? "weekly" : "");
     if (!period) return null;
-    const remainingPct = isRemaining ? pct : boundedPct(100 - pct);
-    const usedPct = isUsed ? pct : boundedPct(100 - pct);
+    const remainingPct = isRemaining ? pct : boundedPercent(100 - pct);
+    const usedPct = isUsed ? pct : boundedPercent(100 - pct);
     return {
       type: "limit",
       title: "",
@@ -1075,7 +1139,7 @@
     if (!balance || typeof balance !== "object") return null;
     const limits = [];
     collectExplicitCodexBalanceLimits(balance, limits);
-    collectCodexLimits(balance, limits, new WeakSet(), 0);
+    if (limits.length === 0) collectCodexLimits(balance, limits, new WeakSet(), 0);
     const credits = normalizeCodexCredits(balance);
     const snapshot = {
       source: "provider",
@@ -1186,11 +1250,12 @@
         try { quotas = JSON.parse(dataStr); } catch (e) { return; }
         if (!Array.isArray(quotas) || !Array.isArray(quotas[0])) return;
 
-        // Gemini feature IDs mapped via empirical testing:
-        // - Feature 4 CONFIRMED: decrements by 1 per "Pro" mode message (limit 25 for AI Pro)
-        // - Flash mode: no quota consumed (unlimited for Pro users)
-        // - Feature 15: likely "Deep/Thinking" mode (limit 80)
-        // Other features mapped by limit magnitude vs Google's published quotas.
+        // qpEbW row schema (verified 2026-06 by replaying the app's own calls):
+        // [featureDescriptor, poolType, ?, [resetSec, resetNanos], limit, remaining]
+        // Current accounts report ONE account-wide daily credit pool — with our "[]"
+        // payload its featureDescriptor is empty. Premium usage drains the pool
+        // (measured: Pro message ≈ 19 credits, Flash-Lite message 0); per-feature
+        // rows ([null, featureId]) are a legacy shape kept as a fallback.
         const GEMINI_FEATURE_NAMES = {
           4: "Pro 3.1", 15: "Thinking", 25: "Chat", 7: "Flash",
           13: "Extended", 16: "Agent", 9: "Images", 21: "Image Edit",
@@ -1200,6 +1265,7 @@
         };
 
         const features = [];
+        let credits = null;
         for (const q of quotas[0]) {
           if (!Array.isArray(q) || q.length < 6) continue;
           const featureId = q[0]?.[1];
@@ -1208,11 +1274,16 @@
           const remaining = q[5];
           if (typeof limit !== "number" || typeof remaining !== "number") continue;
           if (limit === 0) continue;
+          const resetsAt = resetTs ? new Date(resetTs * 1000).toISOString() : null;
+          if (featureId == null) {
+            credits = { limit, remaining, used: Math.max(0, limit - remaining), resetsAt };
+            continue;
+          }
           features.push({
             id: featureId,
             name: GEMINI_FEATURE_NAMES[featureId] || "Feature " + featureId,
             limit, remaining,
-            resetsAt: resetTs ? new Date(resetTs * 1000).toISOString() : null,
+            resetsAt,
           });
         }
         features.sort((a, b) => b.limit - a.limit);
@@ -1220,6 +1291,7 @@
           type: "insights-usage", platform: "gemini",
           usage: {
             source: "provider",
+            credits,
             features,
             mainChat: features[0] || null,
             activeModel: document.querySelector(".input-area-switch")?.textContent?.trim() || null,

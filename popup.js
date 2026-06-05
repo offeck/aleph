@@ -130,7 +130,7 @@
   }
 
   function codexLimitLabel(card) {
-    const suffix = card?.period === "weekly" ? "weekly" : (card?.period || "limit");
+    const suffix = card?.period === "weekly" ? "7d" : (card?.period || "limit");
     if (card?.model) return `${shortCodexModelLabel(card.model)} ${suffix}`;
     return `Codex ${suffix}`;
   }
@@ -250,6 +250,7 @@
       const gptUsage = platformUsage?.chatgpt;
       const GPT_LABELS = { deep_research: "Research", odyssey: "Reasoning", image_gen: "Images" };
       const gptChat = gptUsage?.chat || gptUsage;
+      // KEEP IN SYNC with collectUsageMetricValues() in background.js.
       for (const ml of (gptChat?.modelLimits || []).slice(0, 4)) {
         const key = "chatgpt:model:" + (ml.model || ml.name || ml.feature);
         addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${cleanLabel(ml.model, "GPT")}`, ml, "#4285F4", {
@@ -308,9 +309,16 @@
         });
       }
 
-      // Gemini: feature 4 = Pro 3.1, feature 15 = Thinking (confirmed via testing)
+      // Gemini: one daily credit pool shared by premium features (Pro ≈ 19/msg,
+      // Flash-Lite free). Per-feature rows are a legacy shape, kept as fallback.
       const gemUsage = platformUsage?.gemini;
-      if (gemUsage?.features?.length > 0) {
+      const gemCredits = gemUsage?.credits;
+      if (asNumber(gemCredits?.limit) > 0) {
+        addQuotaMeter(rawMeters.gemini, "Gemini credits", gemCredits, "#10A37F", {
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gemUsage, "gemini:credits"),
+        });
+      } else if (gemUsage?.features?.length > 0) {
         const proChat = gemUsage.features.find((f) => f.id === 4);
         const thinking = gemUsage.features.find((f) => f.id === 15);
         const preferred = [proChat, thinking].filter(Boolean);
@@ -337,23 +345,21 @@
         }
       }
 
-      // Filter: if a platform only reports fully available quotas, collapse them
-      // to one generic row. Detail-only rows stay visible when they changed.
+      // Used percentage quota rows stay visible; fully available quotas collapse
+      // to one platform row. Number-only rows are gated by deltas.
       const PLATFORM_FALLBACK = { claude: { label: "Claude", color: "#D97706" }, chatgpt: { label: "ChatGPT", color: "#4285F4" }, gemini: { label: "Gemini", color: "#10A37F" } };
       const shouldShowMeter = (m) => !m.requiresRecentDelta || m.changedWithin24h;
       for (const p of ["claude", "chatgpt", "gemini"]) {
         const pm = rawMeters[p];
         if (pm.length === 0) continue;
-        const quotaMeters = pm.filter((m) => m.quota);
-        const visibleQuotaMeters = quotaMeters;
-        const detailMeters = pm.filter((m) => !m.quota && shouldShowMeter(m) && (m.alwaysShow || m.pct == null || m.pct > 0));
-        const activeQuotaMeters = visibleQuotaMeters.filter((m) => !m.fullAvailable && (m.alwaysShow || m.pct == null || m.pct > 0));
-        if (activeQuotaMeters.length > 0) {
-          meters.push(...activeQuotaMeters, ...detailMeters);
-        } else if (quotaMeters.length > 0 && quotaMeters.every((m) => m.fullAvailable)) {
-          meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true, quota: true, fullAvailable: true });
+        const pctMeters = pm.filter((m) => m.pct != null);
+        const activePctMeters = pctMeters.filter((m) => m.pct > 0);
+        const detailMeters = pm.filter((m) => m.pct == null && shouldShowMeter(m) && (m.alwaysShow || m.detail));
+        const visibleMeters = [...activePctMeters, ...detailMeters];
+        if (visibleMeters.length > 0) {
+          meters.push(...visibleMeters);
         } else {
-          meters.push(...detailMeters);
+          meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true, quota: true, fullAvailable: true });
         }
       }
 
@@ -364,15 +370,32 @@
           const fillColor = m.pct != null && m.pct >= 90 ? "#ff6b6b" : m.color;
           const row = document.createElement("div");
           row.className = "usage-meter";
+          const label = document.createElement("span");
+          label.className = "usage-meter-label";
+          label.style.color = fillColor;
+          label.textContent = m.label;
+          row.appendChild(label);
           if (m.pct == null) {
-            row.innerHTML =
-              `<span class="usage-meter-label" style="color:${fillColor}">${m.label}</span>` +
-              `<span class="usage-meter-detail" style="color:${fillColor}">${m.detail || ""}</span>`;
+            const detail = document.createElement("span");
+            detail.className = "usage-meter-detail";
+            detail.style.color = fillColor;
+            detail.textContent = m.detail || "";
+            row.appendChild(detail);
           } else {
-            row.innerHTML =
-              `<span class="usage-meter-label" style="color:${fillColor}">${m.label}</span>` +
-              `<div class="usage-meter-track"><div class="usage-meter-fill" style="width:${Math.max(m.pct, 2)}%;background:${fillColor}"></div></div>` +
-              `<span class="usage-meter-pct" style="color:${fillColor}">${m.detail || (m.pct + "%")}</span>`;
+            const track = document.createElement("div");
+            track.className = "usage-meter-track";
+            const fill = document.createElement("div");
+            fill.className = "usage-meter-fill";
+            fill.style.width = Math.max(m.pct, 2) + "%";
+            fill.style.background = fillColor;
+            track.appendChild(fill);
+            row.appendChild(track);
+
+            const pct = document.createElement("span");
+            pct.className = "usage-meter-pct";
+            pct.style.color = fillColor;
+            pct.textContent = m.detail || (m.pct + "%");
+            row.appendChild(pct);
           }
           metersEl.appendChild(row);
         }
