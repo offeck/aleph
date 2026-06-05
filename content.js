@@ -1,8 +1,11 @@
 (function () {
   "use strict";
 
-  const HEB = /[֐-׿]/;
-  const VERSION = "2.6.0";
+  // RTL script letters only. Digits, punctuation, and standalone marks should
+  // not force an element into RTL.
+  // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in insights-tracker.js.
+  const RTL_SCRIPT_LETTER_RE = /(?=[\p{Script=Hebrew}\p{Script=Arabic}])\p{L}/u;
+  const VERSION = "2.7.0";
 
   // ── Platform detection ─────────────────────────────────────────────────
   const host = location.hostname;
@@ -102,6 +105,10 @@
     "Heebo": "Heebo:wght@400;500;700",
     "Assistant": "Assistant:wght@400;600;700",
     "Noto Sans Hebrew": "Noto+Sans+Hebrew:wght@400;500;700",
+    "Noto Sans Arabic": "Noto+Sans+Arabic:wght@400;500;700",
+    "Cairo": "Cairo:wght@400;500;700",
+    "Vazirmatn": "Vazirmatn:wght@400;500;700",
+    "Noto Nastaliq Urdu": "Noto+Nastaliq+Urdu:wght@400;500;700",
     "Open Sans": "Open+Sans:wght@400;600;700",
     "Inter": "Inter:wght@400;500;700",
     "IBM Plex Sans": "IBM+Plex+Sans:wght@400;500;700",
@@ -265,6 +272,14 @@
     return settings[key] !== false;
   }
 
+  function updateBidiRootAttribute() {
+    if (isPlatformEnabled() && settings.bidiEnabled) {
+      document.documentElement.setAttribute("data-aleph-bidi-enabled", "true");
+    } else {
+      document.documentElement.removeAttribute("data-aleph-bidi-enabled");
+    }
+  }
+
   function getActiveThemeName() {
     const platformKey = "theme" + PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1);
     return settings[platformKey] || settings.theme || "none";
@@ -361,13 +376,17 @@
       tag === "mjx-container" || tag === "code" || tag === "pre";
   }
 
-  function hasHebrew(el) {
+  function hasRTLScriptText(text) {
+    return RTL_SCRIPT_LETTER_RE.test(text || "");
+  }
+
+  function hasRTL(el) {
     if (!el) return false;
     for (const c of el.childNodes) {
-      if (c.nodeType === 3 && HEB.test(c.textContent)) return true;
+      if (c.nodeType === 3 && hasRTLScriptText(c.textContent)) return true;
       if (c.nodeType === 1) {
         if (isMathNode(c)) continue;
-        if (hasHebrew(c)) return true;
+        if (hasRTL(c)) return true;
       }
     }
     return false;
@@ -393,9 +412,12 @@
 
   // ── BiDi Patcher ───────────────────────────────────────────────────────
   let patching = false;
+  const editorDirObservers = new WeakMap();
+  const EDITOR_DIR_BLOCKS = "p, div, li";
 
   function patchAll() {
     ensureRootAttributes();
+    updateBidiRootAttribute();
     if (patching || !isPlatformEnabled()) return;
     patching = true;
     try {
@@ -422,14 +444,14 @@
     document.querySelectorAll(textSel).forEach((el) => {
       if (el.closest(".katex") || el.closest("mjx-container")) return;
       const has = el.getAttribute("data-aleph-rtl");
-      if (!has && sendHint && sendHint.lang === "hebrew" && !hintChecked.has(el)) {
+      if (!has && sendHint && sendHint.lang === "rtl" && !hintChecked.has(el)) {
         hintChecked.add(el);
         if ((el.textContent || "").trim().length < 200) {
           el.setAttribute("data-aleph-rtl", "true");
           el.removeAttribute("data-aleph-dir");
         }
       }
-      const need = hasHebrew(el);
+      const need = hasRTL(el);
       if (need && has !== "true") {
         el.setAttribute("data-aleph-rtl", "true");
         el.removeAttribute("data-aleph-dir");
@@ -441,29 +463,57 @@
       }
     });
 
+    patchEditors();
+  }
+
+  function setDirAutoForText(el, text) {
+    const hasText = (text || "").trim().length > 0;
+    if (hasText && el.getAttribute("dir") !== "auto") {
+      el.setAttribute("dir", "auto");
+    } else if (!hasText && el.getAttribute("dir") === "auto") {
+      el.removeAttribute("dir");
+    }
+  }
+
+  function patchEditorDir(ed) {
+    const text = ed.value !== undefined ? ed.value : ed.textContent;
+    setDirAutoForText(ed, text);
+
+    if (ed.value === undefined) {
+      ed.querySelectorAll(EDITOR_DIR_BLOCKS).forEach((child) => {
+        setDirAutoForText(child, child.textContent);
+      });
+    }
+  }
+
+  function scheduleEditorDirPatch(ed) {
+    requestAnimationFrame(() => patchEditorDir(ed));
+    setTimeout(() => patchEditorDir(ed), 80);
+    setTimeout(() => patchEditorDir(ed), 250);
+  }
+
+  function ensureEditorDirObserver(ed) {
+    if (editorDirObservers.has(ed)) return;
+
+    const onInput = () => scheduleEditorDirPatch(ed);
+    ed.addEventListener("beforeinput", onInput);
+    ed.addEventListener("input", onInput);
+    ed.addEventListener("keyup", onInput);
+    ed.addEventListener("compositionend", onInput);
+
+    const observer = new MutationObserver(() => scheduleEditorDirPatch(ed));
+    observer.observe(ed, {
+      childList: true, subtree: true, characterData: true,
+      attributes: true, attributeFilter: ["dir"],
+    });
+    editorDirObservers.set(ed, observer);
+  }
+
+  function patchEditors() {
     SEL.editor.forEach((sel) => {
       document.querySelectorAll(sel).forEach((ed) => {
-        ed.querySelectorAll("p, div, li").forEach((child) => {
-          const hasText = child.textContent.trim().length > 0;
-          if (hasText && child.getAttribute("dir") !== "auto") {
-            child.setAttribute("dir", "auto");
-          } else if (!hasText && child.getAttribute("dir") === "auto") {
-            child.removeAttribute("dir");
-          }
-        });
-        if (!ed.__alephListener) {
-          ed.addEventListener("input", () => {
-            ed.querySelectorAll("p, div, li").forEach((child) => {
-              const hasText = child.textContent.trim().length > 0;
-              if (hasText && child.getAttribute("dir") !== "auto") {
-                child.setAttribute("dir", "auto");
-              } else if (!hasText && child.getAttribute("dir") === "auto") {
-                child.removeAttribute("dir");
-              }
-            });
-          });
-          ed.__alephListener = true;
-        }
+        patchEditorDir(ed);
+        ensureEditorDirObserver(ed);
       });
     });
   }
@@ -471,7 +521,8 @@
   function cleanupEditorDir() {
     SEL.editor.forEach((sel) => {
       document.querySelectorAll(sel).forEach((ed) => {
-        ed.querySelectorAll("p, div, li").forEach((child) => {
+        if (ed.getAttribute("dir") === "auto") ed.removeAttribute("dir");
+        ed.querySelectorAll(EDITOR_DIR_BLOCKS).forEach((child) => {
           if (child.getAttribute("dir") === "auto") child.removeAttribute("dir");
         });
       });
@@ -536,7 +587,6 @@
   const SPACE_LOOK_VAR_NUM = /^[a-zA-Z]{1,2}\s*[0-9+\-=<>]/;
   const WORD_BEFORE_CMD = /^[a-zA-Z]+\s*[\\{^_]/;
   const EXPAND_BACK_STOP = new RegExp("[0-9.+\\-=<>\\\\" + UNICODE_MATH.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "]");
-  const PROXIMITY_GAP = /^[^֐-׿]*$/;
   const HAS_DOLLAR = /\$[^$]+\$/;
   const HAS_LPAREN = /\\\(/;
   const HAS_LBRACKET = /\\\[/;
@@ -687,7 +737,7 @@
     for (const r of regions.sort((a, b) => a.start - b.start)) {
       const last = merged[merged.length - 1];
       if (last && (r.start <= last.end ||
-          (r.start - last.end <= 10 && PROXIMITY_GAP.test(text.slice(last.end, r.start))))) {
+          (r.start - last.end <= 10 && !hasRTLScriptText(text.slice(last.end, r.start))))) {
         last.end = Math.max(last.end, r.end);
         last.latex = text.slice(last.start, last.end).trim();
       } else {
@@ -735,7 +785,7 @@
     let dm;
     while ((dm = DELIMITED_RE.exec(text)) !== null) {
       const latex = dm[1] || dm[2] || dm[3] || dm[4];
-      if (HEB.test(latex)) continue;
+      if (hasRTLScriptText(latex)) continue;
       if (dm[2] !== undefined && !/[\\{}^_]/.test(dm[2])) continue;
       const display = !!(dm[1] || dm[4]);
       regions.push({ start: dm.index, end: dm.index + dm[0].length, latex, display });
@@ -755,7 +805,7 @@
     for (const r of regions) {
       const last = merged[merged.length - 1];
       if (last && (r.start <= last.end ||
-          (r.start - last.end <= 10 && PROXIMITY_GAP.test(text.slice(last.end, r.start))))) {
+          (r.start - last.end <= 10 && !hasRTLScriptText(text.slice(last.end, r.start))))) {
         last.end = Math.max(last.end, r.end);
         last.latex = text.slice(last.start, last.end);
         last.display = last.display || r.display;
@@ -775,7 +825,7 @@
       }
 
       const regionText = text.slice(region.start, region.end);
-      if (HEB.test(regionText)) {
+      if (hasRTLScriptText(regionText)) {
         wrapper.appendChild(document.createTextNode(regionText));
         lastEnd = region.end;
         continue;
@@ -814,25 +864,25 @@
     textNode.parentNode.replaceChild(wrapper, textNode);
   }
 
-  const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()֐-׿]*\)/g;
-  const MATH_PIPE_RE = /\|[^|֐-׿\n]{1,50}\|/g;
+  const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()]*\)/g;
+  const MATH_PIPE_RE = /\|[^|\n]{1,50}\|/g;
   const MATH_TILDE_RE = /[~∼≁]_?\w+/g;
-  const MATH_REPEAT_RE = /(?<![A-Za-z0-9_'])(?:\([^()\n֐-׿]{1,40}\)[*+?]|[A-Za-z][0-9_']{0,3}[*+]|[0-9]+[*+])/g;
-  const RTL_CHAR = /[֐-׿؀-ۿ]/;
+  const MATH_REPEAT_RE = /(?<![A-Za-z0-9_'])(?:\([^()\n]{1,40}\)[*+?]|[A-Za-z][0-9_']{0,3}[*+]|[0-9]+[*+])/g;
 
   function findEqRegions(text) {
     const regions = [];
     let start = -1, hasEq = false, hasLetter = false;
-    for (let i = 0; i <= text.length; i++) {
-      const ch = i < text.length ? text[i] : null;
+    for (let i = 0; i <= text.length;) {
+      const ch = i < text.length ? String.fromCodePoint(text.codePointAt(i)) : null;
+      const nextI = ch ? i + ch.length : i + 1;
       if (start === -1) {
-        if (ch && !RTL_CHAR.test(ch) && ch !== '\n' && ch !== ' ') {
+        if (ch && !hasRTLScriptText(ch) && ch !== '\n' && ch !== ' ') {
           start = i;
           hasEq = ch === '=' || ch === '≠';
           hasLetter = /[a-zA-ZͰ-Ͽ]/.test(ch);
         }
       } else {
-        if (!ch || RTL_CHAR.test(ch) || ch === '\n') {
+        if (!ch || hasRTLScriptText(ch) || ch === '\n') {
           if (hasEq && hasLetter) {
             let end = i;
             while (end > start && /[\s.,;:!?]/.test(text[end - 1])) end--;
@@ -857,16 +907,27 @@
           if (/[a-zA-ZͰ-Ͽ]/.test(ch)) hasLetter = true;
         }
       }
+      i = nextI;
     }
     return regions;
   }
 
-  function collectRegions(re, text, regions, type) {
+  function collectRegions(re, text, regions, type, skipRTL) {
     re.lastIndex = 0;
     let match;
     while ((match = re.exec(text)) !== null) {
+      if (skipRTL && hasRTLScriptText(match[0])) continue;
       regions.push({ start: match.index, end: match.index + match[0].length, text: match[0], type });
     }
+  }
+
+  function hasMathCandidate(re, text, skipRTL) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      if (!skipRTL || !hasRTLScriptText(match[0])) return true;
+    }
+    return false;
   }
 
   function isolateMathText(textNode) {
@@ -874,10 +935,10 @@
     const regions = [];
 
     regions.push(...findEqRegions(text).map(r => ({ ...r, type: "eq" })));
-    collectRegions(MATH_PAREN_RE, text, regions);
-    collectRegions(MATH_PIPE_RE, text, regions);
+    collectRegions(MATH_PAREN_RE, text, regions, undefined, true);
+    collectRegions(MATH_PIPE_RE, text, regions, undefined, true);
     collectRegions(MATH_TILDE_RE, text, regions, "tilde");
-    collectRegions(MATH_REPEAT_RE, text, regions, "repeat");
+    collectRegions(MATH_REPEAT_RE, text, regions, "repeat", true);
 
     if (regions.length === 0) return;
     regions.sort((a, b) => a.start - b.start);
@@ -919,10 +980,10 @@
   }
 
   function shouldIsolateMathText(txt) {
-    return (MATH_PAREN_RE.lastIndex = 0, MATH_PAREN_RE.test(txt)) ||
-           (MATH_PIPE_RE.lastIndex = 0, MATH_PIPE_RE.test(txt)) ||
+    return hasMathCandidate(MATH_PAREN_RE, txt, true) ||
+           hasMathCandidate(MATH_PIPE_RE, txt, true) ||
            (MATH_TILDE_RE.lastIndex = 0, MATH_TILDE_RE.test(txt)) ||
-           (MATH_REPEAT_RE.lastIndex = 0, MATH_REPEAT_RE.test(txt)) ||
+           hasMathCandidate(MATH_REPEAT_RE, txt, true) ||
            findEqRegions(txt).length > 0;
   }
 
@@ -979,6 +1040,7 @@
     if (!isPlatformEnabled()) {
       const existing = document.getElementById(STYLE_ID);
       if (existing) existing.remove();
+      document.documentElement.removeAttribute("data-aleph-bidi-enabled");
       document.documentElement.removeAttribute("data-aleph-theme");
       document.documentElement.removeAttribute("data-aleph-focus");
       document.documentElement.removeAttribute("data-aleph-stream-enabled");
@@ -986,6 +1048,8 @@
       updateColorScheme(null);
       return;
     }
+
+    updateBidiRootAttribute();
 
     let css = "";
 
@@ -1080,6 +1144,8 @@
     }
     if (settings.lineHeight > 0) {
       css += `${textSelectors} { line-height: ${settings.lineHeight} !important; }\n`;
+    } else if (settings.fontFamily === "Noto Nastaliq Urdu") {
+      css += `${textSelectors} { line-height: 2 !important; }\n`;
     }
     if (settings.paragraphSpacing > 0) {
       const pSel = SEL.text.filter(s => s.endsWith(" p") || s === ".whitespace-pre-wrap").join(",\n");

@@ -9,6 +9,16 @@
     null;
   if (!PLATFORM) return;
 
+  // RTL script letters only. Digits, punctuation, and standalone marks should
+  // not classify a send as RTL by themselves.
+  // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in content.js.
+  const RTL_SCRIPT_LETTER_RE_G = /(?=[\p{Script=Hebrew}\p{Script=Arabic}])\p{L}/gu;
+
+  function countRTLScriptLetters(text) {
+    RTL_SCRIPT_LETTER_RE_G.lastIndex = 0;
+    return (text.match(RTL_SCRIPT_LETTER_RE_G) || []).length;
+  }
+
   // ── Pricing ──────────────────────────────────────────────
   const PRICING = {
     claude:  { free: { price: 0, label: "Free" }, pro: { price: 20, label: "Pro" }, max5x: { price: 100, label: "Max 5x" }, max20x: { price: 200, label: "Max 20x" } },
@@ -45,12 +55,12 @@
 
   // Chars-per-token ratios tuned per platform tokenizer and content type.
   // Claude uses a custom BPE tokenizer, ChatGPT uses tiktoken (o200k_base),
-  // Gemini uses SentencePiece — each handles Hebrew, code, and Latin differently.
+  // Gemini uses SentencePiece — each handles RTL scripts, code, and Latin differently.
   // Whitespace/punctuation tokenize at ~1 token per character on all platforms.
   const TOKEN_RATIOS = {
-    claude:  { latin: 3.8, hebrew: 2.0, code: 2.8, whitespace: 5.0 },
-    chatgpt: { latin: 4.0, hebrew: 1.7, code: 2.5, whitespace: 5.5 },
-    gemini:  { latin: 4.2, hebrew: 2.2, code: 3.0, whitespace: 5.0 },
+    claude:  { latin: 3.8, rtl: 2.0, code: 2.8, whitespace: 5.0 },
+    chatgpt: { latin: 4.0, rtl: 1.7, code: 2.5, whitespace: 5.5 },
+    gemini:  { latin: 4.2, rtl: 2.2, code: 3.0, whitespace: 5.0 },
   };
 
   function estimateTokens(text) {
@@ -69,12 +79,12 @@
       tokens += block.length / ratios.code;
     }
 
-    // Split remaining into Hebrew, Latin words, and whitespace/punctuation
-    const hebrewChars = (withoutCode.match(/[֐-׿؀-ۿ]/g) || []).length;
+    // Split remaining into RTL-script letters, Latin words, and whitespace/punctuation
+    const rtlChars = countRTLScriptLetters(withoutCode);
     const wsChars = (withoutCode.match(/[\s\n\r\t]+/g) || []).join("").length;
-    const latinChars = withoutCode.length - hebrewChars - wsChars;
+    const latinChars = Math.max(0, Array.from(withoutCode).length - rtlChars - wsChars);
 
-    tokens += hebrewChars / ratios.hebrew;
+    tokens += rtlChars / ratios.rtl;
     tokens += latinChars / ratios.latin;
     tokens += wsChars / ratios.whitespace;
 
@@ -164,7 +174,6 @@
   let userSentAt = 0;
 
   const EDITOR_SEL = "[contenteditable], textarea, #prompt-textarea, .ProseMirror, .ql-editor, rich-textarea";
-  const HEB_RE = /[֐-׿]/g;
   let lastEditorText = "";
 
   function captureAndSignal(source) {
@@ -180,9 +189,9 @@
     }
 
     const stripped = text.replace(/\s/g, "");
-    HEB_RE.lastIndex = 0;
-    const hebCount = (stripped.match(HEB_RE) || []).length;
-    const lang = stripped.length > 0 && hebCount / stripped.length > 0.3 ? "hebrew" : "other";
+    const rtlCount = countRTLScriptLetters(stripped);
+    const strippedLength = Array.from(stripped).length;
+    const lang = strippedLength > 0 && rtlCount / strippedLength > 0.3 ? "rtl" : "other";
     const words = text.split(/\s+/).filter(Boolean).length;
 
     userSentAt = Date.now();

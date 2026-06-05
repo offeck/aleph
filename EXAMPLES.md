@@ -11,12 +11,12 @@ Real-world Aleph examples demonstrating the seven Development Guidelines. Each s
 ### Bad — What Goes Wrong
 
 ```javascript
-// Immediately rewrites hasHebrew() to add ChatGPT-specific detection
-function hasHebrew(el) {
+// Immediately rewrites hasRTL() to add ChatGPT-specific detection
+function hasRTL(el) {
   if (!el) return false;
   // Special handling for ChatGPT's markdown container
   if (PLATFORM === "chatgpt" && el.closest(".markdown")) {
-    return HEB.test(el.textContent);
+    return RTL_SCRIPT_LETTER_RE.test(el.textContent);
   }
   for (const c of el.childNodes) {
     // ... rest of function
@@ -35,7 +35,7 @@ function hasHebrew(el) {
 Before implementing, I need to clarify:
 
 1. **What's broken?** Is Hebrew text:
-   - Not detected as RTL? (BiDi detection — hasHebrew() in content.js)
+   - Not detected as RTL? (BiDi detection — hasRTL() in content.js)
    - Detected but displayed wrong? (CSS direction — content.css)
    - Missing in LaTeX/math blocks? (patchLatex() exclusion)
    - Rendered in wrong font? (font loading)
@@ -106,10 +106,10 @@ The existing `applyFocusMode()` already iterates over `focusHide` categories, qu
 ### Bad — What Goes Wrong
 
 ```javascript
-function hasHebrew(el) {
+function hasRTL(el) {
   if (!el) return false;
   for (const c of el.childNodes) {
-    if (c.nodeType === 3 && HEB.test(c.textContent)) return true;
+    if (c.nodeType === 3 && RTL_SCRIPT_LETTER_RE.test(c.textContent)) return true;
     if (c.nodeType === 1) {
       const tag = c.tagName?.toLowerCase();
       if (c.classList?.contains("katex") || tag === "mjx-container" ||
@@ -117,11 +117,11 @@ function hasHebrew(el) {
       // Special case: expand <details> elements before checking
       if (tag === "details" && !c.open) {
         c.open = true;
-        const result = hasHebrew(c);
+        const result = hasRTL(c);
         c.open = false;
         return result;
       }
-      if (hasHebrew(c)) return true;
+      if (hasRTL(c)) return true;
     }
   }
   return false;
@@ -129,14 +129,14 @@ function hasHebrew(el) {
 ```
 
 **Problems:**
-- Monkey-patched `hasHebrew()` for one specific element type
-- The real question: why isn't `<details>` being reached by `hasHebrew()` in the first place?
+- Monkey-patched `hasRTL()` for one specific element type
+- The real question: why isn't `<details>` being reached by `hasRTL()` in the first place?
 - Mutating DOM state (`c.open = true`) in a detection function is a side effect
 
 ### Good — What Should Happen
 
 ```
-The hasHebrew() function already walks ALL child nodes recursively — it only
+The hasRTL() function already walks ALL child nodes recursively — it only
 skips katex, mjx-container, code, and pre. So <details> children should
 already be traversed.
 
@@ -389,7 +389,7 @@ Plan once clarified (example: fadeIn on Claude is too jumpy):
 |-----------|-------------|-----|
 | Restate Before Acting | Assumes "fix Hebrew" means BiDi detection | Ask what's broken, where, and on which platform |
 | Search Before Building | Writes new `hideGeminiPromo()` function | Add selector to existing `SELECTORS.gemini.focusHide` |
-| Generalized Solutions | Patches `hasHebrew()` for `<details>` only | Fix the missing selector that prevents `<details>` from being queried |
+| Generalized Solutions | Patches `hasRTL()` for `<details>` only | Fix the missing selector that prevents `<details>` from being queried |
 | Simplicity First | Creates `ThemeBuilder` class for one theme | Add one plain object to `THEMES` matching existing pattern |
 | Surgical Changes | Reformats entire selector object while fixing one string | Change only the broken selector string |
 | Verify Everything | Changes CSS, says "done" | Verify fix + themes + BiDi + typography, state what wasn't tested |

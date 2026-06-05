@@ -60,7 +60,7 @@ Before reporting any change as complete:
 
 ## Project Overview
 
-Chrome extension (Manifest V3) that provides Hebrew BiDi text fixing, custom themes, focus mode, streaming smoothing, and consistent typography/layout styling across Claude, ChatGPT, and Gemini.
+Chrome extension (Manifest V3) that provides Hebrew and Arabic-script BiDi text fixing, custom themes, focus mode, streaming smoothing, and consistent typography/layout styling across Claude, ChatGPT, and Gemini.
 
 ## Architecture
 
@@ -77,7 +77,7 @@ Chrome extension (Manifest V3) that provides Hebrew BiDi text fixing, custom the
 
 **Platform detection** — `PLATFORM` constant set from `location.hostname`. Each platform has its own selector set in `SELECTORS[platform]` covering: text, editor, math, code, message, chatWidth, themeBg, themeText, themeInput, themeCode, themeSidebar, focusHide (categorized), streaming, messageWrapper, chatContainer.
 
-**BiDi detection** — `hasHebrew(el)` recursively walks childNodes, tests text nodes against `/[֐-׿]/`, skips katex/mjx-container/code/pre. Sets `data-aleph-rtl="true"` on matching elements. Uses `unicode-bidi: plaintext` for better mixed RTL/LTR line handling.
+**BiDi detection** — `hasRTL(el)` recursively walks childNodes, tests text nodes against the RTL script-letter regex (Hebrew and Arabic-script letters only), skips katex/mjx-container/code/pre. Sets `data-aleph-rtl="true"` on matching elements. Uses `unicode-bidi: plaintext` for better mixed RTL/LTR line handling. Keep the regex pattern in `content.js` and `insights-tracker.js` in sync.
 
 **Dynamic styles** — `applyStyles()` builds a CSS string from current settings and injects it into `#aleph-dynamic-styles` style element. Covers themes (CSS custom properties on `:root`), typography, code blocks, chat width, message spacing.
 
@@ -85,7 +85,7 @@ Chrome extension (Manifest V3) that provides Hebrew BiDi text fixing, custom the
 
 **MutationObserver** — Watches `document.body` for `childList`, `subtree`, `characterData` changes. Filters out head/style mutations. Debounced at 120ms + 3s interval fallback.
 
-**Font loading** — `GOOGLE_FONTS` map covers Hebrew fonts (Rubik, Heebo, etc.) and code fonts (Fira Code, JetBrains Mono, etc.). `loadFont()` injects a `<link>` tag to Google Fonts API on demand.
+**Font loading** — `GOOGLE_FONTS` map covers Hebrew, Arabic-script, general text, and code fonts (Fira Code, JetBrains Mono, etc.). `loadFont()` injects a `<link>` tag to Google Fonts API on demand.
 
 **Color scheme** — `updateColorScheme()` sets `<meta name="color-scheme">` and `document.documentElement.style.colorScheme` based on the active theme's luminance, so browser UI (scrollbars, form controls) matches.
 
@@ -158,7 +158,7 @@ Agent({
 
 Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 
-**`rtl-direction`** — Hebrew elements have `data-aleph-rtl="true"` and computed `direction: rtl`.
+**`rtl-direction`** — RTL-script elements have `data-aleph-rtl="true"` and computed `direction: rtl`.
 
 **`math-ltr-isolation`** — `.katex` and `mjx-container` maintain `direction: ltr` inside RTL containers.
 

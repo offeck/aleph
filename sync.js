@@ -208,8 +208,8 @@ var alephSync = (function () {
         "fileCountIn", "fileCountOut",
       ]);
       day.hours = _mergeHours(l.hours || {}, r.hours || {});
-      day.sends = _mergeNestedCounters(l.sends || {}, r.sends || {}, ["total", "hebrew", "totalWords", "totalChars"]);
-      if (Object.keys(day.sends).length === 0) delete day.sends;
+      day.sends = _mergeSends(l.sends || {}, r.sends || {});
+      if (!day.sends.total && !day.sends.rtl && !day.sends.totalWords && !day.sends.totalChars) delete day.sends;
       day.timing = _mergeNestedCounters(l.timing || {}, r.timing || {}, ["count", "totalTTFT", "totalThinking", "totalSendToThinking"]);
       if (l.timing?.approximate || r.timing?.approximate) day.timing.approximate = true;
       if (Object.keys(day.timing).length === 0) delete day.timing;
@@ -235,6 +235,15 @@ var alephSync = (function () {
       else delete merged[f];
     }
     return merged;
+  }
+
+  function _mergeSends(localS, remoteS) {
+    return {
+      total: Math.max(localS.total || 0, remoteS.total || 0),
+      rtl: Math.max(localS.rtl || localS.hebrew || 0, remoteS.rtl || remoteS.hebrew || 0),
+      totalWords: Math.max(localS.totalWords || 0, remoteS.totalWords || 0),
+      totalChars: Math.max(localS.totalChars || 0, remoteS.totalChars || 0),
+    };
   }
 
   function _mergeHours(localH, remoteH) {

@@ -51,6 +51,16 @@ function emptyPlatformDay() {
   };
 }
 
+function normalizeSends(sends) {
+  const s = sends || {};
+  return {
+    total: s.total || 0,
+    rtl: s.rtl ?? s.hebrew ?? 0,
+    totalWords: s.totalWords || 0,
+    totalChars: s.totalChars || 0,
+  };
+}
+
 async function readLocal(key, fallback) {
   const result = await chrome.storage.local.get({ [key]: fallback });
   return result[key];
@@ -567,9 +577,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const p = msg.platform;
       await updateUsageDay(async (usage) => {
         const day = ensurePlatformDay(usage, p);
-        if (!day.sends) day.sends = { total: 0, hebrew: 0, totalWords: 0, totalChars: 0 };
+        day.sends = normalizeSends(day.sends);
         day.sends.total++;
-        if (msg.lang === "hebrew") day.sends.hebrew++;
+        if (msg.lang === "rtl" || msg.lang === "hebrew") day.sends.rtl++;
         day.sends.totalWords += numberOrZero(msg.words);
         day.sends.totalChars += numberOrZero(msg.length);
       });
