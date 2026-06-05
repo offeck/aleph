@@ -158,7 +158,7 @@ Agent({
 
 Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 
-**`rtl-direction`** — RTL-script elements have `data-aleph-rtl="true"` and computed `direction: rtl`.
+**`rtl-direction`** — RTL-script elements have `data-aleph-rtl="true"` and computed `direction: rtl`. SKIPs when the conversation has no RTL-script text or messages haven't rendered; FAILs only when RTL text is present but unmarked.
 
 **`math-ltr-isolation`** — `.katex` and `mjx-container` maintain `direction: ltr` inside RTL containers.
 
@@ -172,7 +172,7 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 
 **`streaming-attrs`** — `data-aleph-stream-enabled` and `data-aleph-stream-anim` attributes on `<html>`.
 
-**`selectors-match`** — `[data-aleph-platform]`, `[data-aleph-rtl]`, `[data-aleph-theme]` selectors find DOM elements.
+**`selectors-match`** — `[data-aleph-platform]` always required; `[data-aleph-rtl]` only when the conversation contains RTL-script text; `[data-aleph-theme]` only when a theme is set.
 
 ## Common Tasks
 

@@ -598,35 +598,42 @@
     return signals;
   }
 
-  function normalizeChatgptPriceValue(value) {
-    if (value == null || value === "") return null;
-    const n = Number(value);
+  // Known ChatGPT price points only. Plus ($20) is detected via text, not price,
+  // to avoid collisions with junk numerics. Bands cover dollars and cents-encoded
+  // forms (n/100). Returns a plan string or null \u2014 never a bare number.
+  function planFromPriceNumber(n) {
     if (!Number.isFinite(n)) return null;
-    return n >= 1000 ? n / 100 : n;
+    for (const v of [n, n / 100]) {
+      if (v >= 190 && v <= 260) return "pro20x";
+      if (v >= 90 && v <= 130) return "pro5x";
+    }
+    return null;
   }
 
+  // Only unambiguous price-ish keys: bare price/cost, or qualified amount/monthly
+  // forms (billing_amount, amount_due, price_cents...). Bare amount/monthly are
+  // intentionally excluded (credit_amount etc. are not prices).
+  const CHATGPT_PRICE_KEY_RE =
+    /(?:\b(?:price|cost)\b|(?:billing|monthly|unit|plan|sub|subscription)[_-]?(?:price|amount|cost)|amount[_-](?:due|cents|usd|total|gross|net)|(?:price|amount)[_-]?cents)[a-z0-9_.:= -]{0,40}?(\d+(?:\.\d+)?)/gi;
+
   function extractChatgptPlanPrice(text) {
-    const prices = [];
-    const re = /(?:price|amount|cost|monthly)[a-z0-9_.:= -]{0,40}?(\d+(?:\.\d+)?)/gi;
+    CHATGPT_PRICE_KEY_RE.lastIndex = 0;
+    let best = null;
     let match;
-    while ((match = re.exec(text))) {
-      const price = normalizeChatgptPriceValue(match[1]);
-      if (price != null) prices.push(price);
+    while ((match = CHATGPT_PRICE_KEY_RE.exec(text))) {
+      const plan = planFromPriceNumber(Number(match[1]));
+      if (plan === "pro20x") return "pro20x";
+      if (plan === "pro5x") best = "pro5x";
     }
-    return prices.length ? Math.max(...prices) : null;
+    return best;
   }
 
   function normalizeChatgptPlan(raw, context = {}) {
-    const text = [raw, context.text, ...(context.signals || [])].filter(Boolean).join(" ").toLowerCase();
-    const contextPrice = normalizeChatgptPriceValue(context.price);
-    const signalPrice = extractChatgptPlanPrice(text);
-    const price = Math.max(contextPrice ?? -Infinity, signalPrice ?? -Infinity);
-    if (Number.isFinite(price)) {
-      if (price >= 190) return "pro20x";
-      if (price >= 90) return "pro5x";
-    }
-    if (/\$[\s\u00a0]*200\b|\b200\s*usd\b|\b20x\b|\bpro[_ -]?20x?\b|\b(?:price|amount|cost|monthly|billing|subscription)[a-z0-9_:= -]{0,80}200\b/.test(text)) return "pro20x";
-    if (/\$[\s\u00a0]*100\b|\b100\s*usd\b|\b5x\b|\bpro[_ -]?5x?\b|\b(?:price|amount|cost|monthly|billing|subscription)[a-z0-9_:= -]{0,80}100\b/.test(text)) return "pro5x";
+    const text = [raw, ...(context.signals || [])].filter(Boolean).join(" ").toLowerCase();
+    const pricePlan = extractChatgptPlanPrice(text);
+    if (pricePlan) return pricePlan;
+    if (/\$[\s\u00a0]*200\b|\b200\s*usd\b|\b20x\b|\bpro[_ -]?20x?\b|\b(?:price|cost|billing[_ -]?amount|amount[_ -]due|monthly[_ -]price|subscription)[a-z0-9_:= -]{0,80}200\b/.test(text)) return "pro20x";
+    if (/\$[\s\u00a0]*100\b|\b100\s*usd\b|\b5x\b|\bpro[_ -]?5x?\b|\b(?:price|cost|billing[_ -]?amount|amount[_ -]due|monthly[_ -]price|subscription)[a-z0-9_:= -]{0,80}100\b/.test(text)) return "pro5x";
     if (/\bpro\b/.test(text)) return "pro5x";
     if (/\bplus\b/.test(text)) return "plus";
     if (/\bfree\b|\bgo\b/.test(text)) return "free";
