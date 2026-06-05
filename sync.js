@@ -191,19 +191,48 @@ var alephSync = (function () {
 
   function _mergeUsageDay(local, remote) {
     var platforms = ["claude", "chatgpt", "gemini"];
-    var merged = {};
+    var merged = Object.assign({}, remote, local);
+    delete merged._lastModified;
     for (var i = 0; i < platforms.length; i++) {
       var p = platforms[i];
       var l = local[p] || {};
       var r = remote[p] || {};
-      merged[p] = {
-        totalSeconds: Math.max(l.totalSeconds || 0, r.totalSeconds || 0),
-        messageCount: Math.max(l.messageCount || 0, r.messageCount || 0),
-        tokensIn: Math.max(l.tokensIn || 0, r.tokensIn || 0),
-        tokensOut: Math.max(l.tokensOut || 0, r.tokensOut || 0),
-        hours: _mergeHours(l.hours || {}, r.hours || {}),
-        sends: _mergeSends(l.sends || {}, r.sends || {}),
-      };
+      var day = Object.assign({}, r, l);
+      _mergeCounterFields(day, l, r, [
+        "totalSeconds", "messageCount",
+        "tokensIn", "tokensOut",
+        "textTokensIn", "textTokensOut",
+        "imageTokensIn", "imageTokensOut",
+        "fileTokensIn", "fileTokensOut",
+        "imageCountIn", "imageCountOut",
+        "fileCountIn", "fileCountOut",
+      ]);
+      day.hours = _mergeHours(l.hours || {}, r.hours || {});
+      day.sends = _mergeSends(l.sends || {}, r.sends || {});
+      if (!day.sends.total && !day.sends.rtl && !day.sends.totalWords && !day.sends.totalChars) delete day.sends;
+      day.timing = _mergeNestedCounters(l.timing || {}, r.timing || {}, ["count", "totalTTFT", "totalThinking", "totalSendToThinking"]);
+      if (l.timing?.approximate || r.timing?.approximate) day.timing.approximate = true;
+      if (Object.keys(day.timing).length === 0) delete day.timing;
+      day.estimateSource = l.estimateSource || r.estimateSource || day.estimateSource;
+      merged[p] = day;
+    }
+    return merged;
+  }
+
+  function _mergeCounterFields(target, local, remote, fields) {
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      target[f] = Math.max(local[f] || 0, remote[f] || 0);
+    }
+  }
+
+  function _mergeNestedCounters(local, remote, fields) {
+    var merged = Object.assign({}, remote, local);
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      var value = Math.max(local[f] || 0, remote[f] || 0);
+      if (value > 0) merged[f] = value;
+      else delete merged[f];
     }
     return merged;
   }

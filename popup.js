@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  // ── Defaults (shared with settings.js and content.js) ──
+  // Defaults (shared with settings.js and content.js)
   const DEFAULTS = {
     bidiEnabled: true,
     enableClaude: true,
@@ -32,7 +32,7 @@
   const THEME_NAMES = {
     none: "Default", warmDark: "Warm Dark", coolDark: "Cool Dark",
     paperLight: "Paper Light", highContrast: "High Contrast", midnight: "Midnight",
-    nord: "Nord", dracula: "Dracula", solarized: "Solarized", rosePine: "Rosé Pine",
+    nord: "Nord", dracula: "Dracula", solarized: "Solarized", rosePine: "Ros\u00e9 Pine",
     catppuccin: "Catppuccin", gruvbox: "Gruvbox", oneDark: "One Dark",
     tokyoNight: "Tokyo Night", githubDark: "GitHub Dark",
   };
@@ -48,7 +48,7 @@
     chrome.storage.sync.set({ [key]: value });
   }
 
-  // ── Insights loading ──────────────────────────────────────────────
+  // Insights loading
   function formatTime(seconds) {
     if (!seconds || seconds < 60) return seconds ? `${Math.round(seconds)}s` : "0m";
     const m = Math.round(seconds / 60);
@@ -59,6 +59,107 @@
     if (!n) return "~0";
     if (n >= 1000) return `~${(n / 1000).toFixed(1)}K`;
     return `~${n}`;
+  }
+
+  function localDateString(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+
+  function usageKeyForDate(date = new Date()) {
+    return "usage_" + localDateString(date);
+  }
+
+  function estimatedTokenTotal(day) {
+    if (!day) return 0;
+    return (day.tokensIn || 0) + (day.tokensOut || 0);
+  }
+
+  function asNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function cleanLabel(value, fallback) {
+    return String(value || fallback || "Usage").replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  const METRIC_CHANGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  function metricChangedRecently(usage, key) {
+    const changedAt = asNumber(usage?.metricChanges?.[key]?.changedAt);
+    return changedAt != null && Date.now() - changedAt <= METRIC_CHANGE_WINDOW_MS;
+  }
+
+  function anyMetricChangedRecently(usage, keys) {
+    return keys.some((key) => metricChangedRecently(usage, key));
+  }
+
+  function addQuotaMeter(target, label, item, color, options = {}) {
+    const limit = asNumber(item?.limit);
+    const remaining = asNumber(item?.remaining);
+    const used = asNumber(item?.used);
+    const requiresRecentDelta = !!options.requiresRecentDelta;
+    const changedWithin24h = !!options.changedWithin24h;
+    if (limit && limit > 0) {
+      if (used == null && remaining == null) return;
+      const actualUsed = used != null ? used : Math.max(0, limit - (remaining || 0));
+      const pct = Math.min(100, Math.max(0, Math.round((actualUsed / limit) * 100)));
+      target.push({
+        label,
+        pct,
+        color,
+        alwaysShow: true,
+        quota: true,
+        fullAvailable: pct <= 0 && actualUsed <= 0,
+      });
+      return;
+    }
+    if (remaining != null) {
+      target.push({ label, pct: null, detail: `${remaining} left`, color, alwaysShow: true, requiresRecentDelta, changedWithin24h });
+    }
+  }
+
+  function shortCodexModelLabel(model) {
+    return String(model || "Codex")
+      .replace(/^GPT[-\d.]*-/i, "")
+      .replace(/^Codex-/i, "Codex ")
+      .replace(/-/g, " ");
+  }
+
+  function codexLimitLabel(card) {
+    const suffix = card?.period === "weekly" ? "7d" : (card?.period || "limit");
+    if (card?.model) return `${shortCodexModelLabel(card.model)} ${suffix}`;
+    return `Codex ${suffix}`;
+  }
+
+  function addCodexLimitMeter(target, card, color) {
+    const remainingPct = asNumber(card?.remainingPct);
+    const usedPct = asNumber(card?.usedPct);
+    if (remainingPct == null && usedPct == null) return;
+    const pct = usedPct != null ? usedPct : Math.max(0, Math.min(100, 100 - remainingPct));
+    const remaining = remainingPct != null ? remainingPct : Math.max(0, Math.min(100, 100 - pct));
+    target.push({
+      label: codexLimitLabel(card),
+      pct: Math.round(pct),
+      color,
+      alwaysShow: true,
+      quota: true,
+      fullAvailable: pct <= 0 && remaining >= 100,
+    });
+  }
+
+  function sumCodexWorkspace(data) {
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    const totals = { threads: 0, turns: 0, credits: 0 };
+    for (const row of rows) {
+      totals.threads += asNumber(row?.totals?.threads) || 0;
+      totals.turns += asNumber(row?.totals?.turns) || 0;
+      totals.credits += asNumber(row?.totals?.credits) || 0;
+    }
+    return totals.threads || totals.turns || totals.credits ? totals : null;
   }
 
   function computeTrend(current, previous) {
@@ -94,7 +195,7 @@
         if (!d) continue;
         todaySeconds += d.totalSeconds || 0;
         todayMsgs += d.messageCount || 0;
-        todayTokens += (d.tokensIn || 0) + (d.tokensOut || 0);
+        todayTokens += estimatedTokenTotal(d);
       }
       document.getElementById("todayTime").textContent = formatTime(todaySeconds);
       document.getElementById("todayMsgs").textContent = String(todayMsgs);
@@ -124,11 +225,11 @@
         if (s <= 0 && m <= 0) continue;
         const item = document.createElement("span");
         item.className = `pb-item ${p}`;
-        item.innerHTML = `<span class="pb-dot"></span>${PLATFORM_LABELS[p]}: <span class="pb-value">${formatTime(s)}</span> · <span class="pb-value">${m}</span> msgs`;
+        item.innerHTML = `<span class="pb-dot"></span>${PLATFORM_LABELS[p]}: <span class="pb-value">${formatTime(s)}</span> &middot; <span class="pb-value">${m}</span> msgs`;
         bdEl.appendChild(item);
       }
 
-      // Usage meters — real data for Claude, estimated for ChatGPT/Gemini
+      // Usage meters: provider-backed quotas first, local estimates only as fallback.
       const { platformUsage } = resp;
       const metersEl = document.getElementById("usageMeters");
       const meters = [];
@@ -139,105 +240,126 @@
       // Claude: real utilization from API
       if (platformUsage?.claude?.fiveHour || platformUsage?.claude?.sevenDay) {
         const cu = platformUsage.claude;
-        if (cu.fiveHour) rawMeters.claude.push({ label: "Claude 5h", pct: Math.round(cu.fiveHour.utilization), color: "#D97706" });
-        if (cu.sevenDay) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(cu.sevenDay.utilization), color: "#D97706" });
+        const fiveHourUtil = asNumber(cu.fiveHour?.utilization);
+        const sevenDayUtil = asNumber(cu.sevenDay?.utilization);
+        if (fiveHourUtil != null) rawMeters.claude.push({ label: "Claude 5h", pct: Math.round(fiveHourUtil), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: fiveHourUtil <= 0 });
+        if (sevenDayUtil != null) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(sevenDayUtil), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: sevenDayUtil <= 0 });
       }
 
-      // ChatGPT: per-model rolling-window tracking via our own timestamps.
-      // Known Plus limits: GPT-5.5=160/3h, Thinking=3000/week, o3=50/day, o4-mini=500/day
+      // ChatGPT/Codex: provider-backed usage.
       const gptUsage = platformUsage?.chatgpt;
-      const chatgptSub = subs?.chatgpt || {};
-      const gptPlan = chatgptSub.plan === "pro"
-        ? (chatgptSub.price === 200 ? "pro20x" : "pro5x")
-        : (chatgptSub.plan || "free");
-      const { chatgptModelTs } = resp;
-
-      // Rolling window limits per model per plan
-      const GPT_WINDOWS = {
-        plus: [
-          { match: /thinking/i,           label: "Thinking", limit: 3000, windowMs: 7 * 24 * 3600000 },
-          { match: /^o3$/,                label: "o3",       limit: 50,   windowMs: 24 * 3600000 },
-          { match: /o4-mini/i,            label: "o4-mini",  limit: 500,  windowMs: 24 * 3600000 },
-          { match: /.*/,                  label: "GPT",      limit: 160,  windowMs: 3 * 3600000 },
-        ],
-        pro5x: [
-          { match: /.*/,                  label: "GPT",      limit: 999,  windowMs: 3 * 3600000 },
-        ],
-        pro20x: [
-          { match: /.*/,                  label: "GPT",      limit: 999,  windowMs: 3 * 3600000 },
-        ],
-        pro: [
-          { match: /.*/,                  label: "GPT",      limit: 999,  windowMs: 3 * 3600000 },
-        ],
-        free: [
-          { match: /.*/,                  label: "GPT",      limit: 16,   windowMs: 3 * 3600000 },
-        ],
-      };
-      const windows = GPT_WINDOWS[gptPlan] || GPT_WINDOWS.free;
-      const nowMs = Date.now();
-
-      if (chatgptModelTs && Object.keys(chatgptModelTs).length > 0) {
-        // Aggregate timestamps per window rule
-        const windowCounts = windows.map((w) => ({ ...w, count: 0 }));
-        for (const [model, timestamps] of Object.entries(chatgptModelTs)) {
-          for (const w of windowCounts) {
-            if (w.match.test(model)) {
-              w.count += timestamps.filter((t) => (nowMs - t) < w.windowMs).length;
-              break;
-            }
-          }
-        }
-        // Show windows with actual usage, or the general GPT window as fallback
-        const used = windowCounts.filter((w) => w.count > 0);
-        const toShow = used.length > 0 ? used : [windowCounts[windowCounts.length - 1]];
-        for (const w of toShow) {
-          if (w.limit >= 999) continue;
-          const pct = Math.min(100, Math.round((w.count / w.limit) * 100));
-          rawMeters.chatgpt.push({ label: `${w.label} (${w.count}/${w.limit})`, pct, color: "#4285F4" });
-        }
-      } else {
-        // No model timestamps yet — use simple daily message count
-        const gptMsgs = today?.chatgpt?.messageCount || 0;
-        if (gptMsgs > 0) {
-          const limit = windows[windows.length - 1].limit;
-          const pct = limit >= 999 ? 0 : Math.min(100, Math.round((gptMsgs / limit) * 100));
-          rawMeters.chatgpt.push({ label: `GPT (${gptMsgs}/${limit})`, pct, color: "#4285F4" });
-        }
-      }
-
-      // Feature-specific limits from API (deep research, images, etc.)
       const GPT_LABELS = { deep_research: "Research", odyssey: "Reasoning", image_gen: "Images" };
-      if (gptUsage?.limits?.length > 0) {
-        for (const lp of gptUsage.limits) {
-          const label = GPT_LABELS[lp.feature];
-          if (!label) continue;
-          rawMeters.chatgpt.push({ label: `${label}: ${lp.remaining}`, pct: 0, color: "#4285F4" });
-        }
+      const gptChat = gptUsage?.chat || gptUsage;
+      // KEEP IN SYNC with collectUsageMetricValues() in background.js.
+      for (const ml of (gptChat?.modelLimits || []).slice(0, 4)) {
+        const key = "chatgpt:model:" + (ml.model || ml.name || ml.feature);
+        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${cleanLabel(ml.model, "GPT")}`, ml, "#4285F4", {
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gptUsage, key),
+        });
+      }
+      for (const lp of (gptChat?.limits || [])) {
+        const key = "chatgpt:limit:" + (lp.feature || lp.name);
+        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${GPT_LABELS[lp.feature] || cleanLabel(lp.feature, "GPT")}`, lp, "#4285F4", {
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gptUsage, key),
+        });
       }
 
-      // Gemini: feature 4 = Pro 3.1, feature 15 = Thinking (confirmed via testing)
+      const codexAnalytics = gptUsage?.codex?.analytics;
+      for (const card of (codexAnalytics?.limits || [])) {
+        addCodexLimitMeter(rawMeters.chatgpt, card, "#4285F4");
+      }
+      if (codexAnalytics?.credits) {
+        rawMeters.chatgpt.push({
+          label: "Codex credits",
+          pct: null,
+          detail: `${codexAnalytics.credits.remaining || 0} left`,
+          color: "#4285F4",
+          alwaysShow: true,
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gptUsage, "chatgpt:codex.credits"),
+        });
+      }
+
+      const codexTotals = sumCodexWorkspace(gptUsage?.codex?.dailyWorkspaceUsage);
+      if (codexTotals) {
+        rawMeters.chatgpt.push({
+          label: "Codex",
+          pct: null,
+          detail: `${codexTotals.turns} turns / ${codexTotals.threads} threads`,
+          color: "#4285F4",
+          alwaysShow: true,
+          requiresRecentDelta: true,
+          changedWithin24h: anyMetricChangedRecently(gptUsage, [
+            "chatgpt:codex.workspace.turns",
+            "chatgpt:codex.workspace.threads",
+            "chatgpt:codex.workspace.credits",
+          ]),
+        });
+      }
+
+      if (rawMeters.chatgpt.length === 0 && (today?.chatgpt?.messageCount || 0) > 0) {
+        rawMeters.chatgpt.push({
+          label: "ChatGPT est.",
+          pct: null,
+          detail: `${today.chatgpt.messageCount} local msgs`,
+          color: "#4285F4",
+          alwaysShow: true,
+        });
+      }
+
+      // Gemini: one daily credit pool shared by premium features (Pro ≈ 19/msg,
+      // Flash-Lite free). Per-feature rows are a legacy shape, kept as fallback.
       const gemUsage = platformUsage?.gemini;
-      if (gemUsage?.features?.length > 0) {
+      const gemCredits = gemUsage?.credits;
+      if (asNumber(gemCredits?.limit) > 0) {
+        addQuotaMeter(rawMeters.gemini, "Gemini credits", gemCredits, "#10A37F", {
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gemUsage, "gemini:credits"),
+        });
+      } else if (gemUsage?.features?.length > 0) {
         const proChat = gemUsage.features.find((f) => f.id === 4);
         const thinking = gemUsage.features.find((f) => f.id === 15);
-        for (const f of [proChat, thinking].filter(Boolean)) {
-          const used = f.limit - f.remaining;
-          const pct = f.limit > 0 ? Math.min(100, Math.round((used / f.limit) * 100)) : 0;
-          rawMeters.gemini.push({ label: `${f.name} (${f.remaining}/${f.limit})`, pct, color: "#10A37F" });
+        const preferred = [proChat, thinking].filter(Boolean);
+        for (const f of preferred) {
+          addQuotaMeter(rawMeters.gemini, f.name, f, "#10A37F", {
+            requiresRecentDelta: true,
+            changedWithin24h: metricChangedRecently(gemUsage, "gemini:feature:" + f.id),
+          });
+        }
+        if (preferred.length === 0) {
+          const fullAvailable = gemUsage.features.every((f) => {
+            const limit = asNumber(f?.limit);
+            const remaining = asNumber(f?.remaining);
+            return limit != null && remaining != null && limit > 0 && remaining >= limit;
+          });
+          rawMeters.gemini.push({
+            label: "Gemini",
+            pct: 0,
+            color: "#10A37F",
+            alwaysShow: true,
+            quota: true,
+            fullAvailable,
+          });
         }
       }
 
-      // Filter: only show meters with >0% usage.
-      // If ALL meters for a platform are 0%, show a single "Platform 0%" fallback.
+      // Used percentage quota rows stay visible; fully available quotas collapse
+      // to one platform row. Number-only rows are gated by deltas.
       const PLATFORM_FALLBACK = { claude: { label: "Claude", color: "#D97706" }, chatgpt: { label: "ChatGPT", color: "#4285F4" }, gemini: { label: "Gemini", color: "#10A37F" } };
+      const shouldShowMeter = (m) => !m.requiresRecentDelta || m.changedWithin24h;
       for (const p of ["claude", "chatgpt", "gemini"]) {
         const pm = rawMeters[p];
         if (pm.length === 0) continue;
-        const used = pm.filter((m) => m.pct > 0);
-        if (used.length > 0) {
-          meters.push(...used);
+        const pctMeters = pm.filter((m) => m.pct != null);
+        const activePctMeters = pctMeters.filter((m) => m.pct > 0);
+        const detailMeters = pm.filter((m) => m.pct == null && shouldShowMeter(m) && (m.alwaysShow || m.detail));
+        const visibleMeters = [...activePctMeters, ...detailMeters];
+        if (visibleMeters.length > 0) {
+          meters.push(...visibleMeters);
         } else {
-          meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color });
+          meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true, quota: true, fullAvailable: true });
         }
       }
 
@@ -245,13 +367,36 @@
         metersEl.innerHTML = "";
         metersEl.style.display = "";
         for (const m of meters) {
-          const fillColor = m.pct >= 90 ? "#ff6b6b" : m.color;
+          const fillColor = m.pct != null && m.pct >= 90 ? "#ff6b6b" : m.color;
           const row = document.createElement("div");
           row.className = "usage-meter";
-          row.innerHTML =
-            `<span class="usage-meter-label">${m.label}</span>` +
-            `<div class="usage-meter-track"><div class="usage-meter-fill" style="width:${Math.max(m.pct, 2)}%;background:${fillColor}"></div></div>` +
-            `<span class="usage-meter-pct" style="color:${fillColor}">${m.pct}%</span>`;
+          const label = document.createElement("span");
+          label.className = "usage-meter-label";
+          label.style.color = fillColor;
+          label.textContent = m.label;
+          row.appendChild(label);
+          if (m.pct == null) {
+            const detail = document.createElement("span");
+            detail.className = "usage-meter-detail";
+            detail.style.color = fillColor;
+            detail.textContent = m.detail || "";
+            row.appendChild(detail);
+          } else {
+            const track = document.createElement("div");
+            track.className = "usage-meter-track";
+            const fill = document.createElement("div");
+            fill.className = "usage-meter-fill";
+            fill.style.width = Math.max(m.pct, 2) + "%";
+            fill.style.background = fillColor;
+            track.appendChild(fill);
+            row.appendChild(track);
+
+            const pct = document.createElement("span");
+            pct.className = "usage-meter-pct";
+            pct.style.color = fillColor;
+            pct.textContent = m.detail || (m.pct + "%");
+            row.appendChild(pct);
+          }
           metersEl.appendChild(row);
         }
       }
@@ -262,7 +407,7 @@
       for (let i = 6; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        const k = "usage_" + d.toISOString().slice(0, 10);
+        const k = usageKeyForDate(d);
         weekDays.push(weekData?.[k] || null);
       }
 
@@ -272,7 +417,7 @@
         if (!day) return totals;
         for (const p of ["claude", "chatgpt", "gemini"]) {
           const s = day[p]?.totalSeconds || 0;
-          const t = (day[p]?.tokensIn || 0) + (day[p]?.tokensOut || 0);
+          const t = estimatedTokenTotal(day[p]);
           totals[p] = s;
           totals.total += s;
           totals.tokens += t;
@@ -352,8 +497,8 @@
       if (weekTrend.dir !== "flat" || prevWeekSeconds > 0) {
         weekTrendEl.className = `trend-badge ${weekTrend.dir}`;
         weekTrendEl.textContent = weekTrend.dir === "up"
-          ? `↑${weekTrend.pct}%`
-          : weekTrend.dir === "down" ? `↓${Math.abs(weekTrend.pct)}%` : "—";
+          ? `\u2191${weekTrend.pct}%`
+          : weekTrend.dir === "down" ? `\u2193${Math.abs(weekTrend.pct)}%` : "\u2014";
       }
 
       // Token sparkline
@@ -401,7 +546,7 @@
           const day = prevWeekData[k];
           if (!day) continue;
           for (const p of ["claude", "chatgpt", "gemini"]) {
-            prevWeekTokens += (day[p]?.tokensIn || 0) + (day[p]?.tokensOut || 0);
+            prevWeekTokens += estimatedTokenTotal(day[p]);
           }
         }
       }
@@ -410,8 +555,8 @@
       if (tokenTrend.dir !== "flat" || prevWeekTokens > 0) {
         tokenTrendEl.className = `trend-badge ${tokenTrend.dir}`;
         tokenTrendEl.textContent = tokenTrend.dir === "up"
-          ? `↑${tokenTrend.pct}%`
-          : tokenTrend.dir === "down" ? `↓${Math.abs(tokenTrend.pct)}%` : "—";
+          ? `\u2191${tokenTrend.pct}%`
+          : tokenTrend.dir === "down" ? `\u2193${Math.abs(tokenTrend.pct)}%` : "\u2014";
       }
 
       // Remark (right side of header)
@@ -423,7 +568,7 @@
     });
   }
 
-  // ── Theme grid ─────────────────────────────────────────────────────
+  // Theme grid
   let themeApplyLocal = false;
   let detectedPlatform = null;
 
@@ -463,7 +608,7 @@
     });
   }
 
-  // ── Platform chips ─────────────────────────────────────────────────
+  // Platform chips
   function initPlatformChips(settings) {
     document.querySelectorAll("#platformChips .chip").forEach((chip) => {
       const key = chip.getAttribute("data-key");
@@ -476,7 +621,7 @@
     });
   }
 
-  // ── Load settings into UI ──────────────────────────────────────────
+  // Load settings into UI
   function loadUI() {
     chrome.storage.sync.get(DEFAULTS, (s) => {
       document.getElementById("focusMode").checked = s.focusMode;
@@ -493,7 +638,7 @@
     });
   }
 
-  // ── Export / Import ────────────────────────────────────────────────
+  // Export / Import
   function exportSettings() {
     chrome.storage.sync.get(null, (data) => {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -523,7 +668,7 @@
     reader.readAsText(file);
   }
 
-  // ── Bind events ────────────────────────────────────────────────────
+  // Bind events
   function bindEvents() {
     document.getElementById("focusMode").addEventListener("change", (e) => {
       save("focusMode", e.target.checked);
@@ -579,7 +724,7 @@
     });
   }
 
-  // ── Init ───────────────────────────────────────────────────────────
+  // Init
   document.addEventListener("DOMContentLoaded", () => {
     loadUI();
     bindEvents();

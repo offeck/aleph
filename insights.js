@@ -27,6 +27,17 @@
     return "~" + n;
   }
 
+  function localDateString(date = new Date()) {
+    var y = date.getFullYear();
+    var m = String(date.getMonth() + 1).padStart(2, "0");
+    var d = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+
+  function usageKeyForDate(date = new Date()) {
+    return "usage_" + localDateString(date);
+  }
+
   function normalizeStoredPlan(platform, sub) {
     var plan = (sub && sub.plan) || "free";
     if (platform === "chatgpt" && plan === "pro") {
@@ -163,7 +174,7 @@
     for (var i = 6; i >= 0; i--) {
       var d = new Date(now);
       d.setDate(d.getDate() - i);
-      var key = "usage_" + d.toISOString().slice(0, 10);
+      var key = usageKeyForDate(d);
       var dayData = weekData[key] || null;
       var totalSecs = 0;
       if (dayData) {
@@ -210,7 +221,7 @@
     for (var i = 0; i < 7; i++) {
       var d = new Date(now);
       d.setDate(d.getDate() - i);
-      var key = "usage_" + d.toISOString().slice(0, 10);
+      var key = usageKeyForDate(d);
       var dayData = weekData[key];
       if (!dayData) continue;
       for (var j = 0; j < PLATFORMS.length; j++) {
@@ -267,7 +278,7 @@
             };
             chrome.storage.local.set({ insights_subscriptions: allSubs }, function () {
               // Refresh subscriptions display
-              var todayKey = "usage_" + new Date().toISOString().slice(0, 10);
+              var todayKey = usageKeyForDate();
               chrome.storage.local.get({ [todayKey]: {}, insights_subscriptions: {} }, function (r) {
                 loadSubscriptions(r.insights_subscriptions, r[todayKey]);
               });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Aleph — AI Chat Styler",
-  "version": "2.7.0",
+  "version": "2.7.7",
   "description": "Hebrew & Arabic-script RTL/BiDi fixes, themes, focus mode & styling across Claude, ChatGPT & Gemini",
   "permissions": ["storage", "activeTab", "identity"],
   "oauth2": {
