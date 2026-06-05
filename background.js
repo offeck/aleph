@@ -15,12 +15,40 @@ if (ALEPH_FIREBASE_CONFIG.apiKey !== "PLACEHOLDER") {
 "use strict";
 
 // ── Helpers ──────────────────────────────────────────────
+function localDateString(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + d;
+}
+
+function usageKeyForDate(date = new Date()) {
+  return "usage_" + localDateString(date);
+}
+
 function todayKey() {
-  return "usage_" + new Date().toISOString().slice(0, 10);
+  return usageKeyForDate();
 }
 
 function emptyPlatformDay() {
-  return { totalSeconds: 0, messageCount: 0, hours: {}, tokensIn: 0, tokensOut: 0 };
+  return {
+    totalSeconds: 0,
+    messageCount: 0,
+    hours: {},
+    tokensIn: 0,
+    tokensOut: 0,
+    textTokensIn: 0,
+    textTokensOut: 0,
+    imageTokensIn: 0,
+    imageTokensOut: 0,
+    fileTokensIn: 0,
+    fileTokensOut: 0,
+    imageCountIn: 0,
+    imageCountOut: 0,
+    fileCountIn: 0,
+    fileCountOut: 0,
+    estimateSource: "local",
+  };
 }
 
 async function readLocal(key, fallback) {
@@ -33,6 +61,38 @@ async function writeLocal(key, value) {
   if (key.startsWith("usage_") || key === "insights_subscriptions") {
     try { alephSync.maybePush(key, value); } catch (e) {}
   }
+}
+
+function ensurePlatformDay(usage, platform) {
+  if (!usage[platform]) usage[platform] = emptyPlatformDay();
+  const day = usage[platform];
+  const defaults = emptyPlatformDay();
+  for (const [key, value] of Object.entries(defaults)) {
+    if (day[key] == null) day[key] = Array.isArray(value) ? [] : (typeof value === "object" && value !== null ? Object.assign({}, value) : value);
+  }
+  return day;
+}
+
+function numberOrZero(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function addNonNegative(target, key, delta) {
+  target[key] = Math.max(0, numberOrZero(target[key]) + numberOrZero(delta));
+}
+
+let usageUpdateQueue = Promise.resolve();
+function updateUsageDay(updater) {
+  const run = usageUpdateQueue.catch(() => {}).then(async () => {
+    const key = todayKey();
+    const usage = await readLocal(key, {});
+    await updater(usage);
+    await writeLocal(key, usage);
+    return { key, usage };
+  });
+  usageUpdateQueue = run.catch(() => {});
+  return run;
 }
 
 // ── Remark engine ────────────────────────────────────────
@@ -274,7 +334,7 @@ async function generateRemark(platform) {
   for (let i = 0; i < 7; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    weekKeys.push("usage_" + d.toISOString().slice(0, 10));
+    weekKeys.push(usageKeyForDate(d));
   }
   const weekData = await chrome.storage.local.get(weekKeys);
   let weekSeconds = 0;
@@ -354,7 +414,7 @@ async function cleanupOldUsage() {
   const all = await chrome.storage.local.get(null);
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 90);
-  const cutoffStr = "usage_" + cutoff.toISOString().slice(0, 10);
+  const cutoffStr = usageKeyForDate(cutoff);
   const toRemove = Object.keys(all).filter((k) => k.startsWith("usage_") && k < cutoffStr);
   if (toRemove.length > 0) await chrome.storage.local.remove(toRemove);
 }
@@ -413,7 +473,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       for (let i = 0; i < 7; i++) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        const wk = "usage_" + d.toISOString().slice(0, 10);
+        const wk = usageKeyForDate(d);
         const data = await readLocal(wk, null);
         weekData[wk] = data;
       }
@@ -422,7 +482,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       for (let i = 7; i < 14; i++) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        const wk = "usage_" + d.toISOString().slice(0, 10);
+        const wk = usageKeyForDate(d);
         const data = await readLocal(wk, null);
         prevWeekData[wk] = data;
       }
@@ -437,9 +497,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         modelCaps[p] = await readLocal("insights_model_caps_" + p, null);
       }
 
-      const chatgptModelTs = await readLocal("insights_chatgpt_model_ts", {});
-
-      sendResponse({ subs, today, remark, weekData, prevWeekData, platformUsage, modelCaps, chatgptModelTs });
+      sendResponse({ subs, today, remark, weekData, prevWeekData, platformUsage, modelCaps });
     })();
     return true;
   }
@@ -462,14 +520,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Insights: time tracking
   if (msg.type === "insights-time") {
     (async () => {
-      const key = todayKey();
-      const usage = await readLocal(key, {});
       const p = msg.platform;
-      if (!usage[p]) usage[p] = emptyPlatformDay();
-      usage[p].totalSeconds += msg.seconds;
-      const h = String(msg.hour);
-      usage[p].hours[h] = (usage[p].hours[h] || 0) + msg.seconds;
-      await writeLocal(key, usage);
+      await updateUsageDay(async (usage) => {
+        const day = ensurePlatformDay(usage, p);
+        const seconds = numberOrZero(msg.seconds);
+        day.totalSeconds += seconds;
+        const h = String(msg.hour);
+        day.hours[h] = (day.hours[h] || 0) + seconds;
+      });
 
       const remark = await readLocal("insights_last_remark", null);
       if (!remark || Date.now() - remark.generatedAt > 1800000) {
@@ -478,63 +536,58 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
   }
 
-  // Insights: message + tokens + per-model timestamps (for ChatGPT rolling window)
+  // Insights: message counts and local token estimates
   if (msg.type === "insights-message") {
     (async () => {
-      const key = todayKey();
-      const usage = await readLocal(key, {});
       const p = msg.platform;
-      if (!usage[p]) usage[p] = emptyPlatformDay();
-      usage[p].messageCount++;
-      if (msg.role === "user") usage[p].tokensIn += (msg.estimatedTokens || 0);
-      else if (msg.role === "assistant") usage[p].tokensOut += (msg.estimatedTokens || 0);
+      await updateUsageDay(async (usage) => {
+        const day = ensurePlatformDay(usage, p);
+        const roleSuffix = msg.role === "user" ? "In" : "Out";
+        const totalDelta = msg.isUpdate ? numberOrZero(msg.tokenDelta) : numberOrZero(msg.estimatedTokens);
+        const textDelta = msg.isUpdate ? numberOrZero(msg.textTokenDelta) : numberOrZero(msg.estimatedTextTokens ?? msg.textTokens);
+        const imageDelta = msg.isUpdate ? numberOrZero(msg.imageTokenDelta) : numberOrZero(msg.estimatedImageTokens ?? msg.imageTokens);
+        const fileDelta = msg.isUpdate ? numberOrZero(msg.fileTokenDelta) : numberOrZero(msg.estimatedFileTokens ?? msg.fileTokens);
+        const imageCountDelta = msg.isUpdate ? numberOrZero(msg.imageCountDelta) : numberOrZero(msg.imageCount);
+        const fileCountDelta = msg.isUpdate ? numberOrZero(msg.fileCountDelta) : numberOrZero(msg.fileCount);
 
-      // Store per-model timestamps for rolling-window tracking (ChatGPT)
-      if (p === "chatgpt" && msg.model && msg.role === "user") {
-        const tsKey = "insights_chatgpt_model_ts";
-        const modelTs = await readLocal(tsKey, {});
-        const m = msg.model;
-        if (!modelTs[m]) modelTs[m] = [];
-        modelTs[m].push(msg.timestamp || Date.now());
-        // Prune timestamps older than 24 hours
-        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-        for (const k of Object.keys(modelTs)) {
-          modelTs[k] = modelTs[k].filter((t) => t > cutoff);
-          if (modelTs[k].length === 0) delete modelTs[k];
-        }
-        await writeLocal(tsKey, modelTs);
-      }
-      await writeLocal(key, usage);
+        if (!msg.isUpdate) day.messageCount++;
+        addNonNegative(day, "tokens" + roleSuffix, totalDelta);
+        addNonNegative(day, "textTokens" + roleSuffix, textDelta);
+        addNonNegative(day, "imageTokens" + roleSuffix, imageDelta);
+        addNonNegative(day, "fileTokens" + roleSuffix, fileDelta);
+        addNonNegative(day, "imageCount" + roleSuffix, imageCountDelta);
+        addNonNegative(day, "fileCount" + roleSuffix, fileCountDelta);
+        day.estimateSource = msg.estimateSource || "local";
+      });
     })();
   }
 
   if (msg.type === "insights-send-analytics") {
     (async () => {
-      const key = todayKey();
-      const usage = await readLocal(key, {});
       const p = msg.platform;
-      if (!usage[p]) usage[p] = emptyPlatformDay();
-      if (!usage[p].sends) usage[p].sends = { total: 0, hebrew: 0, totalWords: 0, totalChars: 0 };
-      usage[p].sends.total++;
-      if (msg.lang === "hebrew") usage[p].sends.hebrew++;
-      usage[p].sends.totalWords += (msg.words || 0);
-      usage[p].sends.totalChars += (msg.length || 0);
-      await writeLocal(key, usage);
+      await updateUsageDay(async (usage) => {
+        const day = ensurePlatformDay(usage, p);
+        if (!day.sends) day.sends = { total: 0, hebrew: 0, totalWords: 0, totalChars: 0 };
+        day.sends.total++;
+        if (msg.lang === "hebrew") day.sends.hebrew++;
+        day.sends.totalWords += numberOrZero(msg.words);
+        day.sends.totalChars += numberOrZero(msg.length);
+      });
     })();
   }
 
   if (msg.type === "insights-response-timing") {
     (async () => {
-      const key = todayKey();
-      const usage = await readLocal(key, {});
       const p = msg.platform;
-      if (!usage[p]) usage[p] = emptyPlatformDay();
-      if (!usage[p].timing) usage[p].timing = { count: 0, totalTTFT: 0, totalThinking: 0, totalSendToThinking: 0 };
-      usage[p].timing.count++;
-      usage[p].timing.totalTTFT += (msg.totalTTFT || 0);
-      usage[p].timing.totalThinking += (msg.thinkingToFirstToken || 0);
-      usage[p].timing.totalSendToThinking += (msg.sendToThinking || 0);
-      await writeLocal(key, usage);
+      await updateUsageDay(async (usage) => {
+        const day = ensurePlatformDay(usage, p);
+        if (!day.timing) day.timing = { count: 0, totalTTFT: 0, totalThinking: 0, totalSendToThinking: 0, approximate: true };
+        day.timing.count++;
+        day.timing.totalTTFT += numberOrZero(msg.totalTTFT);
+        day.timing.totalThinking += numberOrZero(msg.thinkingToFirstToken);
+        day.timing.totalSendToThinking += numberOrZero(msg.sendToThinking);
+        day.timing.approximate = true;
+      });
     })();
   }
 
@@ -555,13 +608,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
   }
 
-  // Insights: real usage data (Claude's /api/organizations/{orgId}/usage)
+  // Insights: provider-backed usage snapshots
   if (msg.type === "insights-usage") {
     (async () => {
-      await writeLocal("insights_platform_usage_" + msg.platform, {
+      const key = "insights_platform_usage_" + msg.platform;
+      const nextUsage = {
         ...msg.usage,
+        source: msg.usage?.source || "provider",
         fetchedAt: Date.now(),
-      });
+      };
+      if (msg.platform === "chatgpt") {
+        const previous = await readLocal(key, null);
+        if (!nextUsage.chat && previous?.chat) nextUsage.chat = previous.chat;
+        if (!nextUsage.limits && previous?.limits) nextUsage.limits = previous.limits;
+        if (!nextUsage.modelLimits && previous?.modelLimits) nextUsage.modelLimits = previous.modelLimits;
+        if (!nextUsage.codex?.analytics && previous?.codex?.analytics) {
+          nextUsage.codex = Object.assign({}, nextUsage.codex || {}, { analytics: previous.codex.analytics });
+        }
+      }
+      await writeLocal(key, nextUsage);
     })();
   }
 

@@ -89,6 +89,25 @@
     return null;
   }
 
+  function localDateString(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+
+  function dateDaysAgo(days) {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return localDateString(d);
+  }
+
+  function fetchJson(url, options = {}) {
+    return fetch(url, options)
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(String(r.status))))
+      .catch((e) => ({ __alephError: e?.message || String(e) }));
+  }
+
   // ── Time tracking ────────────────────────────────────────
   let isActive = document.visibilityState === "visible" && document.hasFocus();
   let lastTickTime = isActive ? Date.now() : null;
@@ -308,25 +327,110 @@
   // Images cost tokens too — roughly 1600 tokens per image on Claude/ChatGPT,
   // varies on Gemini. Count <img> tags inside messages and add to estimate.
   const IMG_TOKEN_COST = { claude: 1600, chatgpt: 1600, gemini: 1200 };
+  const messageEstimates = new WeakMap();
+
+  function isContentImage(img) {
+    if (img.closest?.('[data-testid*="avatar" i], [class*="avatar" i], [aria-label*="avatar" i]')) return false;
+    const w = img.naturalWidth || parseInt(img.getAttribute("width"), 10) || 0;
+    const h = img.naturalHeight || parseInt(img.getAttribute("height"), 10) || 0;
+    return !w || !h || (w * h) >= 4096;
+  }
+
+  function estimateMessage(el) {
+    const text = el.textContent || "";
+    const images = Array.from(el.querySelectorAll("img")).filter(isContentImage);
+    const fileCount = el.querySelectorAll(
+      '[data-testid*="file" i], [aria-label*="file" i], a[href*="/backend-api/files/"], a[href*="attachment"], [class*="attachment" i]'
+    ).length;
+    const textTokens = estimateTokens(text);
+    const imageTokens = images.length * (IMG_TOKEN_COST[PLATFORM] || 1600);
+    const fileTokens = 0;
+    return {
+      text,
+      textTokens,
+      imageTokens,
+      fileTokens,
+      imageCount: images.length,
+      fileCount,
+      totalTokens: textTokens + imageTokens + fileTokens,
+    };
+  }
+
+  function sendMessageEstimate(el, role, isUpdate) {
+    const next = estimateMessage(el);
+    const prev = messageEstimates.get(el) || {
+      totalTokens: 0, textTokens: 0, imageTokens: 0, fileTokens: 0, imageCount: 0, fileCount: 0,
+    };
+    const delta = {
+      total: next.totalTokens - prev.totalTokens,
+      text: next.textTokens - prev.textTokens,
+      image: next.imageTokens - prev.imageTokens,
+      file: next.fileTokens - prev.fileTokens,
+      imageCount: next.imageCount - prev.imageCount,
+      fileCount: next.fileCount - prev.fileCount,
+    };
+    messageEstimates.set(el, next);
+
+    if (isUpdate && delta.total === 0 && delta.text === 0 && delta.image === 0 && delta.file === 0 && delta.imageCount === 0 && delta.fileCount === 0) {
+      return;
+    }
+
+    const payload = {
+      type: "insights-message",
+      platform: PLATFORM,
+      role,
+      estimatedTokens: next.totalTokens,
+      estimatedTextTokens: next.textTokens,
+      estimatedImageTokens: next.imageTokens,
+      estimatedFileTokens: next.fileTokens,
+      imageCount: next.imageCount,
+      fileCount: next.fileCount,
+      estimateSource: "local",
+      model: getCurrentModel(),
+      timestamp: Date.now(),
+    };
+
+    if (isUpdate) {
+      payload.isUpdate = true;
+      payload.tokenDelta = delta.total;
+      payload.textTokenDelta = delta.text;
+      payload.imageTokenDelta = delta.image;
+      payload.fileTokenDelta = delta.file;
+      payload.imageCountDelta = delta.imageCount;
+      payload.fileCountDelta = delta.fileCount;
+    }
+
+    console.log("[Aleph] message " + (isUpdate ? "updated" : "counted") + ":", role, "tokens:", next.totalTokens, "preview:", next.text.substring(0, 60));
+    send(payload);
+  }
+
+  function scheduleSettledRecount(el, role) {
+    if (role !== "assistant") return;
+    let lastText = el.textContent || "";
+    let stableChecks = 0;
+    let checks = 0;
+    const check = () => {
+      if (!document.contains(el)) return;
+      sendMessageEstimate(el, role, true);
+      const currentText = el.textContent || "";
+      if (currentText === lastText) stableChecks++;
+      else {
+        stableChecks = 0;
+        lastText = currentText;
+      }
+      checks++;
+      if (stableChecks < 3 && checks < 20) setTimeout(check, 1500);
+    };
+    setTimeout(check, 1500);
+  }
 
   function processNewMessage(el) {
     if (countedMessages.has(el)) return;
     countedMessages.add(el);
     const role = classifyMessage(el);
     if (!role) return;
-    const text = el.textContent || "";
-    const imgCount = el.querySelectorAll("img").length;
-    const textTokens = estimateTokens(text);
-    const imgTokens = imgCount * (IMG_TOKEN_COST[PLATFORM] || 1600);
-    console.log("[Aleph] message counted:", role, "tokens:", textTokens + imgTokens, "preview:", text.substring(0, 60));
-    send({
-      type: "insights-message",
-      platform: PLATFORM,
-      role,
-      estimatedTokens: textTokens + imgTokens,
-      model: getCurrentModel(),
-      timestamp: Date.now(),
-    });
+    sendMessageEstimate(el, role, false);
+    scheduleSettledRecount(el, role);
   }
 
   function markExistingMessages() {
@@ -656,6 +760,7 @@
             type: "insights-usage",
             platform: "claude",
             usage: {
+              source: "provider",
               fiveHour: data.five_hour ? { utilization: data.five_hour.utilization, resetsAt: data.five_hour.resets_at } : null,
               sevenDay: data.seven_day ? { utilization: data.seven_day.utilization, resetsAt: data.seven_day.resets_at } : null,
               sonnet: data.seven_day_sonnet ? { utilization: data.seven_day_sonnet.utilization } : null,
@@ -688,37 +793,191 @@
       .catch(() => null);
   }
 
+  function normalizeChatgptLimit(lp) {
+    return {
+      feature: lp.feature_name || lp.feature || lp.name,
+      remaining: lp.remaining,
+      limit: lp.limit ?? lp.max ?? lp.total,
+      used: lp.used ?? lp.consumed,
+      resetsAt: lp.reset_after ?? lp.resets_at,
+    };
+  }
+
+  function normalizeChatgptModelLimit(ml) {
+    return {
+      model: ml.model_slug || ml.model || ml.slug,
+      remaining: ml.remaining,
+      limit: ml.limit ?? ml.max ?? ml.total,
+      used: ml.used ?? ml.consumed,
+      resetsAt: ml.reset_after ?? ml.resets_at,
+    };
+  }
+
+  function fetchChatgptChatUsage(token) {
+    if (!token) return Promise.resolve({ limits: [], modelLimits: [], error: "missing access token" });
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + token };
+    return fetchJson("/backend-api/conversation/init", {
+      method: "POST", credentials: "same-origin", headers, body: "{}",
+    }).then((data) => {
+      if (data?.__alephError) return { limits: [], modelLimits: [], error: data.__alephError };
+      const limits = Array.isArray(data?.limits_progress) ? data.limits_progress.map(normalizeChatgptLimit) : [];
+      const modelLimits = Array.isArray(data?.model_limits) ? data.model_limits.map(normalizeChatgptModelLimit) : [];
+      return { limits, modelLimits };
+    });
+  }
+
+  let cachedCodexUsage = null;
+  let lastCodexUsagePoll = 0;
+  const CODEX_USAGE_POLL_MS = 5 * 60 * 1000;
+
+  function fetchCodexUsage() {
+    const now = Date.now();
+    if (cachedCodexUsage && (now - lastCodexUsagePoll) < CODEX_USAGE_POLL_MS) {
+      return Promise.resolve(cachedCodexUsage);
+    }
+
+    const start = dateDaysAgo(29);
+    const end = localDateString();
+    const opts = { credentials: "same-origin" };
+    const endpoints = {
+      balance: "/backend-api/wham/usage",
+      dailyTokenUsage: "/backend-api/wham/usage/daily-token-usage-breakdown?start_date=" + start + "&end_date=" + end + "&group_by=day",
+      dailyWorkspaceUsage: "/backend-api/wham/analytics/daily-workspace-usage-counts?start_date=" + start + "&end_date=" + end + "&group_by=day&workspace_user=true",
+      creditUsageEvents: "/backend-api/wham/usage/credit-usage-events",
+    };
+
+    return Promise.all(Object.entries(endpoints).map(([key, url]) => (
+      fetchJson(url, opts).then((data) => [key, data])
+    ))).then((entries) => {
+      const codex = { errors: {} };
+      for (const [key, data] of entries) {
+        if (data?.__alephError) codex.errors[key] = data.__alephError;
+        else codex[key] = data;
+      }
+      if (Object.keys(codex.errors).length === 0) delete codex.errors;
+      if (Object.keys(codex).some((key) => key !== "errors")) {
+        cachedCodexUsage = codex;
+        lastCodexUsagePoll = now;
+      }
+      return codex;
+    });
+  }
+
+  function findFirstValue(obj, names) {
+    if (!obj || typeof obj !== "object") return null;
+    for (const name of names) {
+      if (obj[name] != null) return obj[name];
+    }
+    return null;
+  }
+
+  function boundedPct(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null;
+  }
+
+  function textFromValues(obj) {
+    if (!obj || typeof obj !== "object") return "";
+    const keys = ["title", "label", "name", "displayName", "display_name", "model", "modelSlug", "model_slug", "bucket", "period", "window", "limitType", "limit_type"];
+    return keys.map((k) => obj[k]).filter((v) => typeof v === "string").join(" ");
+  }
+
+  function normalizeCodexLimit(obj, context) {
+    const text = (textFromValues(obj) + " " + (context?.text || "")).trim();
+    if (!/(codex|agentic|usage|limit|quota|weekly|week|hour|5h|spark)/i.test(text + " " + Object.keys(obj).join(" "))) return null;
+
+    const remainingPct = boundedPct(findFirstValue(obj, [
+      "remainingPct", "remaining_pct", "remainingPercent", "remaining_percent", "percentRemaining", "percent_remaining", "remainingPercentage", "remaining_percentage",
+    ]));
+    const usedPct = boundedPct(findFirstValue(obj, [
+      "usedPct", "used_pct", "usagePct", "usage_pct", "usedPercent", "used_percent", "usagePercent", "usage_percent", "utilization", "utilizationPct", "utilization_pct",
+    ]));
+    const remainingRaw = findFirstValue(obj, ["remaining", "remainingCredits", "remaining_credits"]);
+    const limitRaw = findFirstValue(obj, ["limit", "max", "total", "quota"]);
+    const remaining = remainingRaw != null ? Number(remainingRaw) : NaN;
+    const limit = limitRaw != null ? Number(limitRaw) : NaN;
+    const computedRemainingPct = Number.isFinite(remaining) && Number.isFinite(limit) && limit > 0 ? boundedPct((remaining / limit) * 100) : null;
+    const normalizedRemainingPct = remainingPct ?? (usedPct != null ? boundedPct(100 - usedPct) : computedRemainingPct);
+    const normalizedUsedPct = usedPct ?? (normalizedRemainingPct != null ? boundedPct(100 - normalizedRemainingPct) : null);
+    if (normalizedRemainingPct == null && normalizedUsedPct == null) return null;
+
+    const periodText = text + " " + Object.entries(obj).map(([k, v]) => (typeof v === "string" ? k + " " + v : k)).join(" ");
+    const period = /5\s*(?:hour|hr|h)|five[_ -]?hour|5h/i.test(periodText) ? "5h" : (/weekly|week|7d|seven[_ -]?day/i.test(periodText) ? "weekly" : "");
+    if (!period) return null;
+
+    const model = findFirstValue(obj, ["model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model"]) || context?.model || "";
+    return {
+      type: "limit",
+      title: findFirstValue(obj, ["title", "label", "name", "displayName", "display_name"]) || "",
+      period,
+      model: String(model || ""),
+      remainingPct: normalizedRemainingPct,
+      usedPct: normalizedUsedPct,
+      remaining: Number.isFinite(remaining) ? remaining : null,
+      limit: Number.isFinite(limit) ? limit : null,
+      resetsAt: findFirstValue(obj, ["resetsAt", "resets_at", "resetAt", "reset_at", "resetAfter", "reset_after", "nextResetAt", "next_reset_at"]) || "",
+    };
+  }
+
+  function collectCodexLimits(value, out, seen, depth, context = {}) {
+    if (!value || typeof value !== "object" || depth > 8 || out.length >= 12) return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) collectCodexLimits(item, out, seen, depth + 1, context);
+      return;
+    }
+
+    const normalized = normalizeCodexLimit(value, context);
+    if (normalized) {
+      const key = (normalized.model || "shared") + ":" + normalized.period;
+      if (!out.some((item) => ((item.model || "shared") + ":" + item.period) === key)) out.push(normalized);
+    }
+    const contextModel = findFirstValue(value, ["model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model"]) || context.model || "";
+    for (const [key, child] of Object.entries(value)) {
+      const childText = (context.text || "") + " " + key + " " + (child && typeof child === "object" ? textFromValues(child) : "");
+      collectCodexLimits(child, out, seen, depth + 1, { model: contextModel, text: childText });
+    }
+  }
+
+  function normalizeCodexBalance(balance) {
+    if (!balance || typeof balance !== "object") return null;
+    const limits = [];
+    collectCodexLimits(balance, limits, new WeakSet(), 0);
+    const credits = findFirstValue(balance, ["creditsRemaining", "credits_remaining", "creditBalance", "credit_balance", "balance"]);
+    const snapshot = {
+      source: "provider",
+      collectedAt: Date.now(),
+      limits,
+      credits: credits != null && Number.isFinite(Number(credits)) ? { remaining: Number(credits) } : null,
+    };
+    return limits.length > 0 || snapshot.credits ? snapshot : null;
+  }
+
   function pollChatgptUsage() {
     const doFetch = (token) => {
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = "Bearer " + token;
-      fetch("/backend-api/conversation/init", {
-        method: "POST", credentials: "same-origin", headers, body: "{}",
-      })
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (!data) return;
-          const usage = { limits: [], modelLimits: [] };
-          if (data.limits_progress) {
-            for (const lp of data.limits_progress) {
-              usage.limits.push({
-                feature: lp.feature_name,
-                remaining: lp.remaining,
-                resetsAt: lp.reset_after,
-              });
-            }
+      const chatPromise = token ? fetchChatgptChatUsage(token) : Promise.resolve(null);
+      Promise.all([chatPromise, fetchCodexUsage()])
+        .then(([chat, codex]) => {
+          const hasCodexData = codex && Object.keys(codex).some((key) => key !== "errors");
+          if (!chat && !hasCodexData) return;
+          const codexWithAnalytics = Object.assign({}, codex);
+          const analytics = normalizeCodexBalance(codex.balance);
+          if (analytics) codexWithAnalytics.analytics = analytics;
+          const usage = {
+            source: "provider",
+            codex: codexWithAnalytics,
+          };
+          if (chat && !chat.error) {
+            usage.chat = chat;
+            usage.limits = chat.limits || [];
+            usage.modelLimits = chat.modelLimits || [];
           }
-          if (data.model_limits) {
-            for (const ml of data.model_limits) {
-              usage.modelLimits.push({
-                model: ml.model_slug || ml.model,
-                remaining: ml.remaining,
-                limit: ml.limit || ml.max,
-                resetsAt: ml.reset_after,
-              });
-            }
-          }
-          send({ type: "insights-usage", platform: "chatgpt", usage });
+          send({
+            type: "insights-usage",
+            platform: "chatgpt",
+            usage,
+          });
         })
         .catch(() => {});
     };
@@ -726,7 +985,7 @@
     if (chatgptAccessToken) {
       doFetch(chatgptAccessToken);
     } else {
-      refreshChatgptToken().then((token) => { if (token) doFetch(token); });
+      refreshChatgptToken().then((token) => { doFetch(token); });
     }
   }
 
@@ -736,26 +995,49 @@
   // run in ISOLATED world — so we extract the values from <script> tags in the DOM.
   function getGeminiSessionData() {
     const scripts = document.querySelectorAll("script");
-    let sid = "", at = "";
+    let sid = "", at = "", bl = "";
+    bl = getGeminiBuildLabel();
     for (const s of scripts) {
       const text = s.textContent || "";
       if (!text.includes("WIZ_global_data")) continue;
       const sidMatch = text.match(/FdrFJe["']?\s*[:=]\s*["']([^"']+)["']/);
       const atMatch = text.match(/SNlM0e["']?\s*[:=]\s*["']([^"']+)["']/);
+      const blMatch = text.match(/boq_assistant-bard-web-server_[^"'\\\s&]+/);
       if (sidMatch) sid = sidMatch[1];
       if (atMatch) at = atMatch[1];
+      if (!bl && blMatch) bl = blMatch[0];
       break;
     }
-    return { sid, at };
+    return { sid, at, bl };
+  }
+
+  function getGeminiBuildLabel() {
+    const re = /boq_assistant-bard-web-server_[^"'\\\s&]+/;
+    try {
+      const entries = performance.getEntriesByType("resource") || [];
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const name = entries[i].name || "";
+        const m = name.match(re);
+        if (m) return decodeURIComponent(m[0]);
+      }
+    } catch (e) {}
+    for (const s of document.querySelectorAll("script[src]")) {
+      const m = (s.src || "").match(re);
+      if (m) return decodeURIComponent(m[0]);
+    }
+    return "";
   }
 
   function pollGeminiUsage() {
-    const { sid, at } = getGeminiSessionData();
+    const { sid, at, bl } = getGeminiSessionData();
     if (!sid) return;
     const body = new URLSearchParams();
     body.append("f.req", JSON.stringify([[["qpEbW", "[]", null, "generic"]]]));
     body.append("at", at);
-    fetch("/_/BardChatUi/data/batchexecute?rpcids=qpEbW&bl=boq_assistant-bard-web-server_20260511.08_p0&f.sid=" + sid + "&hl=en&_reqid=" + Math.floor(Math.random() * 9999999) + "&rt=c", {
+    let url = "/_/BardChatUi/data/batchexecute?rpcids=qpEbW&source-path=" + encodeURIComponent(location.pathname || "/app");
+    if (bl) url += "&bl=" + encodeURIComponent(bl);
+    url += "&f.sid=" + encodeURIComponent(sid) + "&hl=" + encodeURIComponent(document.documentElement.lang || "en") + "&_reqid=" + Math.floor(Math.random() * 9999999) + "&rt=c";
+    fetch(url, {
       method: "POST", credentials: "same-origin", body,
     })
       .then((r) => r.text())
@@ -804,7 +1086,7 @@
         features.sort((a, b) => b.limit - a.limit);
         send({
           type: "insights-usage", platform: "gemini",
-          usage: { features, mainChat: features[0] || null },
+          usage: { source: "provider", features, mainChat: features[0] || null, buildLabel: bl || null },
         });
       })
       .catch(() => {});
