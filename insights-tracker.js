@@ -839,7 +839,7 @@
   let lastCodexUsagePoll = 0;
   const CODEX_USAGE_POLL_MS = 5 * 60 * 1000;
 
-  function fetchCodexUsage() {
+  function fetchCodexUsage(token) {
     const now = Date.now();
     if (cachedCodexUsage && (now - lastCodexUsagePoll) < CODEX_USAGE_POLL_MS) {
       return Promise.resolve(cachedCodexUsage);
@@ -847,7 +847,8 @@
 
     const start = dateDaysAgo(29);
     const end = localDateString();
-    const opts = { credentials: "same-origin" };
+    const headers = token ? { Authorization: "Bearer " + token } : {};
+    const opts = { credentials: "same-origin", headers };
     const endpoints = {
       balance: "/backend-api/wham/usage",
       dailyTokenUsage: "/backend-api/wham/usage/daily-token-usage-breakdown?start_date=" + start + "&end_date=" + end + "&group_by=day",
@@ -882,7 +883,9 @@
 
   function boundedPct(value) {
     const n = Number(value);
-    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null;
+    if (!Number.isFinite(n)) return null;
+    const pct = n >= 0 && n <= 1 ? n * 100 : n;
+    return Math.max(0, Math.min(100, pct));
   }
 
   function textFromValues(obj) {
@@ -896,10 +899,13 @@
     if (!/(codex|agentic|usage|limit|quota|weekly|week|hour|5h|spark)/i.test(text + " " + Object.keys(obj).join(" "))) return null;
 
     const remainingPct = boundedPct(findFirstValue(obj, [
-      "remainingPct", "remaining_pct", "remainingPercent", "remaining_percent", "percentRemaining", "percent_remaining", "remainingPercentage", "remaining_percentage",
+      "remainingPct", "remaining_pct", "remainingPercent", "remaining_percent", "percentRemaining", "percent_remaining", "percentageRemaining", "percentage_remaining", "remainingPercentage", "remaining_percentage",
+      "remainingRatio", "remaining_ratio", "fractionRemaining", "fraction_remaining", "remainingFraction", "remaining_fraction",
     ]));
     const usedPct = boundedPct(findFirstValue(obj, [
-      "usedPct", "used_pct", "usagePct", "usage_pct", "usedPercent", "used_percent", "usagePercent", "usage_percent", "utilization", "utilizationPct", "utilization_pct",
+      "usedPct", "used_pct", "usagePct", "usage_pct", "usedPercent", "used_percent", "usagePercent", "usage_percent", "percentageUsed", "percentage_used",
+      "usedRatio", "used_ratio", "usageRatio", "usage_ratio", "usedFraction", "used_fraction", "usageFraction", "usage_fraction",
+      "utilization", "utilizationPct", "utilization_pct",
     ]));
     const remainingRaw = findFirstValue(obj, ["remaining", "remainingCredits", "remaining_credits"]);
     const limitRaw = findFirstValue(obj, ["limit", "max", "total", "quota"]);
@@ -911,7 +917,11 @@
     if (normalizedRemainingPct == null && normalizedUsedPct == null) return null;
 
     const periodText = text + " " + Object.entries(obj).map(([k, v]) => (typeof v === "string" ? k + " " + v : k)).join(" ");
-    const period = /5\s*(?:hour|hr|h)|five[_ -]?hour|5h/i.test(periodText) ? "5h" : (/weekly|week|7d|seven[_ -]?day/i.test(periodText) ? "weekly" : "");
+    let period = /5\s*(?:hour|hr|h)|five[_ -]?hour|5h|pt5h/i.test(periodText) ? "5h" : (/weekly|week|7d|seven[_ -]?day|p7d/i.test(periodText) ? "weekly" : "");
+    const windowSeconds = Number(findFirstValue(obj, ["windowSeconds", "window_seconds", "durationSeconds", "duration_seconds", "periodSeconds", "period_seconds"]));
+    const windowMinutes = Number(findFirstValue(obj, ["windowMinutes", "window_minutes", "durationMinutes", "duration_minutes", "periodMinutes", "period_minutes"]));
+    if (!period && (windowSeconds === 18000 || windowMinutes === 300)) period = "5h";
+    if (!period && (windowSeconds === 604800 || windowMinutes === 10080)) period = "weekly";
     if (!period) return null;
 
     const model = findFirstValue(obj, ["model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model"]) || context?.model || "";
@@ -924,7 +934,31 @@
       usedPct: normalizedUsedPct,
       remaining: Number.isFinite(remaining) ? remaining : null,
       limit: Number.isFinite(limit) ? limit : null,
-      resetsAt: findFirstValue(obj, ["resetsAt", "resets_at", "resetAt", "reset_at", "resetAfter", "reset_after", "nextResetAt", "next_reset_at"]) || "",
+      resetsAt: findFirstValue(obj, ["resetsAt", "resets_at", "resetAt", "reset_at", "resetAfter", "reset_after", "resetTime", "reset_time", "resetDate", "reset_date", "nextResetAt", "next_reset_at"]) || "",
+    };
+  }
+
+  function normalizeCodexScalarLimit(key, value, context) {
+    const pct = boundedPct(value);
+    if (pct == null) return null;
+    const text = String(key || "") + " " + (context?.text || "");
+    const isRemaining = /remaining|left|available/i.test(text);
+    const isUsed = /used|usage|utilization|consumed/i.test(text);
+    if (!isRemaining && !isUsed) return null;
+    const period = /5\s*(?:hour|hr|h)|five[_ -]?hour|5h|pt5h/i.test(text) ? "5h" : (/weekly|week|7d|seven[_ -]?day|p7d/i.test(text) ? "weekly" : "");
+    if (!period) return null;
+    const remainingPct = isRemaining ? pct : boundedPct(100 - pct);
+    const usedPct = isUsed ? pct : boundedPct(100 - pct);
+    return {
+      type: "limit",
+      title: "",
+      period,
+      model: context?.model || "",
+      remainingPct,
+      usedPct,
+      remaining: null,
+      limit: null,
+      resetsAt: "",
     };
   }
 
@@ -945,6 +979,11 @@
     const contextModel = findFirstValue(value, ["model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model"]) || context.model || "";
     for (const [key, child] of Object.entries(value)) {
       const childText = (context.text || "") + " " + key + " " + (child && typeof child === "object" ? textFromValues(child) : "");
+      const scalar = normalizeCodexScalarLimit(key, child, { model: contextModel, text: childText });
+      if (scalar) {
+        const scalarKey = (scalar.model || "shared") + ":" + scalar.period;
+        if (!out.some((item) => ((item.model || "shared") + ":" + item.period) === scalarKey)) out.push(scalar);
+      }
       collectCodexLimits(child, out, seen, depth + 1, { model: contextModel, text: childText });
     }
   }
@@ -966,7 +1005,7 @@
   function pollChatgptUsage() {
     const doFetch = (token) => {
       const chatPromise = token ? fetchChatgptChatUsage(token) : Promise.resolve(null);
-      Promise.all([chatPromise, fetchCodexUsage()])
+      Promise.all([chatPromise, fetchCodexUsage(token)])
         .then(([chat, codex]) => {
           const hasCodexData = codex && Object.keys(codex).some((key) => key !== "errors");
           if (!chat && !hasCodexData) return;

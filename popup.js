@@ -232,10 +232,10 @@
       const GPT_LABELS = { deep_research: "Research", odyssey: "Reasoning", image_gen: "Images" };
       const gptChat = gptUsage?.chat || gptUsage;
       for (const ml of (gptChat?.modelLimits || []).slice(0, 4)) {
-        addQuotaMeter(rawMeters.chatgpt, cleanLabel(ml.model, "GPT"), ml, "#4285F4");
+        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${cleanLabel(ml.model, "GPT")}`, ml, "#4285F4");
       }
       for (const lp of (gptChat?.limits || [])) {
-        addQuotaMeter(rawMeters.chatgpt, GPT_LABELS[lp.feature] || cleanLabel(lp.feature, "GPT"), lp, "#4285F4");
+        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${GPT_LABELS[lp.feature] || cleanLabel(lp.feature, "GPT")}`, lp, "#4285F4");
       }
 
       const codexAnalytics = gptUsage?.codex?.analytics;
@@ -306,11 +306,11 @@
           row.className = "usage-meter";
           if (m.pct == null) {
             row.innerHTML =
-              `<span class="usage-meter-label">${m.label}</span>` +
-              `<span class="usage-meter-detail">${m.detail || ""}</span>`;
+              `<span class="usage-meter-label" style="color:${fillColor}">${m.label}</span>` +
+              `<span class="usage-meter-detail" style="color:${fillColor}">${m.detail || ""}</span>`;
           } else {
             row.innerHTML =
-              `<span class="usage-meter-label">${m.label}</span>` +
+              `<span class="usage-meter-label" style="color:${fillColor}">${m.label}</span>` +
               `<div class="usage-meter-track"><div class="usage-meter-fill" style="width:${Math.max(m.pct, 2)}%;background:${fillColor}"></div></div>` +
               `<span class="usage-meter-pct" style="color:${fillColor}">${m.detail || (m.pct + "%")}</span>`;
           }
