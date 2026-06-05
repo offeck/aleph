@@ -882,6 +882,7 @@
   }
 
   function boundedPct(value) {
+    if (value == null || value === "") return null;
     const n = Number(value);
     if (!Number.isFinite(n)) return null;
     const pct = n >= 0 && n <= 1 ? n * 100 : n;
@@ -890,8 +891,15 @@
 
   function textFromValues(obj) {
     if (!obj || typeof obj !== "object") return "";
-    const keys = ["title", "label", "name", "displayName", "display_name", "model", "modelSlug", "model_slug", "bucket", "period", "window", "limitType", "limit_type"];
+    const keys = ["title", "label", "name", "displayName", "display_name", "limitName", "limit_name", "model", "modelSlug", "model_slug", "bucket", "period", "window", "limitType", "limit_type"];
     return keys.map((k) => obj[k]).filter((v) => typeof v === "string").join(" ");
+  }
+
+  function codexContextModel(obj, fallback = "") {
+    return findFirstValue(obj, [
+      "model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model",
+      "limitName", "limit_name", "title", "label", "name", "displayName", "display_name",
+    ]) || fallback || "";
   }
 
   function normalizeCodexLimit(obj, context) {
@@ -901,30 +909,35 @@
     const remainingPct = boundedPct(findFirstValue(obj, [
       "remainingPct", "remaining_pct", "remainingPercent", "remaining_percent", "percentRemaining", "percent_remaining", "percentageRemaining", "percentage_remaining", "remainingPercentage", "remaining_percentage",
       "remainingRatio", "remaining_ratio", "fractionRemaining", "fraction_remaining", "remainingFraction", "remaining_fraction",
+      "availablePercent", "available_percent", "remainingQuotaPercent", "remaining_quota_percent", "usageRemainingPercent", "usage_remaining_percent",
     ]));
     const usedPct = boundedPct(findFirstValue(obj, [
       "usedPct", "used_pct", "usagePct", "usage_pct", "usedPercent", "used_percent", "usagePercent", "usage_percent", "percentageUsed", "percentage_used",
       "usedRatio", "used_ratio", "usageRatio", "usage_ratio", "usedFraction", "used_fraction", "usageFraction", "usage_fraction",
-      "utilization", "utilizationPct", "utilization_pct",
+      "utilization", "utilizationPct", "utilization_pct", "consumedPercent", "consumed_percent", "percentUsed", "percent_used",
     ]));
-    const remainingRaw = findFirstValue(obj, ["remaining", "remainingCredits", "remaining_credits"]);
-    const limitRaw = findFirstValue(obj, ["limit", "max", "total", "quota"]);
+    const remainingRaw = findFirstValue(obj, ["remaining", "remainingAmount", "remaining_amount", "remainingCredits", "remaining_credits", "available", "availableAmount", "available_amount"]);
+    const usedRaw = findFirstValue(obj, ["used", "usedAmount", "used_amount", "current", "currentUsage", "current_usage", "consumed", "consumedAmount", "consumed_amount", "usedCredits", "used_credits"]);
+    const limitRaw = findFirstValue(obj, ["limit", "limitAmount", "limit_amount", "max", "maximum", "total", "quota", "allowed", "allowedAmount", "allowed_amount"]);
     const remaining = remainingRaw != null ? Number(remainingRaw) : NaN;
+    const used = usedRaw != null ? Number(usedRaw) : NaN;
     const limit = limitRaw != null ? Number(limitRaw) : NaN;
     const computedRemainingPct = Number.isFinite(remaining) && Number.isFinite(limit) && limit > 0 ? boundedPct((remaining / limit) * 100) : null;
-    const normalizedRemainingPct = remainingPct ?? (usedPct != null ? boundedPct(100 - usedPct) : computedRemainingPct);
-    const normalizedUsedPct = usedPct ?? (normalizedRemainingPct != null ? boundedPct(100 - normalizedRemainingPct) : null);
+    const computedUsedPct = Number.isFinite(used) && Number.isFinite(limit) && limit > 0 ? boundedPct((used / limit) * 100) : null;
+    const normalizedRemainingPct = remainingPct ?? (usedPct != null ? boundedPct(100 - usedPct) : (computedRemainingPct ?? (computedUsedPct != null ? boundedPct(100 - computedUsedPct) : null)));
+    const normalizedUsedPct = usedPct ?? computedUsedPct ?? (normalizedRemainingPct != null ? boundedPct(100 - normalizedRemainingPct) : null);
     if (normalizedRemainingPct == null && normalizedUsedPct == null) return null;
 
     const periodText = text + " " + Object.entries(obj).map(([k, v]) => (typeof v === "string" ? k + " " + v : k)).join(" ");
     let period = /5\s*(?:hour|hr|h)|five[_ -]?hour|5h|pt5h/i.test(periodText) ? "5h" : (/weekly|week|7d|seven[_ -]?day|p7d/i.test(periodText) ? "weekly" : "");
-    const windowSeconds = Number(findFirstValue(obj, ["windowSeconds", "window_seconds", "durationSeconds", "duration_seconds", "periodSeconds", "period_seconds"]));
+    const windowSeconds = Number(findFirstValue(obj, ["windowSeconds", "window_seconds", "limitWindowSeconds", "limit_window_seconds", "durationSeconds", "duration_seconds", "periodSeconds", "period_seconds"]));
     const windowMinutes = Number(findFirstValue(obj, ["windowMinutes", "window_minutes", "durationMinutes", "duration_minutes", "periodMinutes", "period_minutes"]));
     if (!period && (windowSeconds === 18000 || windowMinutes === 300)) period = "5h";
     if (!period && (windowSeconds === 604800 || windowMinutes === 10080)) period = "weekly";
+    if (!period && context?.period) period = context.period;
     if (!period) return null;
 
-    const model = findFirstValue(obj, ["model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model"]) || context?.model || "";
+    const model = codexContextModel(obj, context?.model || "");
     return {
       type: "limit",
       title: findFirstValue(obj, ["title", "label", "name", "displayName", "display_name"]) || "",
@@ -932,10 +945,68 @@
       model: String(model || ""),
       remainingPct: normalizedRemainingPct,
       usedPct: normalizedUsedPct,
-      remaining: Number.isFinite(remaining) ? remaining : null,
+      remaining: Number.isFinite(remaining) ? remaining : (Number.isFinite(used) && Number.isFinite(limit) ? Math.max(0, limit - used) : null),
       limit: Number.isFinite(limit) ? limit : null,
-      resetsAt: findFirstValue(obj, ["resetsAt", "resets_at", "resetAt", "reset_at", "resetAfter", "reset_after", "resetTime", "reset_time", "resetDate", "reset_date", "nextResetAt", "next_reset_at"]) || "",
+      resetsAt: findFirstValue(obj, ["resetsAt", "resets_at", "resetAt", "reset_at", "resetAfter", "reset_after", "resetAfterSeconds", "reset_after_seconds", "resetTime", "reset_time", "resetDate", "reset_date", "nextResetAt", "next_reset_at"]) || "",
     };
+  }
+
+  function codexLimitKey(limit) {
+    return String(limit?.model || limit?.title || "shared").toLowerCase() + ":" + (limit?.period || "");
+  }
+
+  function addCodexLimit(out, limit) {
+    if (!limit) return;
+    const key = codexLimitKey(limit);
+    if (!out.some((item) => codexLimitKey(item) === key)) out.push(limit);
+  }
+
+  function collectCodexRateWindows(rateLimit, out, context = {}) {
+    if (!rateLimit || typeof rateLimit !== "object") return;
+    const windows = [
+      ["primary_window", "5h"],
+      ["primaryWindow", "5h"],
+      ["secondary_window", "weekly"],
+      ["secondaryWindow", "weekly"],
+    ];
+    for (const [key, period] of windows) {
+      const windowData = rateLimit[key];
+      if (!windowData || typeof windowData !== "object") continue;
+      addCodexLimit(out, normalizeCodexLimit(windowData, {
+        model: context.model || "",
+        period,
+        text: "codex usage limit " + period + " " + (context.text || ""),
+      }));
+    }
+  }
+
+  function collectExplicitCodexBalanceLimits(balance, out) {
+    const rootRateLimit = balance.rate_limit || balance.rateLimit;
+    collectCodexRateWindows(rootRateLimit, out, { text: "shared codex rate_limit" });
+
+    const additional = balance.additional_rate_limits || balance.additionalRateLimits || balance.model_rate_limits || balance.modelRateLimits;
+    if (!Array.isArray(additional)) return;
+    for (const item of additional) {
+      if (!item || typeof item !== "object") continue;
+      const model = codexContextModel(item);
+      const rateLimit = item.rate_limit || item.rateLimit || item;
+      collectCodexRateWindows(rateLimit, out, { model, text: "additional codex rate_limit " + textFromValues(item) });
+    }
+  }
+
+  function unwrapCodexBalancePayload(value, seen = new WeakSet()) {
+    if (!value || typeof value !== "object" || seen.has(value)) return null;
+    seen.add(value);
+    if (value.rate_limit || value.rateLimit || value.credits || value.additional_rate_limits || value.additionalRateLimits) {
+      return value;
+    }
+    for (const key of ["data", "body", "result", "usage", "balance"]) {
+      const child = value[key];
+      if (!child || typeof child !== "object") continue;
+      const unwrapped = unwrapCodexBalancePayload(child, seen);
+      if (unwrapped) return unwrapped;
+    }
+    return value;
   }
 
   function normalizeCodexScalarLimit(key, value, context) {
@@ -973,31 +1044,44 @@
 
     const normalized = normalizeCodexLimit(value, context);
     if (normalized) {
-      const key = (normalized.model || "shared") + ":" + normalized.period;
-      if (!out.some((item) => ((item.model || "shared") + ":" + item.period) === key)) out.push(normalized);
+      addCodexLimit(out, normalized);
     }
-    const contextModel = findFirstValue(value, ["model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model"]) || context.model || "";
+    const contextModel = codexContextModel(value, context.model || "");
     for (const [key, child] of Object.entries(value)) {
       const childText = (context.text || "") + " " + key + " " + (child && typeof child === "object" ? textFromValues(child) : "");
       const scalar = normalizeCodexScalarLimit(key, child, { model: contextModel, text: childText });
       if (scalar) {
-        const scalarKey = (scalar.model || "shared") + ":" + scalar.period;
-        if (!out.some((item) => ((item.model || "shared") + ":" + item.period) === scalarKey)) out.push(scalar);
+        addCodexLimit(out, scalar);
       }
       collectCodexLimits(child, out, seen, depth + 1, { model: contextModel, text: childText });
     }
   }
 
+  function normalizeCodexCredits(balance) {
+    const credits = findFirstValue(balance, ["credits", "creditBalance", "credit_balance", "creditsRemaining", "credits_remaining", "balance"]);
+    if (credits == null) return null;
+    if (typeof credits === "object") {
+      const remaining = findFirstValue(credits, [
+        "remaining", "remainingCredits", "remaining_credits", "available", "availableCredits", "available_credits",
+        "balance", "creditBalance", "credit_balance", "creditsRemaining", "credits_remaining",
+      ]);
+      return remaining != null && Number.isFinite(Number(remaining)) ? { remaining: Number(remaining) } : null;
+    }
+    return Number.isFinite(Number(credits)) ? { remaining: Number(credits) } : null;
+  }
+
   function normalizeCodexBalance(balance) {
+    balance = unwrapCodexBalancePayload(balance);
     if (!balance || typeof balance !== "object") return null;
     const limits = [];
+    collectExplicitCodexBalanceLimits(balance, limits);
     collectCodexLimits(balance, limits, new WeakSet(), 0);
-    const credits = findFirstValue(balance, ["creditsRemaining", "credits_remaining", "creditBalance", "credit_balance", "balance"]);
+    const credits = normalizeCodexCredits(balance);
     const snapshot = {
       source: "provider",
       collectedAt: Date.now(),
       limits,
-      credits: credits != null && Number.isFinite(Number(credits)) ? { remaining: Number(credits) } : null,
+      credits,
     };
     return limits.length > 0 || snapshot.credits ? snapshot : null;
   }
@@ -1134,7 +1218,13 @@
         features.sort((a, b) => b.limit - a.limit);
         send({
           type: "insights-usage", platform: "gemini",
-          usage: { source: "provider", features, mainChat: features[0] || null, buildLabel: bl || null },
+          usage: {
+            source: "provider",
+            features,
+            mainChat: features[0] || null,
+            activeModel: document.querySelector(".input-area-switch")?.textContent?.trim() || null,
+            buildLabel: bl || null,
+          },
         });
       })
       .catch(() => {});

@@ -86,23 +86,39 @@
     return String(value || fallback || "Usage").replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  function addQuotaMeter(target, label, item, color) {
+  const METRIC_CHANGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  function metricChangedRecently(usage, key) {
+    const changedAt = asNumber(usage?.metricChanges?.[key]?.changedAt);
+    return changedAt != null && Date.now() - changedAt <= METRIC_CHANGE_WINDOW_MS;
+  }
+
+  function anyMetricChangedRecently(usage, keys) {
+    return keys.some((key) => metricChangedRecently(usage, key));
+  }
+
+  function addQuotaMeter(target, label, item, color, options = {}) {
     const limit = asNumber(item?.limit);
     const remaining = asNumber(item?.remaining);
     const used = asNumber(item?.used);
+    const requiresRecentDelta = !!options.requiresRecentDelta;
+    const changedWithin24h = !!options.changedWithin24h;
     if (limit && limit > 0) {
-      if (used == null && remaining == null) {
-        target.push({ label, pct: null, detail: `limit ${limit}`, color, alwaysShow: true });
-        return;
-      }
+      if (used == null && remaining == null) return;
       const actualUsed = used != null ? used : Math.max(0, limit - (remaining || 0));
       const pct = Math.min(100, Math.max(0, Math.round((actualUsed / limit) * 100)));
-      const detail = remaining != null ? `${remaining}/${limit} left` : `${actualUsed}/${limit} used`;
-      target.push({ label, pct, detail, color, alwaysShow: true });
+      target.push({
+        label,
+        pct,
+        color,
+        alwaysShow: true,
+        quota: true,
+        fullAvailable: pct <= 0 && actualUsed <= 0,
+      });
       return;
     }
     if (remaining != null) {
-      target.push({ label, pct: null, detail: `${remaining} left`, color, alwaysShow: true });
+      target.push({ label, pct: null, detail: `${remaining} left`, color, alwaysShow: true, requiresRecentDelta, changedWithin24h });
     }
   }
 
@@ -128,9 +144,10 @@
     target.push({
       label: codexLimitLabel(card),
       pct: Math.round(pct),
-      detail: `${Math.round(remaining)}% left`,
       color,
       alwaysShow: true,
+      quota: true,
+      fullAvailable: pct <= 0 && remaining >= 100,
     });
   }
 
@@ -223,8 +240,10 @@
       // Claude: real utilization from API
       if (platformUsage?.claude?.fiveHour || platformUsage?.claude?.sevenDay) {
         const cu = platformUsage.claude;
-        if (cu.fiveHour) rawMeters.claude.push({ label: "Claude 5h", pct: Math.round(cu.fiveHour.utilization), color: "#D97706", alwaysShow: true });
-        if (cu.sevenDay) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(cu.sevenDay.utilization), color: "#D97706", alwaysShow: true });
+        const fiveHourUtil = asNumber(cu.fiveHour?.utilization);
+        const sevenDayUtil = asNumber(cu.sevenDay?.utilization);
+        if (fiveHourUtil != null) rawMeters.claude.push({ label: "Claude 5h", pct: Math.round(fiveHourUtil), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: fiveHourUtil <= 0 });
+        if (sevenDayUtil != null) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(sevenDayUtil), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: sevenDayUtil <= 0 });
       }
 
       // ChatGPT/Codex: provider-backed usage.
@@ -232,10 +251,18 @@
       const GPT_LABELS = { deep_research: "Research", odyssey: "Reasoning", image_gen: "Images" };
       const gptChat = gptUsage?.chat || gptUsage;
       for (const ml of (gptChat?.modelLimits || []).slice(0, 4)) {
-        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${cleanLabel(ml.model, "GPT")}`, ml, "#4285F4");
+        const key = "chatgpt:model:" + (ml.model || ml.name || ml.feature);
+        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${cleanLabel(ml.model, "GPT")}`, ml, "#4285F4", {
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gptUsage, key),
+        });
       }
       for (const lp of (gptChat?.limits || [])) {
-        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${GPT_LABELS[lp.feature] || cleanLabel(lp.feature, "GPT")}`, lp, "#4285F4");
+        const key = "chatgpt:limit:" + (lp.feature || lp.name);
+        addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${GPT_LABELS[lp.feature] || cleanLabel(lp.feature, "GPT")}`, lp, "#4285F4", {
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gptUsage, key),
+        });
       }
 
       const codexAnalytics = gptUsage?.codex?.analytics;
@@ -249,6 +276,8 @@
           detail: `${codexAnalytics.credits.remaining || 0} left`,
           color: "#4285F4",
           alwaysShow: true,
+          requiresRecentDelta: true,
+          changedWithin24h: metricChangedRecently(gptUsage, "chatgpt:codex.credits"),
         });
       }
 
@@ -260,6 +289,12 @@
           detail: `${codexTotals.turns} turns / ${codexTotals.threads} threads`,
           color: "#4285F4",
           alwaysShow: true,
+          requiresRecentDelta: true,
+          changedWithin24h: anyMetricChangedRecently(gptUsage, [
+            "chatgpt:codex.workspace.turns",
+            "chatgpt:codex.workspace.threads",
+            "chatgpt:codex.workspace.credits",
+          ]),
         });
       }
 
@@ -278,22 +313,47 @@
       if (gemUsage?.features?.length > 0) {
         const proChat = gemUsage.features.find((f) => f.id === 4);
         const thinking = gemUsage.features.find((f) => f.id === 15);
-        for (const f of [proChat, thinking].filter(Boolean)) {
-          addQuotaMeter(rawMeters.gemini, f.name, f, "#10A37F");
+        const preferred = [proChat, thinking].filter(Boolean);
+        for (const f of preferred) {
+          addQuotaMeter(rawMeters.gemini, f.name, f, "#10A37F", {
+            requiresRecentDelta: true,
+            changedWithin24h: metricChangedRecently(gemUsage, "gemini:feature:" + f.id),
+          });
+        }
+        if (preferred.length === 0) {
+          const fullAvailable = gemUsage.features.every((f) => {
+            const limit = asNumber(f?.limit);
+            const remaining = asNumber(f?.remaining);
+            return limit != null && remaining != null && limit > 0 && remaining >= limit;
+          });
+          rawMeters.gemini.push({
+            label: "Gemini",
+            pct: 0,
+            color: "#10A37F",
+            alwaysShow: true,
+            quota: true,
+            fullAvailable,
+          });
         }
       }
 
-      // Filter: provider rows are useful even at 0% or without a percentage.
-      // If all rows are old non-provider 0% rows, show a compact fallback.
+      // Filter: if a platform only reports fully available quotas, collapse them
+      // to one generic row. Detail-only rows stay visible when they changed.
       const PLATFORM_FALLBACK = { claude: { label: "Claude", color: "#D97706" }, chatgpt: { label: "ChatGPT", color: "#4285F4" }, gemini: { label: "Gemini", color: "#10A37F" } };
+      const shouldShowMeter = (m) => !m.requiresRecentDelta || m.changedWithin24h;
       for (const p of ["claude", "chatgpt", "gemini"]) {
         const pm = rawMeters[p];
         if (pm.length === 0) continue;
-        const used = pm.filter((m) => m.alwaysShow || m.pct == null || m.pct > 0);
-        if (used.length > 0) {
-          meters.push(...used);
+        const quotaMeters = pm.filter((m) => m.quota);
+        const visibleQuotaMeters = quotaMeters;
+        const detailMeters = pm.filter((m) => !m.quota && shouldShowMeter(m) && (m.alwaysShow || m.pct == null || m.pct > 0));
+        const activeQuotaMeters = visibleQuotaMeters.filter((m) => !m.fullAvailable && (m.alwaysShow || m.pct == null || m.pct > 0));
+        if (activeQuotaMeters.length > 0) {
+          meters.push(...activeQuotaMeters, ...detailMeters);
+        } else if (quotaMeters.length > 0 && quotaMeters.every((m) => m.fullAvailable)) {
+          meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true, quota: true, fullAvailable: true });
         } else {
-          meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true });
+          meters.push(...detailMeters);
         }
       }
 

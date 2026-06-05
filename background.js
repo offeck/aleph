@@ -88,6 +88,86 @@ function numberOrZero(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const USAGE_METRIC_CHANGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function metricNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function addUsageMetricValue(values, key, value) {
+  const n = metricNumber(value);
+  if (key && n != null) values[key] = n;
+}
+
+function collectCodexWorkspaceMetricValues(values, data) {
+  const rows = Array.isArray(data?.data) ? data.data : [];
+  let threads = 0, turns = 0, credits = 0;
+  for (const row of rows) {
+    threads += metricNumber(row?.totals?.threads) || 0;
+    turns += metricNumber(row?.totals?.turns) || 0;
+    credits += metricNumber(row?.totals?.credits) || 0;
+  }
+  if (threads || turns || credits) {
+    addUsageMetricValue(values, "chatgpt:codex.workspace.threads", threads);
+    addUsageMetricValue(values, "chatgpt:codex.workspace.turns", turns);
+    addUsageMetricValue(values, "chatgpt:codex.workspace.credits", credits);
+  }
+}
+
+function collectUsageMetricValues(platform, usage) {
+  const values = {};
+  if (!usage || typeof usage !== "object") return values;
+
+  if (platform === "chatgpt") {
+    const chat = usage.chat || usage;
+    for (const ml of (chat?.modelLimits || [])) {
+      const id = ml?.model || ml?.name || ml?.feature;
+      if (id != null) addUsageMetricValue(values, "chatgpt:model:" + id, ml?.remaining ?? ml?.used);
+    }
+    for (const lp of (chat?.limits || [])) {
+      const id = lp?.feature || lp?.name;
+      if (id != null) addUsageMetricValue(values, "chatgpt:limit:" + id, lp?.remaining ?? lp?.used);
+    }
+    const analytics = usage.codex?.analytics;
+    addUsageMetricValue(values, "chatgpt:codex.credits", analytics?.credits?.remaining);
+    collectCodexWorkspaceMetricValues(values, analytics?.dailyWorkspaceUsage);
+  }
+
+  if (platform === "gemini") {
+    for (const feature of (usage.features || [])) {
+      if (feature?.id != null) addUsageMetricValue(values, "gemini:feature:" + feature.id, feature?.remaining ?? feature?.used);
+    }
+  }
+
+  return values;
+}
+
+function updateUsageMetricChanges(platform, previous, nextUsage) {
+  const now = Date.now();
+  const previousValues = previous?.metricValues || collectUsageMetricValues(platform, previous);
+  const previousChanges = previous?.metricChanges || {};
+  const nextValues = collectUsageMetricValues(platform, nextUsage);
+  const nextChanges = {};
+
+  for (const [key, value] of Object.entries(nextValues)) {
+    const hadPrevious = Object.prototype.hasOwnProperty.call(previousValues, key);
+    const previousValue = previousValues[key];
+    const changed = hadPrevious && Math.abs(value - previousValue) > 1e-9;
+    const previousChangedAt = metricNumber(previousChanges[key]?.changedAt);
+    const changedAt = changed ? now : previousChangedAt;
+    if (changedAt && now - changedAt <= USAGE_METRIC_CHANGE_WINDOW_MS) {
+      nextChanges[key] = {
+        changedAt,
+        previous: changed ? previousValue : previousChanges[key]?.previous,
+        current: value,
+      };
+    }
+  }
+
+  return { metricValues: nextValues, metricChanges: nextChanges };
+}
+
 function addNonNegative(target, key, delta) {
   target[key] = Math.max(0, numberOrZero(target[key]) + numberOrZero(delta));
 }
@@ -622,13 +702,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "insights-usage") {
     (async () => {
       const key = "insights_platform_usage_" + msg.platform;
+      const previous = await readLocal(key, null);
       const nextUsage = {
         ...msg.usage,
         source: msg.usage?.source || "provider",
         fetchedAt: Date.now(),
       };
       if (msg.platform === "chatgpt") {
-        const previous = await readLocal(key, null);
         if (!nextUsage.chat && previous?.chat) nextUsage.chat = previous.chat;
         if (!nextUsage.limits && previous?.limits) nextUsage.limits = previous.limits;
         if (!nextUsage.modelLimits && previous?.modelLimits) nextUsage.modelLimits = previous.modelLimits;
@@ -636,6 +716,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           nextUsage.codex = Object.assign({}, nextUsage.codex || {}, { analytics: previous.codex.analytics });
         }
       }
+      Object.assign(nextUsage, updateUsageMetricChanges(msg.platform, previous, nextUsage));
       await writeLocal(key, nextUsage);
     })();
   }

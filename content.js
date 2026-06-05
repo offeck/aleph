@@ -5,7 +5,7 @@
   // not force an element into RTL.
   // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in insights-tracker.js.
   const RTL_SCRIPT_LETTER_RE = /(?=[\p{Script=Hebrew}\p{Script=Arabic}])\p{L}/u;
-  const VERSION = "2.7.0";
+  const VERSION = "2.7.7";
 
   // ── Platform detection ─────────────────────────────────────────────────
   const host = location.hostname;
