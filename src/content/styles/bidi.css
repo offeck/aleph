@@ -80,15 +80,17 @@ mjx-container[display="true"], .math-display {
   unicode-bidi: isolate !important;
 }
 
-/* RTL lists */
-ul:has(> [data-aleph-rtl="true"]),
-ol:has(> [data-aleph-rtl="true"]) {
+/* RTL lists — parent attribute set by patchBidi's reconcileListParent()
+   (same specificity as the former ul:has(> [data-aleph-rtl="true"]) rules,
+   without the page-wide :has() invalidation cost on every mutation). */
+ul[data-aleph-rtl-list="true"],
+ol[data-aleph-rtl-list="true"] {
   direction: rtl !important;
   padding-right: 2rem !important;
   padding-left: 0 !important;
 }
-ul:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]),
-ol:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]) {
+ul[data-aleph-rtl-list="true"] > li:not([data-aleph-rtl]),
+ol[data-aleph-rtl-list="true"] > li:not([data-aleph-rtl]) {
   unicode-bidi: plaintext !important;
 }
 

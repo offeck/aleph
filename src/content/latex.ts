@@ -2,6 +2,7 @@ import { PLATFORM } from "./platform";
 import { SEL } from "./selectors";
 import { getSettings } from "./settingsStore";
 import { hasRTLScriptText } from "./bidi";
+import { collectCandidates, makeTextGate, notifyPending, textOf } from "./rescan";
 
 // Vendored global (vendor/katex/katex.min.js, loaded as a sibling content
 // script) — no type definitions shipped; the only non-boundary `any` allowed.
@@ -223,9 +224,9 @@ export function cleanMathText(s: string): string {
   return s;
 }
 
-function renderLatexInNode(textNode: Text) {
+function renderLatexInNode(textNode: Text): Node | null {
   const text = textNode.textContent;
-  if (!text || text.trim().length === 0) return;
+  if (!text || text.trim().length === 0) return null;
 
   const regions: LatexRegion[] = [];
 
@@ -246,7 +247,7 @@ function renderLatexInNode(textNode: Text) {
     }
   }
 
-  if (regions.length === 0) return;
+  if (regions.length === 0) return null;
 
   regions.sort((a, b) => a.start - b.start);
   const merged: LatexRegion[] = [];
@@ -310,6 +311,7 @@ function renderLatexInNode(textNode: Text) {
   }
 
   textNode.parentNode!.replaceChild(wrapper, textNode);
+  return wrapper;
 }
 
 const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()]*\)/g;
@@ -378,7 +380,7 @@ function hasMathCandidate(re: RegExp, text: string, skipRTL?: boolean) {
   return false;
 }
 
-function isolateMathText(textNode: Text) {
+function isolateMathText(textNode: Text): Node | null {
   const text = textNode.textContent || "";
   const regions: IsolateRegion[] = [];
 
@@ -388,7 +390,7 @@ function isolateMathText(textNode: Text) {
   collectRegions(MATH_TILDE_RE, text, regions, "tilde");
   collectRegions(MATH_REPEAT_RE, text, regions, "repeat", true);
 
-  if (regions.length === 0) return;
+  if (regions.length === 0) return null;
   regions.sort((a, b) => a.start - b.start);
   const merged: IsolateRegion[] = [];
   for (const r of regions) {
@@ -425,6 +427,7 @@ function isolateMathText(textNode: Text) {
     wrapper.appendChild(document.createTextNode(text.slice(lastEnd)));
   }
   textNode.parentNode!.replaceChild(wrapper, textNode);
+  return wrapper;
 }
 
 export function shouldIsolateMathText(txt: string): boolean {
@@ -435,44 +438,165 @@ export function shouldIsolateMathText(txt: string): boolean {
          findEqRegions(txt).length > 0;
 }
 
-export function patchMathText() {
-  const messageSel = SEL.message.join(", ");
-  document.querySelectorAll(messageSel).forEach((msg) => {
-    if (isMessageStreaming(msg)) return;
-    const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-    const mathTextNodes: Text[] = [];
-    let node: Node | null;
-    while ((node = walker.nextNode())) {
-      if (isInsideSkip(node)) continue;
-      const txt = node.textContent;
-      if (!txt || txt.trim().length === 0) continue;
-      if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
-        continue;
-      }
-      if (shouldIsolateMathText(txt)) {
-        mathTextNodes.push(node as Text);
-      }
-    }
-    mathTextNodes.forEach(isolateMathText);
-  });
+// Per-message processed-gates: a pass skips messages whose textContent is
+// unchanged since last processed (see rescan.ts). This keeps the TreeWalker
+// + regex cost proportional to changed messages instead of total
+// conversation size. Marked with the post-mutation text, so the pass our
+// own wrapper writes trigger settles immediately.
+const mathTextSeen = makeTextGate();
+const latexSeen = makeTextGate();
+
+// Messages skipped while streaming (ChatGPT's .result-streaming): the
+// stream ending is a class change the body observer doesn't see, so a
+// scoped pass would never revisit them. Parking a message calls
+// notifyPending(), which starts index.ts's self-canceling drain; the drain
+// re-runs passes (roots=[]) until these sets empty.
+const mathTextPending = new Set<Element>();
+const latexPending = new Set<Element>();
+
+interface ScanProgress {
+  text: string;
+  anchor: Node;
 }
 
-export function patchLatex() {
-  if (typeof katex === "undefined" || !getSettings().latexFix) return;
-  const messageSel = SEL.message.join(", ");
-  document.querySelectorAll(messageSel).forEach((msg) => {
-    if (isMessageStreaming(msg)) return;
-    const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-    const latexNodes: Text[] = [];
-    let node: Node | null;
-    while ((node = walker.nextNode())) {
-      if (isInsideSkip(node)) continue;
-      const txt = node.textContent;
-      if (!txt || txt.trim().length === 0) continue;
-      if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
-        latexNodes.push(node as Text);
-      }
+interface ScanResult {
+  complete: boolean;
+  anchor?: Node;
+}
+
+const mathTextProgress = new WeakMap<Element, ScanProgress>();
+const latexProgress = new WeakMap<Element, ScanProgress>();
+
+function getScanAnchor(progress: WeakMap<Element, ScanProgress>, msg: Element, text: string): Node | null {
+  const state = progress.get(msg);
+  if (!state) return null;
+  if (state.text !== text || !state.anchor.isConnected || !msg.contains(state.anchor)) {
+    progress.delete(msg);
+    return null;
+  }
+  return state.anchor;
+}
+
+function saveScanAnchor(progress: WeakMap<Element, ScanProgress>, msg: Element, text: string, anchor: Node) {
+  if (anchor.isConnected && msg.contains(anchor)) {
+    progress.set(msg, { text, anchor });
+  } else {
+    progress.delete(msg);
+  }
+}
+
+function scanTextNodes(
+  msg: Element,
+  anchor: Node | null,
+  deadline: number,
+  isActionable: (text: string) => boolean,
+  processNode: (node: Text) => Node | null,
+): ScanResult {
+  const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
+  if (anchor) walker.currentNode = anchor;
+
+  let node: Node | null;
+  let lastVisited: Node | null = anchor;
+  let visited = 0;
+  while ((node = walker.nextNode())) {
+    if (visited++ > 0 && deadline && performance.now() > deadline) {
+      return lastVisited ? { complete: false, anchor: lastVisited } : { complete: false, anchor: msg };
     }
-    latexNodes.forEach(renderLatexInNode);
-  });
+    lastVisited = node;
+    if (isInsideSkip(node)) continue;
+    const txt = node.textContent;
+    if (!txt || txt.trim().length === 0) continue;
+    if (!isActionable(txt)) continue;
+
+    const replacement = processNode(node as Text);
+    if (replacement) {
+      // Keep scanning within the same slice: resume document order from the
+      // wrapper (its internals are skipped by isInsideSkip, so this cannot
+      // loop or re-process). The deadline check above bounds the slice.
+      lastVisited = replacement;
+      walker.currentNode = replacement;
+    }
+  }
+
+  return { complete: true };
+}
+
+export function hasPendingLatexWork(): boolean {
+  return latexPending.size > 0 || mathTextPending.size > 0;
+}
+
+// One parameterized runner for both scan modes — they differ only in what
+// counts as actionable, how a node is processed, and which per-mode stores
+// they use. Returns elements left unprocessed when the time budget
+// (`deadline`, performance.now() epoch) ran out; the caller re-queues them
+// as dirty roots for a continuation slice, and the per-mode progress maps
+// resume inside the interrupted message instead of starting its TreeWalker
+// from the top again.
+interface ScanMode {
+  gate: ReturnType<typeof makeTextGate>;
+  pending: Set<Element>;
+  progress: WeakMap<Element, ScanProgress>;
+  isActionable(txt: string): boolean;
+  processNode(node: Text): Node | null;
+}
+
+const mathTextMode: ScanMode = {
+  gate: mathTextSeen,
+  pending: mathTextPending,
+  progress: mathTextProgress,
+  isActionable: (txt) => {
+    if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
+      return false;
+    }
+    return shouldIsolateMathText(txt);
+  },
+  processNode: isolateMathText,
+};
+
+const latexMode: ScanMode = {
+  gate: latexSeen,
+  pending: latexPending,
+  progress: latexProgress,
+  isActionable: (txt) =>
+    LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt),
+  processNode: renderLatexInNode,
+};
+
+function runScan(mode: ScanMode, roots: Element[] | null, deadline: number): Element[] {
+  const messageSel = SEL.message.join(", ");
+  const candidates = new Set<Element>();
+  for (const m of collectCandidates(roots, messageSel)) candidates.add(m);
+  mode.pending.forEach((m) => { if (m.isConnected) candidates.add(m); });
+  mode.pending.clear();
+  const remainder: Element[] = [];
+  let processedOne = false;
+  for (const msg of candidates) {
+    if (processedOne && deadline && performance.now() > deadline) { remainder.push(msg); continue; }
+    if (isMessageStreaming(msg)) { mode.pending.add(msg); notifyPending(); continue; }
+    const text = textOf(msg);
+    const anchor = getScanAnchor(mode.progress, msg, text);
+    if (!anchor && !mode.gate.changed(msg, text)) continue;
+    processedOne = true;
+    const result = scanTextNodes(msg, anchor, deadline, mode.isActionable, mode.processNode);
+    // Single post-scan read — the text only changes via our own processNode
+    // mutations within this synchronous call.
+    const after = textOf(msg);
+    if (!result.complete && result.anchor) {
+      saveScanAnchor(mode.progress, msg, after, result.anchor);
+      remainder.push(msg);
+      continue;
+    }
+    mode.progress.delete(msg);
+    mode.gate.mark(msg, after);
+  }
+  return remainder;
+}
+
+export function patchMathText(roots: Element[] | null = null, deadline = 0): Element[] {
+  return runScan(mathTextMode, roots, deadline);
+}
+
+export function patchLatex(roots: Element[] | null = null, deadline = 0): Element[] {
+  if (typeof katex === "undefined" || !getSettings().latexFix) return [];
+  return runScan(latexMode, roots, deadline);
 }

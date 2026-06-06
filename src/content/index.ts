@@ -1,12 +1,13 @@
 import { VERSION } from "../shared/version";
 import { updateBadge } from "./badge";
-import { cleanupEditorDir, patchBidi, updateBidiRootAttribute } from "./bidi";
+import { cleanupEditorDir, hasPendingHintWork, patchBidi, updateBidiRootAttribute } from "./bidi";
 import { applyFocusMode } from "./focus";
-import { patchLatex, patchMathText } from "./latex";
+import { hasPendingLatexWork, patchLatex, patchMathText } from "./latex";
 import { PLATFORM } from "./platform";
 import { applySettingsChange, getSettings, isPlatformEnabled, loadSettings } from "./settingsStore";
 import { applyStreamSmooth } from "./streaming";
 import { applyStyles, STYLE_ID } from "./styles";
+import { debounceDelay, isAlephAuthored, setOnPending, takePatchRoots, type PatchRootQueues } from "./rescan";
 
 declare const __ALEPH_BUILD__: string;
 
@@ -25,24 +26,89 @@ function ensureRootAttributes() {
 // so our own DOM writes don't re-trigger a patch via the MutationObserver.
 let patching = false;
 
-function patchAll() {
+// Dirty-set: the observer records mutated elements and the scanners process
+// only those subtrees/ancestors (see collectCandidates in rescan.ts), so
+// per-pass cost tracks what changed, not total conversation size. Continuation
+// leftovers live in their own queue so a non-event slice cannot consume real
+// mutation roots before focus/editor/list event work sees them.
+const rootQueues: PatchRootQueues = {
+  dirtyRoots: new Set<Element>(),
+  continuationRoots: new Set<Element>(),
+  fullPassNeeded: true,
+};
+
+function markDirty(n: Node) {
+  const el = n.nodeType === 1 ? (n as Element) : n.parentElement;
+  if (el) rootQueues.dirtyRoots.add(el);
+}
+
+// ── Reactive scheduling ────────────────────────────────────────────────
+// No standing scan loop. Work runs from four event-driven sources:
+//  1. scheduleUpdate() — debounced observer mutations (QUIET_MS of silence,
+//     forced at MAX_WAIT_MS so continuous streaming can't starve passes);
+//  2. scheduleContinuation() — each pass is budgeted to SLICE_BUDGET_MS and
+//     re-queues unprocessed elements, so first-decoration of a huge
+//     conversation interleaves with paint instead of blocking;
+//  3. requestDrain() — self-canceling timer that exists only while a scanner
+//     parked observer-invisible work (ChatGPT stream-end class changes,
+//     hint-window expiry) and stops when those sets drain;
+//  4. a 30s attribute-recovery heartbeat (the one standing timer).
+const QUIET_MS = 120;
+const MAX_WAIT_MS = 500;
+const SLICE_BUDGET_MS = 12;
+const CONTINUE_DELAY_MS = 30;
+const DRAIN_MS = 500;
+
+let contTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleContinuation() {
+  if (contTimer) return;
+  contTimer = setTimeout(() => { contTimer = null; patchAll(false); }, CONTINUE_DELAY_MS);
+}
+
+let drainTimer: ReturnType<typeof setTimeout> | null = null;
+function requestDrain() {
+  if (drainTimer) return;
+  drainTimer = setTimeout(() => {
+    drainTimer = null;
+    patchAll(false);
+    if (hasPendingLatexWork() || hasPendingHintWork()) requestDrain();
+  }, DRAIN_MS);
+}
+
+function ensureStreamAnimAttr() {
+  const settings = getSettings();
+  if (!settings.streamSmooth) return;
+  const anim = settings.streamAnimation || "platform";
+  if (document.documentElement.getAttribute("data-aleph-stream-anim") !== anim) {
+    document.documentElement.setAttribute("data-aleph-stream-anim", anim);
+  }
+}
+
+// eventPass: false on continuation/drain slices — those only advance our own
+// decoration work, so unscoped per-pass scans that react to real page
+// mutations (focus mode, the bidi list sweep, editor attachment) skip them.
+function patchAll(eventPass = true) {
   ensureRootAttributes();
   updateBidiRootAttribute();
   if (patching || !isPlatformEnabled()) return;
   patching = true;
   try {
+    const roots = takePatchRoots(rootQueues, eventPass);
+    const deadline = performance.now() + SLICE_BUDGET_MS;
     const settings = getSettings();
-    if (settings.bidiEnabled) patchBidi();
+    const leftovers: Element[] = [];
+    if (settings.bidiEnabled) leftovers.push(...patchBidi(roots, deadline, eventPass));
     else cleanupEditorDir();
-    if (settings.focusMode) applyFocusMode();
-    if (settings.latexFix) patchLatex();
-    if (settings.bidiEnabled) patchMathText();
+    if (settings.focusMode && eventPass) applyFocusMode();
+    if (settings.latexFix) leftovers.push(...patchLatex(roots, deadline));
+    if (settings.bidiEnabled) leftovers.push(...patchMathText(roots, deadline));
     if (settings.streamSmooth) {
       applyStreamSmooth();
-      const anim = settings.streamAnimation || "platform";
-      if (document.documentElement.getAttribute("data-aleph-stream-anim") !== anim) {
-        document.documentElement.setAttribute("data-aleph-stream-anim", anim);
-      }
+      ensureStreamAnimAttr();
+    }
+    if (leftovers.length) {
+      for (const el of leftovers) rootQueues.continuationRoots.add(el);
+      scheduleContinuation();
     }
   } finally {
     patching = false;
@@ -51,10 +117,13 @@ function patchAll() {
 
 // ── Observer (scoped to relevant mutations) ────────────────────────────
 let timer: ReturnType<typeof setTimeout> | null = null;
+let firstMutationAt = 0;
 function scheduleUpdate() {
   if (patching) return;
+  const now = Date.now();
   if (timer) clearTimeout(timer);
-  timer = setTimeout(patchAll, 120);
+  else firstMutationAt = now;
+  timer = setTimeout(() => { timer = null; patchAll(); }, debounceDelay(now, firstMutationAt, QUIET_MS, MAX_WAIT_MS));
 }
 
 if (PLATFORM) {
@@ -67,6 +136,7 @@ if (PLATFORM) {
           applySettingsChange(key, newValue);
         }
         applyStyles();
+        rootQueues.fullPassNeeded = true;
         patchAll();
         updateBadge();
       }
@@ -87,35 +157,44 @@ if (PLATFORM) {
   }
 
   new MutationObserver((mutations) => {
+    let relevant = false;
     for (const m of mutations) {
       const target = m.target as Element;
       if (target === document.head || target.closest?.("head")) continue;
       if (target.id === STYLE_ID) continue;
-      scheduleUpdate();
-      return;
+      // Our own DOM writes (latex/math wrappers, mini-game overlay) must not
+      // re-trigger a patch pass — the `patching` flag can't catch them because
+      // observer callbacks are delivered after the synchronous pass ends.
+      if (isAlephAuthored(target)) continue;
+      if (
+        m.type === "childList" && m.addedNodes.length > 0 &&
+        Array.from(m.addedNodes).every(isAlephAuthored) &&
+        Array.from(m.removedNodes).every((n) => n.nodeType === 3 || isAlephAuthored(n))
+      ) continue;
+      markDirty(target);
+      relevant = true;
     }
+    if (relevant) scheduleUpdate();
   }).observe(document.body, {
     childList: true, subtree: true, characterData: true,
   });
 
   // ── Boot ───────────────────────────────────────────────────────────────
+  setOnPending(requestDrain);
   loadSettings().then(() => {
     applyStyles();
     patchAll();
     updateBadge();
-    setTimeout(() => { applyStyles(); patchAll(); }, 1500);
-    let patchIntervalId = setInterval(patchAll, 3000);
+    setTimeout(() => { applyStyles(); rootQueues.fullPassNeeded = true; patchAll(); }, 1500);
 
-    new MutationObserver(() => {
-      clearInterval(patchIntervalId);
-      patchIntervalId = setInterval(patchAll, 500);
-      setTimeout(() => {
-        clearInterval(patchIntervalId);
-        patchIntervalId = setInterval(patchAll, 3000);
-      }, 30000);
-    }).observe(document.documentElement, {
-      attributes: true, attributeFilter: ["data-aleph-thinking"],
-    });
+    // Attribute-recovery heartbeat — the one standing timer. <html>
+    // attributes can be stripped by SPA rewrites that never touch body's
+    // subtree; everything else is event-driven (see Reactive scheduling).
+    setInterval(() => {
+      ensureRootAttributes();
+      updateBidiRootAttribute();
+      if (isPlatformEnabled()) ensureStreamAnimAttr();
+    }, 30000);
   });
 
   console.log(
