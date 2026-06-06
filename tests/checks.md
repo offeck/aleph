@@ -12,17 +12,17 @@ Zero-element results are suspect: if a check FAILs purely on a zero-element coun
 
 ```javascript
 (() => {
-  // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in content.js / insights-tracker.js.
+  // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in src/shared/rtl.ts.
   const RTL_SCRIPT_LETTER_RE = /(?=[\p{Script=Hebrew}\p{Script=Arabic}])\p{L}/u;
-  // Union of SELECTORS[platform].text in content.js — the exact elements the
-  // extension scans with hasRTL() and marks. KEEP IN SYNC with content.js.
+  // Union of SELECTORS[platform].text in src/shared/selectors.ts — the exact
+  // elements the extension scans with hasRTL() and marks.
   const TEXT_SEL = [
     ".font-claude-response-body", ".standard-markdown p", ".standard-markdown li", ".standard-markdown h1", ".standard-markdown h2", ".standard-markdown h3", ".standard-markdown h4", ".standard-markdown blockquote", ".progressive-markdown p", ".progressive-markdown li", ".progressive-markdown h1", ".progressive-markdown h2", ".progressive-markdown h3", ".progressive-markdown h4", ".font-claude-response p", ".font-claude-response li", ".whitespace-pre-wrap",
     ".markdown p", ".markdown li", ".markdown h1", ".markdown h2", ".markdown h3", ".markdown h4", ".markdown blockquote", ".prose p", ".prose li", "[data-message-author-role='assistant'] p", "[data-message-author-role='assistant'] li",
     ".response-content p", ".response-content li", ".response-content h1", ".response-content h2", ".response-content h3", ".response-content h4", ".response-content blockquote", ".model-response-text p", ".model-response-text li", "message-content p", "message-content li",
   ].join(", ");
   // Wrapper presence only distinguishes "not rendered yet" from "no RTL content".
-  // KEEP IN SYNC with messageWrapper (content.js) / MSG_WRAPPER (insights-tracker.js).
+  // KEEP IN SYNC with MESSAGE_WRAPPER_SELECTOR_UNION in src/shared/selectors.ts.
   const WRAPPER_SEL = "[data-testid='chat-message'], .font-claude-response, [data-testid='user-message'], [data-testid^='conversation-turn'], .group\\/conversation-turn, model-response, .conversation-turn, .query-content, message-content";
 
   const marked = document.querySelectorAll('[data-aleph-rtl]');
@@ -122,10 +122,10 @@ Use `mcp__claude-in-chrome__read_console_messages` with pattern `Aleph|aleph` an
 
 ```javascript
 (() => {
-  // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in content.js / insights-tracker.js.
+  // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in src/shared/rtl.ts.
   const RTL_SCRIPT_LETTER_RE = /(?=[\p{Script=Hebrew}\p{Script=Arabic}])\p{L}/u;
-  // Union of SELECTORS[platform].text in content.js — the exact elements the
-  // extension scans with hasRTL() and marks. KEEP IN SYNC with content.js.
+  // Union of SELECTORS[platform].text in src/shared/selectors.ts — the exact
+  // elements the extension scans with hasRTL() and marks.
   const TEXT_SEL = [
     ".font-claude-response-body", ".standard-markdown p", ".standard-markdown li", ".standard-markdown h1", ".standard-markdown h2", ".standard-markdown h3", ".standard-markdown h4", ".standard-markdown blockquote", ".progressive-markdown p", ".progressive-markdown li", ".progressive-markdown h1", ".progressive-markdown h2", ".progressive-markdown h3", ".progressive-markdown h4", ".font-claude-response p", ".font-claude-response li", ".whitespace-pre-wrap",
     ".markdown p", ".markdown li", ".markdown h1", ".markdown h2", ".markdown h3", ".markdown h4", ".markdown blockquote", ".prose p", ".prose li", "[data-message-author-role='assistant'] p", "[data-message-author-role='assistant'] li",

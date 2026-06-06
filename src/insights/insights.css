@@ -1,0 +1,335 @@
+@import "../shared/ui.css";
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #e2e2e2;
+  background: #1a1a2e;
+  padding: 24px 32px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────── */
+section {
+  margin-bottom: 16px;
+}
+h2 {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #7c83ff;
+  margin-bottom: 10px;
+}
+
+/* ── Subscription Cards ───────────────────────────────────────────── */
+.sub-cards {
+  display: flex;
+  gap: 12px;
+}
+.sub-card {
+  flex: 1;
+  background: #2a2a4a;
+  border-radius: 8px;
+  padding: 16px;
+  border-left: 3px solid #3a3a5a;
+}
+#subClaude  { border-left-color: #D97706; }
+#subChatgpt { border-left-color: #4285F4; }
+#subGemini  { border-left-color: #10A37F; }
+
+.sub-platform {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+#subClaude .sub-platform  { color: #D97706; }
+#subChatgpt .sub-platform { color: #4285F4; }
+#subGemini .sub-platform  { color: #10A37F; }
+
+.plan-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #3a3a5a;
+  color: #e2e2e2;
+  letter-spacing: 0.3px;
+}
+.sub-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin: 8px 0 4px;
+}
+.model-name {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 8px;
+}
+.sub-tokens {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #888;
+}
+.total-spend {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 16px;
+}
+
+/* ── 24-Hour Chart ────────────────────────────────────────────────── */
+.hour-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 180px;
+  padding-bottom: 24px;
+  background: #2a2a4a;
+  border-radius: 8px;
+  padding: 16px 12px 32px;
+}
+.hour-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column-reverse;
+  position: relative;
+  height: 100%;
+  align-items: stretch;
+}
+.bar-fill {
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+  min-height: 0;
+}
+.bar-fill.claude  { background: #D97706; }
+.bar-fill.chatgpt { background: #4285F4; }
+.bar-fill.gemini  { background: #10A37F; }
+
+.hour-label {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #666;
+  white-space: nowrap;
+}
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #888;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.legend-dot.claude  { background: #D97706; }
+.legend-dot.chatgpt { background: #4285F4; }
+.legend-dot.gemini  { background: #10A37F; }
+
+/* ── Stats Table ──────────────────────────────────────────────────── */
+.stats-table {
+  width: 100%;
+  background: #2a2a4a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.stats-header,
+.stats-row {
+  display: flex;
+  padding: 10px 16px;
+}
+.stats-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #666;
+  border-bottom: 1px solid #3a3a5a;
+}
+.stats-header span,
+.stats-row span {
+  flex: 1;
+  text-align: right;
+}
+.stats-header span:first-child,
+.stats-row span:first-child {
+  text-align: left;
+  flex: 1.2;
+}
+.stats-row {
+  font-size: 13px;
+  color: #e2e2e2;
+  border-bottom: 1px solid #3a3a5a;
+}
+.stats-row:last-child {
+  border-bottom: none;
+}
+.stats-row.totals-row {
+  font-weight: 700;
+  color: #fff;
+  background: #33335a;
+}
+.stats-row .platform-name {
+  font-weight: 600;
+}
+.stats-row .platform-name.claude  { color: #D97706; }
+.stats-row .platform-name.chatgpt { color: #4285F4; }
+.stats-row .platform-name.gemini  { color: #10A37F; }
+
+/* ── Week Grid ────────────────────────────────────────────────────── */
+.week-grid {
+  display: flex;
+  gap: 8px;
+}
+.day-card {
+  flex: 1;
+  background: #2a2a4a;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+.day-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.day-time {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e2e2;
+  margin-bottom: 8px;
+}
+.day-bar-track {
+  height: 6px;
+  background: #1a1a2e;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.day-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #7c83ff;
+  transition: width 0.3s ease;
+}
+
+/* ── Prediction Cards ─────────────────────────────────────────────── */
+.prediction-cards {
+  display: flex;
+  gap: 12px;
+}
+.prediction-card {
+  flex: 1;
+  background: #2a2a4a;
+  border-radius: 8px;
+  border-left: 3px solid #7c83ff;
+  padding: 16px;
+  text-align: center;
+}
+.prediction-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.prediction-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+.prediction-hint {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* ── Remark ────────────────────────────────────────────────────────── */
+.remark-text {
+  text-align: center;
+  font-size: 16px;
+  font-style: italic;
+  color: #aaa;
+  padding: 24px;
+  line-height: 1.5;
+}
+
+/* ── Override Section ─────────────────────────────────────────────── */
+.override-row {
+  display: flex;
+  gap: 12px;
+}
+.override-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.override-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+}
+.override-field select {
+  background: #2a2a4a;
+  color: #e2e2e2;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.override-field select:focus {
+  border-color: #7c83ff;
+}
+.override-hint {
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  margin-top: 10px;
+}

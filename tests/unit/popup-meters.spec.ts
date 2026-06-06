@@ -1,0 +1,144 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  addCodexLimitMeter,
+  addQuotaMeter,
+  anyMetricChangedRecently,
+  asNumber,
+  cleanLabel,
+  codexLimitLabel,
+  computeTrend,
+  estimatedTokenTotal,
+  METRIC_CHANGE_WINDOW_MS,
+  metricChangedRecently,
+  shortCodexModelLabel,
+  sumCodexWorkspace,
+  type Meter,
+} from "../../src/popup/meters";
+
+describe("pure helpers", () => {
+  it("estimatedTokenTotal sums in/out and tolerates missing days", () => {
+    expect(estimatedTokenTotal({ tokensIn: 10, tokensOut: 5 })).toBe(15);
+    expect(estimatedTokenTotal(null)).toBe(0);
+    expect(estimatedTokenTotal({})).toBe(0);
+  });
+
+  it("asNumber parses finite numbers only", () => {
+    expect(asNumber("42")).toBe(42);
+    expect(asNumber(0)).toBe(0);
+    expect(asNumber("soon")).toBeNull();
+    expect(asNumber(undefined)).toBeNull();
+  });
+
+  it("cleanLabel title-cases and de-snake-cases with fallback", () => {
+    expect(cleanLabel("deep_research")).toBe("Deep Research");
+    expect(cleanLabel("gpt-4o")).toBe("Gpt 4o");
+    expect(cleanLabel(null, "GPT")).toBe("GPT");
+    expect(cleanLabel(null)).toBe("Usage");
+  });
+
+  it("shortCodexModelLabel strips GPT/Codex prefixes", () => {
+    expect(shortCodexModelLabel("gpt-5-codex")).toBe("codex");
+    expect(shortCodexModelLabel("codex-mini-latest")).toBe("Codex mini latest");
+    expect(shortCodexModelLabel(null)).toBe("Codex");
+  });
+
+  it("codexLimitLabel maps weekly to 7d and falls back to the period", () => {
+    expect(codexLimitLabel({ period: "weekly" })).toBe("Codex 7d");
+    expect(codexLimitLabel({ period: "monthly" })).toBe("Codex monthly");
+    expect(codexLimitLabel({})).toBe("Codex limit");
+    expect(codexLimitLabel({ model: "gpt-5-codex", period: "weekly" })).toBe("codex 7d");
+  });
+
+  it("computeTrend classifies up/down/flat with a 5% deadband and zero-previous guard", () => {
+    expect(computeTrend(200, 100)).toEqual({ pct: 100, dir: "up" });
+    expect(computeTrend(90, 100)).toEqual({ pct: -10, dir: "down" });
+    expect(computeTrend(102, 100)).toEqual({ pct: 2, dir: "flat" });
+    expect(computeTrend(50, 0)).toEqual({ pct: 0, dir: "flat" });
+  });
+});
+
+describe("metric change windows", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("metricChangedRecently honors the 24h window edge", () => {
+    const usage = { metricChanges: { k: { changedAt: 1000 } } };
+    vi.setSystemTime(1000 + METRIC_CHANGE_WINDOW_MS);
+    expect(metricChangedRecently(usage, "k")).toBe(true);
+    vi.setSystemTime(1000 + METRIC_CHANGE_WINDOW_MS + 1);
+    expect(metricChangedRecently(usage, "k")).toBe(false);
+    expect(metricChangedRecently({}, "k")).toBe(false);
+    expect(metricChangedRecently(null, "k")).toBe(false);
+  });
+
+  it("anyMetricChangedRecently matches when any key is recent", () => {
+    vi.setSystemTime(5000);
+    const usage = { metricChanges: { b: { changedAt: 4000 } } };
+    expect(anyMetricChangedRecently(usage, ["a", "b"])).toBe(true);
+    expect(anyMetricChangedRecently(usage, ["a", "c"])).toBe(false);
+  });
+});
+
+describe("addQuotaMeter", () => {
+  it("builds a percentage meter from used/limit and clamps to 0-100", () => {
+    const target: Meter[] = [];
+    addQuotaMeter(target, "ChatGPT GPT-5", { limit: 100, used: 25 }, "#4285F4");
+    addQuotaMeter(target, "Clamped", { limit: 10, used: 25 }, "#4285F4");
+    expect(target[0]).toMatchObject({ label: "ChatGPT GPT-5", pct: 25, quota: true, fullAvailable: false });
+    expect(target[1].pct).toBe(100);
+  });
+
+  it("derives used from remaining and flags fully available quotas", () => {
+    const target: Meter[] = [];
+    addQuotaMeter(target, "Fresh", { limit: 100, remaining: 100 }, "#10A37F");
+    expect(target[0]).toMatchObject({ pct: 0, fullAvailable: true });
+  });
+
+  it("skips limit-only items and emits detail rows for remaining-only items", () => {
+    const target: Meter[] = [];
+    addQuotaMeter(target, "NoData", { limit: 100 }, "#fff");
+    expect(target).toHaveLength(0);
+
+    addQuotaMeter(target, "Credits", { remaining: 7 }, "#fff", { requiresRecentDelta: true, changedWithin24h: true });
+    expect(target[0]).toMatchObject({ pct: null, detail: "7 left", requiresRecentDelta: true, changedWithin24h: true });
+
+    addQuotaMeter(target, "Empty", {}, "#fff");
+    expect(target).toHaveLength(1);
+  });
+});
+
+describe("addCodexLimitMeter", () => {
+  it("prefers usedPct, derives from remainingPct, and skips when neither exists", () => {
+    const target: Meter[] = [];
+    addCodexLimitMeter(target, { usedPct: 30, period: "weekly" }, "#4285F4");
+    addCodexLimitMeter(target, { remainingPct: 25 }, "#4285F4");
+    addCodexLimitMeter(target, {}, "#4285F4");
+    expect(target).toHaveLength(2);
+    expect(target[0]).toMatchObject({ label: "Codex 7d", pct: 30, fullAvailable: false });
+    expect(target[1]).toMatchObject({ label: "Codex limit", pct: 75 });
+  });
+
+  it("flags fully available when nothing is used", () => {
+    const target: Meter[] = [];
+    addCodexLimitMeter(target, { remainingPct: 100 }, "#4285F4");
+    expect(target[0]).toMatchObject({ pct: 0, fullAvailable: true });
+  });
+});
+
+describe("sumCodexWorkspace", () => {
+  it("sums totals across workspace rows", () => {
+    expect(sumCodexWorkspace({
+      data: [
+        { totals: { threads: 2, turns: 10, credits: 30 } },
+        { totals: { threads: 1, turns: 5, credits: 20 } },
+      ],
+    })).toEqual({ threads: 3, turns: 15, credits: 50 });
+  });
+
+  it("returns null for empty, zero, or malformed data", () => {
+    expect(sumCodexWorkspace({ data: [] })).toBeNull();
+    expect(sumCodexWorkspace({ data: [{ totals: { threads: 0, turns: 0, credits: 0 } }] })).toBeNull();
+    expect(sumCodexWorkspace(null)).toBeNull();
+    expect(sumCodexWorkspace({ data: "nope" })).toBeNull();
+  });
+});

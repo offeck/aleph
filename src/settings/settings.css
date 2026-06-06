@@ -1,0 +1,192 @@
+@import "../shared/ui.css";
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  max-width: 600px;
+  margin: 0 auto;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #e2e2e2;
+  background: #1a1a2e;
+  padding: 24px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+h1 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.back-link {
+  font-size: 12px;
+  color: #888;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.back-link:hover {
+  color: #7c83ff;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────── */
+section {
+  background: #2a2a4a;
+  border: 1px solid #3a3a5a;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+h2 {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #7c83ff;
+  margin-bottom: 12px;
+}
+
+/* ── Toggle rows ──────────────────────────────────────────────────── */
+.toggle-row {
+  padding: 8px 0;
+}
+.toggle-row + .toggle-row {
+  border-top: 1px solid #3a3a5a;
+}
+
+/* ── Fields ───────────────────────────────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+.field + .field {
+  border-top: 1px solid #3a3a5a;
+}
+.field > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.field output {
+  font-size: 12px;
+  color: #7c83ff;
+  font-weight: 600;
+  min-width: 52px;
+  text-align: right;
+}
+
+select {
+  background: #1a1a2e;
+  color: #e2e2e2;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+select:focus {
+  border-color: #7c83ff;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #1a1a2e;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #7c83ff;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #7c83ff;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+/* ── Cloud Sync ──────────────────────────────────────────────────── */
+.google-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: #4285f4;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.google-btn:hover { background: #3367d6; }
+.google-btn:disabled { background: #666; cursor: wait; }
+
+.sync-status { font-size: 13px; margin-bottom: 4px; }
+.sync-actions { display: flex; gap: 8px; margin-top: 8px; }
+.sync-actions button {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sync-actions button:hover { color: #e2e2e2; border-color: #5a5a8a; }
+.sync-actions button:disabled { opacity: 0.5; cursor: wait; }
+.danger-btn:hover { color: #ff6b6b !important; border-color: #ff6b6b !important; }
+
+/* ── Reset button ─────────────────────────────────────────────────── */
+#resetBtn {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: #888;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#resetBtn:hover {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}

@@ -34,14 +34,23 @@
 - Every changed line should trace directly to the request
 - Don't refactor things that aren't broken
 
-### 6. Verify Everything — No Regressions
+### 6. Tests Are Part of the Change
+- Every behavioral change must add or update automated coverage that would fail before the change, unless automation is genuinely impractical
+- Bug fixes need a failing unit test, regression check, or `tests/sessions.json` entry before the fix when possible
+- Shared logic, parsers, metric keys, defaults, storage merge behavior, plan/usage normalizers, and formatting helpers require Vitest unit tests
+- DOM and visual behavior should be covered through `tests/checks.md`, `tests/sessions.json`, or a browser regression check; if only manual verification is possible, state why
+- Documentation-only and mechanical config changes do not need new tests, but still require a clear verification note
+- Never report `npm test` as meaningful if it passed only because no tests existed
+- CI runs `typecheck` + `lint` + `test` + `build` on every PR — a change that breaks any of these does not merge
+
+### 7. Verify Everything — No Regressions
 This extension has tightly interconnected features (BiDi, themes, focus mode, streaming, fonts, chat width). A change to one can silently break others.
 
 Before reporting any change as complete:
 1. **Reproduce first**: If fixing a bug, confirm you can reproduce it before changing code
 2. **Verify the fix**: Confirm the specific change works as intended
 3. **Check for console errors**: Load the extension and confirm no errors in the console
-4. **Cross-platform check**: If the change touches shared code or `content.js`/`content.css`, test on all affected platforms (Claude, ChatGPT, Gemini)
+4. **Cross-platform check**: If the change touches `src/shared/` or `src/content/`, test on all affected platforms (Claude, ChatGPT, Gemini)
 5. **Regression sweep**: Spot-check related features:
    - Touched styling/themes → verify themes still apply correctly
    - Touched the MutationObserver or `patchAll()` → verify BiDi detection still fires
@@ -49,7 +58,7 @@ Before reporting any change as complete:
    - Touched `applyStyles()` → verify typography, code blocks, chat width still work
 6. **State what wasn't tested**: If you can't verify something (e.g., no browser access), explicitly say so — never assume a change is safe
 
-### 7. Goal-Driven Execution
+### 8. Goal-Driven Execution
 - Transform tasks into verifiable success criteria before starting
 - For multi-step tasks, state a brief plan with verification steps:
   ```
@@ -60,28 +69,34 @@ Before reporting any change as complete:
 
 ## Project Overview
 
-Chrome extension (Manifest V3) that provides Hebrew and Arabic-script BiDi text fixing, custom themes, focus mode, streaming smoothing, and consistent typography/layout styling across Claude, ChatGPT, and Gemini.
+Chrome extension (Manifest V3, TypeScript) that provides Hebrew and Arabic-script BiDi text fixing, custom themes, focus mode, streaming smoothing, and consistent typography/layout styling across Claude, ChatGPT, and Gemini.
 
 ## Architecture
 
-**Extension structure** — no build step, plain JS/CSS/HTML:
+TypeScript source lives in `src/`, bundled by esbuild (`node build.mjs`, or `npm run dev` for watch mode) into `dist/` — one IIFE bundle per entry plus generated CSS/HTML assets and a `__ALEPH_BUILD__` stamp exposed as `data-aleph-build` on `<html>`. `manifest.json` stays at the **repo root**; page HTML/CSS source lives beside its entry in `src/<page>/` and ships from `dist/`. The repo root remains the unpacked-extension directory (moving the manifest would change the extension ID and orphan user storage). **Never edit `dist/`** — it's gitignored build output. After editing `src/`, rebuild (or have watch running), then reload via the `aleph-reload` flow below.
 
-- `manifest.json` — MV3 manifest with commands (keyboard shortcut) and service worker
-- `background.js` — Service worker for toolbar badge updates and keyboard shortcut handling
-- `content.js` — Main content script. Platform detection, BiDi engine, theme injection, focus mode, streaming smoothing, font loading, color-scheme, style injector. Runs at `document_idle`.
-- `content.css` — Static CSS rules for BiDi, streaming animations, focus mode hiding, theme transitions, platform-specific structural fixes
-- `popup.html` / `popup.css` / `popup.js` — Settings popup UI with toggle switches, theme grid, per-platform theme overrides, focus mode categories, range sliders, export/import
-- `tests/sessions.json` — Visual regression test registry. Stores known problematic chat sessions with platform, URL, bug description, and checks to run.
+**Extension structure:**
+
+- `manifest.json` — MV3 manifest with commands (keyboard shortcut), service worker, popup, and content asset paths pointing into `dist/`
+- `src/shared/` — cross-bundle modules: `platform` (PLATFORMS, `detectPlatform`, setting-key builders), `selectors` (SELECTORS per platform + `SelectorSet`), `themes` (THEMES + THEME_NAMES), `defaults` (DEFAULTS), `rtl` (the RTL script-letter regex — single source), `dates`, `format`, `metricKeys` (frozen metric-key strings/builders), `messages` (wire-shape types), `platformMeta`, `pricing`, `version`; `ui.css` is the shared page-UI primitive sheet imported by popup/settings/insights CSS
+- `src/background/` (→ `dist/background.js`) — classic service worker (NOT module type — firebase compat needs `importScripts`). Boot order in `index.ts` is load-bearing: `importScripts` of `vendor/firebase/*` (root-absolute paths — the worker lives in `dist/`) → firebase init guard → `registerBackgroundListeners()`. MV3 requires every `chrome.*` listener registered in the worker's first synchronous turn, and esbuild hoists bundled imports above the entry's own statements — so all background submodules must be **define-only at import time**. Modules: `usage` (usage-day storage + serialized `updateUsageDay` queue), `metrics` (provider metric collection/change tracking), `remarks` (remark engine), `cleanup`, `router` (all listener registrations incl. the message router), `sync` (`alephSync` cloud sync; exported merge helpers are unit-tested)
+- `src/content/` (→ `dist/content.js` + `dist/content.css`) — main content script/CSS at `document_idle`: `platform`, `selectors` (SEL), `settingsStore` (settings singleton), `bidi`, `latex`, `theme`, `styles` (`applyStyles()`), `focus`, `streaming`, `fonts`, `badge`, `index` (boot + MutationObserver + `patchAll()`). CSS source in `content.css` + `styles/*.css` — **rule order is behavior**; imports stay in section order, never alphabetized
+- `src/tracker/` (→ `dist/insights-tracker.js`) — usage/insights tracking content script: `send`, `time`, `timing`, `messages`, `tokens`, `plans`, `modelCaps`, `usageClaude`/`usageChatgpt`/`usageGemini`, `platform`, `index`
+- `src/popup/` — `meters` (pure meter/trend helpers, unit-tested), `insightsView`, `ui`, `index`; `src/settings/` — `controls`, `syncUi`, `index`; `src/insights/` — `subscriptions`, `charts`, `index`; `src/mini-game/` — `spawn` (owns game state), `snake`, `minesweeper`, `index`
+- `tests/unit/` — Vitest specs (node env); `tests/sessions.json` — visual regression registry; `tests/checks.md` — browser check snippets
+- Commands: `npm run build` / `npm run dev` (watch) / `npm test` (vitest) / `npm run typecheck` / `npm run lint` / `npm run check` (all four)
+
+**TypeScript & lint policy** — strict tsconfig, **zero `tsc` errors repo-wide**. `any` is allowed only at commented boundaries: raw provider/storage JSON, the firebase compat globals, and the boot-gated `SEL` cast in `src/content/selectors.ts`. Types in `src/shared/messages.ts` and `metricKeys.ts` **describe** wire shapes and storage keys — never use a type change to alter what is actually sent or stored. ESLint runs syntactic rules only (typescript-eslint recommended, calibrated in `eslint.config.mjs`); type-aware lint is deferred deliberately — tsc strict is the type gate, and the codebase's fire-and-forget promise style + boundary `any`s would fight `no-floating-promises`/`no-unsafe-*`. CI (`.github/workflows/ci.yml`) runs typecheck + lint + test + build on every PR; publish (`publish.yml`) runs the same gates before zipping `dist/`.
 
 ## Key Patterns
 
-**Platform detection** — `PLATFORM` constant set from `location.hostname`. Each platform has its own selector set in `SELECTORS[platform]` covering: text, editor, math, code, message, chatWidth, themeBg, themeText, themeInput, themeCode, themeSidebar, focusHide (categorized), streaming, messageWrapper, chatContainer.
+**Platform detection** — `detectPlatform(hostname)` in `src/shared/platform.ts`; each content bundle derives its own `PLATFORM` constant (`src/content/platform.ts`, `src/tracker/platform.ts`), honestly typed `Platform | null` — guard before indexing platform-keyed maps (narrowing doesn't reach into closures; capture or re-check locally). Each platform has its own selector set in `SELECTORS[platform]` (`src/shared/selectors.ts`) covering: text, editor, math, code, message, chatWidth, themeBg, themeText, themeInput, themeCode, themeSidebar, focusHide (categorized), streaming, messageWrapper, chatContainer.
 
-**BiDi detection** — `hasRTL(el)` recursively walks childNodes, tests text nodes against the RTL script-letter regex (Hebrew and Arabic-script letters only), skips katex/mjx-container/code/pre. Sets `data-aleph-rtl="true"` on matching elements. Uses `unicode-bidi: plaintext` for better mixed RTL/LTR line handling. Keep the regex pattern in `content.js` and `insights-tracker.js` in sync.
+**BiDi detection** — `hasRTL(el)` (`src/content/bidi.ts`) recursively walks childNodes, tests text nodes against the RTL script-letter regex (Hebrew and Arabic-script letters only), skips katex/mjx-container/code/pre. Sets `data-aleph-rtl="true"` on matching elements. Uses `unicode-bidi: plaintext` for better mixed RTL/LTR line handling. The regex has a **single source**: `src/shared/rtl.ts` (content and tracker both import it; `tests/checks.md` mirrors it — keep that copy in sync).
 
-**Dynamic styles** — `applyStyles()` builds a CSS string from current settings and injects it into `#aleph-dynamic-styles` style element. Covers themes (CSS custom properties on `:root`), typography, code blocks, chat width, message spacing.
+**Dynamic styles** — `applyStyles()` (`src/content/styles.ts`) builds a CSS string from current settings and injects it into `#aleph-dynamic-styles` style element. Covers themes (CSS custom properties on `:root`), typography, code blocks, chat width, message spacing.
 
-**Settings** — Stored in `chrome.storage.sync`. Defaults defined in `DEFAULTS` object. Live updates via `chrome.storage.onChanged` listener. Export/import via JSON.
+**Settings** — Stored in `chrome.storage.sync`. Defaults defined in `DEFAULTS` (`src/shared/defaults.ts`); the content script reads them through the `settingsStore` singleton (`src/content/settingsStore.ts`). Live updates via `chrome.storage.onChanged` listener. Export/import via JSON.
 
 **MutationObserver** — Watches `document.body` for `childList`, `subtree`, `characterData` changes. Filters out head/style mutations. Debounced at 120ms + 3s interval fallback.
 
@@ -89,13 +104,13 @@ Chrome extension (Manifest V3) that provides Hebrew and Arabic-script BiDi text 
 
 **Color scheme** — `updateColorScheme()` sets `<meta name="color-scheme">` and `document.documentElement.style.colorScheme` based on the active theme's luminance, so browser UI (scrollbars, form controls) matches.
 
-**Badge** — Content script sends `{ type: "badge", count }` to service worker. Count reflects active features (BiDi, theme, focus, streaming, fonts, width). Shows "OFF" when platform is disabled.
+**Badge** — Content script sends `{ type: "badge", count }` to service worker (`src/content/badge.ts` → `src/background/router.ts`). Count reflects active features (BiDi, theme, focus, streaming, fonts, width). Shows "OFF" when platform is disabled. Message shapes are typed in `src/shared/messages.ts` — the types document the wire, senders define it.
 
 **Keyboard shortcut** — `Alt+Shift+A` toggles the extension on/off for the current platform. Handled via `chrome.commands` API → service worker → content script message.
 
 ## Theme System
 
-Ten presets defined in `THEMES` object: `warmDark`, `coolDark`, `paperLight`, `highContrast`, `midnight`, `nord`, `dracula`, `solarized`, `rosePine`, `catppuccin`. Each defines: `bg`, `bgSecondary`, `bgTertiary`, `text`, `textMuted`, `accent`, `border`, `codeBg`, `codeBorder`, `inputBg`. Applied via CSS custom properties (`--aleph-bg`, `--aleph-accent`, etc.) on `[data-aleph-theme]`.
+Fourteen presets defined in `THEMES` (`src/shared/themes.ts`): `warmDark`, `coolDark`, `paperLight`, `highContrast`, `midnight`, `nord`, `dracula`, `solarized`, `rosePine`, `catppuccin`, `gruvbox`, `oneDark`, `tokyoNight`, `githubDark`. Each defines: `bg`, `bgSecondary`, `bgTertiary`, `text`, `textMuted`, `accent`, `border`, `codeBg`, `codeBorder`, `inputBg`. Applied via CSS custom properties (`--aleph-bg`, `--aleph-accent`, etc.) on `[data-aleph-theme]`.
 
 **Per-platform themes** — `themeClaude`, `themeChatgpt`, `themeGemini` settings override the global `theme` per platform. `getActiveThemeName()` resolves the platform-specific theme, falling back to global.
 
@@ -109,7 +124,7 @@ When "Smooth streaming" is enabled, platform default streaming animations (curso
 - `glow` — accent-colored text-shadow that fades out
 - `none` — suppresses platform default only, no custom animation
 
-Animation mode stored as `data-aleph-stream-anim` attribute on `<html>`. CSS in `content.css` matches `[data-aleph-stream-anim="<mode>"]` for each variant. `patchAll()` also ensures this attribute stays set as a recovery mechanism.
+Animation mode stored as `data-aleph-stream-anim` attribute on `<html>`. CSS in `src/content/styles/streaming.css` matches `[data-aleph-stream-anim="<mode>"]` for each variant. `patchAll()` also ensures this attribute stays set as a recovery mechanism.
 
 ## Focus Mode
 
@@ -176,15 +191,18 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 
 ## Common Tasks
 
-**Adding a new theme**: Add entry to `THEMES` object in `content.js`, add swatch button in `popup.html` theme grid, add to `THEME_NAMES` in `popup.js`.
+**Adding a new theme**: Add the entry to `THEMES` and its label to `THEME_NAMES` in `src/shared/themes.ts` (the settings page builds its per-platform dropdowns from `THEME_NAMES`), and add a swatch button in `src/popup/popup.html`'s theme grid (static HTML).
 
-**Adding a new platform**: Add hostname check in platform detection, add full selector set in `SELECTORS` (including categorized `focusHide` and `chatContainer`), add `enable<Platform>` and `theme<Platform>` to `DEFAULTS`, add popup toggles and theme override dropdown, add content_scripts match in `manifest.json`.
+**Adding a new platform**: Add it to `PLATFORMS`/`detectPlatform` in `src/shared/platform.ts`, add a full selector set in `src/shared/selectors.ts` (including categorized `focusHide` and `chatContainer`), add `enable<Platform>` and `theme<Platform>` to `DEFAULTS` in `src/shared/defaults.ts`, add popup toggles and theme override dropdown, add a content_scripts match in `manifest.json`.
 
-**Updating selectors**: When a platform changes its DOM, update the relevant arrays in `SELECTORS[platform]`. Test by querying `document.querySelectorAll(selector)` in the browser console on that platform.
+**Updating selectors**: When a platform changes its DOM, update the relevant arrays in `SELECTORS[platform]` in `src/shared/selectors.ts`. Test by querying `document.querySelectorAll(selector)` in the browser console on that platform.
 
 **Export/import settings**: JSON format matching the `DEFAULTS` keys. Import validates keys against `DEFAULTS` to prevent injection of unknown settings.
 
-**Reloading the extension after code changes**: `content.js` exposes the extension ID as `data-aleph-ext-id` on `<html>`. `background.js` has an `onMessageExternal` listener for `{type: "aleph-reload"}` that calls `chrome.runtime.reload()`. From any supported platform page (Claude, ChatGPT, Gemini), run in the browser console or via `javascript_tool`:
+**Reloading the extension after code changes** — the extension runs the **built** bundles in `dist/`, not `src/` directly, so the reload procedure is THREE steps and the build step is mandatory (skipping it silently reloads stale code and invalidates any verification):
+
+1. **Rebuild**: `npm run build` (skip only if you started `npm run dev` watch in this session and it is still running).
+2. **Reload**: the content bundle exposes the extension ID as `data-aleph-ext-id` on `<html>`; the background bundle has an `onMessageExternal` listener for `{type: "aleph-reload"}` that calls `chrome.runtime.reload()`. From any supported platform page (Claude, ChatGPT, Gemini), run in the browser console or via `javascript_tool`:
 ```javascript
 (() => {
   const extId = document.documentElement.getAttribute('data-aleph-ext-id');
@@ -193,4 +211,4 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
   return 'OK: reload triggered for ' + extId;
 })()
 ```
-After reload, refresh the page to load the new content scripts.
+3. **Refresh the page** to load the new content scripts, then confirm `document.documentElement.getAttribute('data-aleph-build')` matches the build stamp printed by `npm run build` before treating any verification as meaningful. Wait ~2s between triggering the reload and refreshing: a refresh that races the extension restart skips the manifest CSS injection (document_start) while the JS still injects at document_idle — leaving a fresh stamp but no `content.css`, which fails `rtl-direction` spuriously. If CSS-dependent checks fail right after a reload, refresh once more before investigating.

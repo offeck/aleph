@@ -1,0 +1,11 @@
+/* ══════════════════════════════════════════════════════════════════════
+ *  Theme Transitions (smooth switching)
+ * ══════════════════════════════════════════════════════════════════════ */
+
+[data-aleph-theme] body,
+[data-aleph-theme] main,
+[data-aleph-theme] nav,
+[data-aleph-theme] pre,
+[data-aleph-theme] code {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
