@@ -3,7 +3,8 @@
  *  Dynamic styles (fonts, themes, widths) are injected by content.js
  *
  *  Section files under styles/ are imported in the ORIGINAL order —
- *  CSS rule order is behavior (MIGRATION.md rule 11); never reorder.
+ *  CSS rule order is behavior (equal-specificity rules must keep their
+ *  relative order); never reorder or alphabetize these imports.
  * ====================================================================== */
 
 @import "./styles/bidi.css";

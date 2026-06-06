@@ -1,6 +1,6 @@
 // Message field lists describe what senders actually put on the wire today
 // (tracker/content) and what the background router reads — they must never
-// be used to change wire shapes (MIGRATION rule: types describe, not change).
+// be used to change wire shapes (types describe, not change; see CLAUDE.md).
 
 export interface InsightsMessagePayload {
   type: "insights-message";

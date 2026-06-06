@@ -1,6 +1,6 @@
 // esbuild driver: one IIFE bundle per extension entry point, plus built CSS/HTML
 // assets, output to dist/. The repo root stays the unpacked-extension directory;
-// never edit dist/ by hand. See MIGRATION.md.
+// never edit dist/ by hand. See CLAUDE.md (Architecture).
 import * as esbuild from "esbuild";
 import { watch as watchFile } from "node:fs";
 import { copyFile, mkdir, rm } from "node:fs/promises";
