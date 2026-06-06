@@ -4,14 +4,14 @@
 
 ## 0. Why / Constraints / Rules
 
-**Goal.** Replace 9 hand-written IIFE files (`content.js`, `insights-tracker.js`, `mini-game.js`, `background.js`, `popup.js`, `settings.js`, `insights.js`, `sync.js`) with TypeScript under `src/`, compiled by a small `build.mjs` esbuild script into `dist/<entry>.js` — one bundle per current entry. Kill duplicated constants/helpers into `src/shared/`. Add type safety, vitest unit tests, and CI — without changing runtime behavior or breaking the published extension.
+**Goal.** Replace 9 hand-written IIFE files (`content.js`, `insights-tracker.js`, `mini-game.js`, `background.js`, `popup.js`, `settings.js`, `insights.js`, `sync.js`) with TypeScript/assets under `src/`, compiled by a small `build.mjs` esbuild script into `dist/`. Kill duplicated constants/helpers into `src/shared/`. Add type safety, vitest unit tests, and CI — without changing runtime behavior or breaking the published extension.
 
 **Extension identity (shapes everything).** The unpacked extension loads from the repo root; the extension ID derives from that path. Moving `manifest.json` would change the ID and orphan all `chrome.storage` (settings + insights history). Therefore:
 
-- `manifest.json` + `popup.html` / `settings.html` / `insights.html` stay at repo root — the root remains the unpacked-extension directory
-- esbuild outputs to `dist/`; manifest js paths and HTML `<script src>` point into `dist/`
+- `manifest.json` stays at repo root — the root remains the unpacked-extension directory
+- page HTML/CSS source lives under `src/<page>/`; esbuild outputs generated JS/CSS/HTML to `dist/`
 - `dist/` is gitignored; the publish workflow builds before zipping
-- the zip ships `manifest.json`, HTML, CSS, `icons/`, `vendor/`, `dist/` — never `src/`
+- the zip ships `manifest.json`, `dist/`, `icons/`, `vendor/` — never `src/`
 - `vendor/` (katex + firebase compat SDKs + `firebase-config.js`) stays as-is
 
 **Rules (every phase):**
@@ -125,10 +125,10 @@ First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typeche
 - [x] `npm run typecheck:baseline` green (**552/552**); count shrank from 566 and `tests/typecheck-baseline.json` was updated in the same commit
 - [x] `npm test` discovers and runs real unit tests (**13 tests**); no `passWithNoTests`
 - [x] build+test+lint green; grep shows each migrated duplicated literal exists once under `src/shared/` (excluding intentional `tests/checks.md` console snippets and unit-test assertions)
-- [ ] reload, all platforms clean
-- [ ] settings delta verified: per-platform dropdowns gain "Default"; miniGame persists incl. reset + export/import round-trip
-- [ ] popup meters render identically (shared keys match stored snapshots); insights spend/time render
-- [ ] `checks.md` RTL sweep passes
+- [x] reload, all platforms clean *(verified during Phase 2.5 testing: `aleph-reload` + refresh on Claude/ChatGPT/Gemini — platform attrs set, build stamp fresh, no console errors)*
+- [ ] settings delta verified: per-platform dropdowns gain "Default"; miniGame persists incl. reset + export/import round-trip *(extension pages blocked to automation — needs human glance)*
+- [ ] popup meters render identically (shared keys match stored snapshots); insights spend/time render *(extension pages blocked to automation — needs human glance)*
+- [x] `checks.md` RTL sweep passes *(claude-bidi-math-001, post-Phase-2.5 bundle: 51 RTL / 48 math / 48 katex, no console errors)*
 
 **Rollback:** revert → consumers back to local literals. No storage/manifest impact.
 
@@ -142,17 +142,17 @@ Steps (behavior-identical; CSS rule order preserved — rule 11):
 3. Extract `src/shared/ui.css` containing **only byte-identical** page-chrome blocks (`.logo`; the shared toggle base) — each page CSS opens with `@import "../shared/ui.css";` so base rules still precede page rules. Divergent blocks (`.field` gap, `select`/range backgrounds `#2a2a4a` vs `#1a1a2e`, settings' toggle `border-top`) **stay per-page** — they differ on purpose.
 4. `manifest.json`: `"default_popup": "dist/popup.html"`; content_scripts `"css": ["dist/content.css"]`.
 5. `src/popup/index.ts`: `getURL("settings.html")` → `getURL("dist/settings.html")`, `getURL("insights.html")` → `getURL("dist/insights.html")`.
-6. `publish.yml`: zip list shrinks to `manifest.json dist/ icons/ vendor/`; required-files check gains `dist/content.css` + `dist/popup.html`.
+6. `publish.yml`: zip list shrinks to `manifest.json dist/ icons/ vendor/`; required-files check covers generated `dist/*.js`, `dist/*.css`, and `dist/*.html`.
 7. CLAUDE.md structure bullets: asset paths updated (small touch; full rewrite stays Phase 6).
 8. Optional root tidy (separate commit, gated on grep showing zero inbound references): `COMPETITORS.md`, `EXAMPLES.md`, `store-listing.md` → `docs/`. **Keep at root**: `README.md`, `LICENSE`, `CLAUDE.md` + `AGENTS.md` symlink, `PRIVACY.md` (the Web Store listing may deep-link its GitHub blob URL — verify before ever moving), `MIGRATION.md` (deleted in Phase 6 anyway).
 9. **Build stamp (agent dev-loop affordance)**: `build.mjs` injects `define: { __ALEPH_BUILD__: <ISO timestamp> }`; the content entry sets it as `data-aleph-build` on `<html>` next to `data-aleph-ext-id` and includes it in the console banner. The CLAUDE.md reload procedure (already updated to *build → reload → refresh*) gains a freshness assertion: after refresh, read `data-aleph-build` and confirm it matches the just-finished build — closing the silent-stale-bundle loop end to end for Claude/Codex (both consume the procedure via CLAUDE.md / the AGENTS.md symlink).
 
-- [ ] build emits 7 JS + 4 CSS + 3 HTML into dist/; `npm test` + `npm run typecheck:baseline` green
-- [ ] reload → popup opens from `dist/popup.html` (toolbar click); settings/insights open via popup buttons; settings back-link returns to popup
-- [ ] content.css still injected (path-only change): `theme-applied`, `focus-hidden`, `streaming-attrs`, `rtl-direction` PASS on an RTL session (all depend on content.css rules)
-- [ ] page styling pixel-identical (ui.css extraction is visually invisible): popup/settings/insights eyeball
-- [ ] build stamp round-trip: rebuild → reload → refresh → `data-aleph-build` on `<html>` equals the new build's stamp (and differs from the previous one)
-- [ ] extension ID unchanged; publish zip list reviewed
+- [x] build emits 7 JS + 4 CSS + 3 HTML into dist/; `npm test` (**16 tests**) + `npm run typecheck:baseline` (**552/552**) green; `npm run lint` green
+- [x] reload → popup opens from `dist/popup.html` (toolbar click); settings/insights open via popup buttons; settings back-link returns to popup *(human-verified 2026-06-06; paths also verified statically + locked by `tests/unit/assets.spec.ts` — extension pages remain blocked to browser automation)*
+- [x] content.css still injected (path-only change): `rtl-direction` PASS (51), `math-ltr-isolation` PASS (48), `latex-rendered` PASS (48), `streaming-attrs` + `selectors-match` PASS on `claude-bidi-math-001`; `focus-hidden`/`theme-applied` SKIP by live settings (focus off, no theme set) — their content.css rules verified by DOM-attribute probes (`[data-aleph-hidden]` → display:none, `[data-aleph-theme]` → transition rule) on all 3 platforms; `dist/content.css` proven token-identical to the pre-move file (only comments/whitespace/attr-quote/hex-escape-case differ)
+- [x] page styling pixel-identical (ui.css extraction is visually invisible): popup/settings/insights eyeball *(human-verified 2026-06-06: all three pages render unchanged; extraction reviewed declaration-identical — `.logo` + toggle base values match the originals exactly, divergent padding/border-top stayed per-page)*
+- [x] build stamp round-trip: rebuild → reload → refresh → `data-aleph-build` on `<html>` equals the new build's stamp (and differs from the previous one) *(00:33:29.673Z → 00:40:09.273Z; fresh stamp confirmed on Claude, ChatGPT, and Gemini; no console errors)*
+- [x] manifest remains at repo root (extension ID path unchanged); publish zip list reviewed (`manifest.json dist/ icons/ vendor/`)
 
 **Rollback:** revert → assets back at root, paths restored. No storage impact.
 

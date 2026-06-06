@@ -1,3 +1,5 @@
+@import "../shared/ui.css";
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -25,12 +27,6 @@ header {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-.logo {
-  font-size: 32px;
-  font-weight: 700;
-  color: #7c83ff;
-  line-height: 1;
 }
 h1 {
   font-size: 18px;
@@ -67,44 +63,7 @@ h2 {
 
 /* ── Toggle rows ──────────────────────────────────────────────────── */
 .toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 8px 0;
-  cursor: pointer;
-}
-.toggle-row span:first-child {
-  flex: 1;
-}
-.toggle-row input[type="checkbox"] {
-  display: none;
-}
-.toggle {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  background: #333;
-  border-radius: 10px;
-  transition: background 0.2s;
-  flex-shrink: 0;
-}
-.toggle::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  background: #888;
-  border-radius: 50%;
-  transition: transform 0.2s, background 0.2s;
-}
-.toggle-row input:checked + .toggle {
-  background: #7c83ff;
-}
-.toggle-row input:checked + .toggle::after {
-  transform: translateX(16px);
-  background: #fff;
 }
 .toggle-row + .toggle-row {
   border-top: 1px solid #3a3a5a;

@@ -47,7 +47,7 @@ jobs:
 
       - name: Check required files exist
         run: |
-          for f in dist/background.js dist/content.js dist/insights-tracker.js dist/mini-game.js dist/popup.js dist/settings.js dist/insights.js content.css popup.html popup.css icons/icon16.png icons/icon48.png icons/icon128.png; do
+          for f in dist/background.js dist/content.js dist/insights-tracker.js dist/mini-game.js dist/popup.js dist/settings.js dist/insights.js dist/content.css dist/popup.css dist/settings.css dist/insights.css dist/popup.html dist/settings.html dist/insights.html icons/icon16.png icons/icon48.png icons/icon128.png; do
             [ -f "$f" ] || { echo "Missing: $f"; exit 1; }
           done
           echo "All required files present"
@@ -77,13 +77,6 @@ jobs:
           zip -r extension.zip \
             manifest.json \
             dist/ \
-            content.css \
-            popup.html \
-            popup.css \
-            settings.html \
-            settings.css \
-            insights.html \
-            insights.css \
             icons/ \
             vendor/ \
             -x "*.DS_Store"

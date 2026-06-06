@@ -72,17 +72,16 @@ Chrome extension (Manifest V3) that provides Hebrew and Arabic-script BiDi text 
 
 ## Architecture
 
-> **TypeScript migration in progress** (see `MIGRATION.md` + PR #2). Source now lives in `src/` as TypeScript, bundled by esbuild (`node build.mjs`, or `npm run dev` for watch mode) into `dist/` — one IIFE bundle per entry. `manifest.json` and the HTML pages stay at the **repo root** and point into `dist/`; the repo root remains the unpacked-extension directory (moving the manifest would change the extension ID and orphan user storage). **Never edit `dist/`** — it's gitignored build output. After editing `src/`, rebuild (or have watch running), then reload via the `aleph-reload` flow below.
+> **TypeScript migration in progress** (see `MIGRATION.md` + PR #2). Source now lives in `src/`, bundled by esbuild (`node build.mjs`, or `npm run dev` for watch mode) into `dist/` — one IIFE bundle per entry plus generated CSS/HTML assets. `manifest.json` stays at the **repo root**; page HTML/CSS source lives beside its entry in `src/<page>/` and ships from `dist/`. The repo root remains the unpacked-extension directory (moving the manifest would change the extension ID and orphan user storage). **Never edit `dist/`** — it's gitignored build output. After editing `src/`, rebuild (or have watch running), then reload via the `aleph-reload` flow below.
 
 **Extension structure:**
 
-- `manifest.json` — MV3 manifest with commands (keyboard shortcut) and service worker; script paths point into `dist/`
+- `manifest.json` — MV3 manifest with commands (keyboard shortcut), service worker, popup, and content asset paths pointing into `dist/`
 - `src/background/` (→ `dist/background.js`) — Service worker: badge updates, keyboard shortcut, insights storage, cloud sync (firebase via `importScripts` of `vendor/firebase/`)
-- `src/content/` (→ `dist/content.js`) — Main content script. Platform detection, BiDi engine, theme injection, focus mode, streaming smoothing, font loading, color-scheme, style injector. Runs at `document_idle`.
+- `src/content/` (→ `dist/content.js` + `dist/content.css`) — Main content script/CSS. Platform detection, BiDi engine, theme injection, focus mode, streaming smoothing, font loading, color-scheme, style injector. Runs at `document_idle`.
 - `src/tracker/` (→ `dist/insights-tracker.js`) — usage/insights tracking content script
-- `src/mini-game/`, `src/popup/`, `src/settings/`, `src/insights/` — remaining entries, same pattern
-- `content.css` — Static CSS rules for BiDi, streaming animations, focus mode hiding, theme transitions, platform-specific structural fixes
-- `popup.html` / `popup.css` — Settings popup UI with toggle switches, theme grid, per-platform theme overrides, focus mode categories, range sliders, export/import
+- `src/mini-game/`, `src/popup/`, `src/settings/`, `src/insights/` — remaining entries; page HTML/CSS in these folders is copied/bundled to `dist/`
+- `src/shared/ui.css` — shared page UI primitives imported by popup/settings/insights CSS
 - `tests/sessions.json` — Visual regression test registry. Stores known problematic chat sessions with platform, URL, bug description, and checks to run.
 - Commands: `npm run build` / `npm run dev` (watch) / `npm test` (vitest) / `npm run typecheck`
 
@@ -122,7 +121,7 @@ When "Smooth streaming" is enabled, platform default streaming animations (curso
 - `glow` — accent-colored text-shadow that fades out
 - `none` — suppresses platform default only, no custom animation
 
-Animation mode stored as `data-aleph-stream-anim` attribute on `<html>`. CSS in `content.css` matches `[data-aleph-stream-anim="<mode>"]` for each variant. `patchAll()` also ensures this attribute stays set as a recovery mechanism.
+Animation mode stored as `data-aleph-stream-anim` attribute on `<html>`. CSS in `src/content/content.css` matches `[data-aleph-stream-anim="<mode>"]` for each variant. `patchAll()` also ensures this attribute stays set as a recovery mechanism.
 
 ## Focus Mode
 
@@ -209,4 +208,4 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
   return 'OK: reload triggered for ' + extId;
 })()
 ```
-3. **Refresh the page** to load the new content scripts, then confirm your change is actually present (console banner, a probe of the changed behavior, or — once available — the `data-aleph-build` stamp on `<html>`) before treating any verification as meaningful.
+3. **Refresh the page** to load the new content scripts, then confirm `document.documentElement.getAttribute('data-aleph-build')` matches the build stamp printed by `npm run build` before treating any verification as meaningful.

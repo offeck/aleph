@@ -5,6 +5,8 @@ import { SELECTORS } from "../shared/selectors";
 import { THEMES } from "../shared/themes";
 import { VERSION } from "../shared/version";
 
+declare const __ALEPH_BUILD__: string;
+
 (function () {
   "use strict";
 
@@ -15,6 +17,7 @@ import { VERSION } from "../shared/version";
 
   function ensureRootAttributes() {
     document.documentElement.setAttribute("data-aleph-platform", PLATFORM);
+    document.documentElement.setAttribute("data-aleph-build", __ALEPH_BUILD__);
     if (chrome?.runtime?.id) document.documentElement.setAttribute("data-aleph-ext-id", chrome.runtime.id);
   }
 
@@ -1012,7 +1015,7 @@ import { VERSION } from "../shared/version";
   });
 
   console.log(
-    `%c[Aleph v${VERSION}] loaded on ${PLATFORM}`,
+    `%c[Aleph v${VERSION}] loaded on ${PLATFORM} (build ${__ALEPH_BUILD__})`,
     "color:#4ade80;font-weight:bold;font-size:14px"
   );
 })();

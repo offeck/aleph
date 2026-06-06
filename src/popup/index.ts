@@ -639,13 +639,13 @@ import { PLATFORM_LABELS } from "../shared/platformMeta";
     });
 
     const openSettings = () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
+      chrome.tabs.create({ url: chrome.runtime.getURL("dist/settings.html") });
     };
     document.getElementById("settingsBtn").addEventListener("click", openSettings);
     document.getElementById("settingsBtn2").addEventListener("click", openSettings);
 
     document.getElementById("dashboardBtn").addEventListener("click", () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL("insights.html") });
+      chrome.tabs.create({ url: chrome.runtime.getURL("dist/insights.html") });
     });
 
     document.getElementById("exportBtn").addEventListener("click", exportSettings);
