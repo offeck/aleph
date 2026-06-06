@@ -208,4 +208,4 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
   return 'OK: reload triggered for ' + extId;
 })()
 ```
-3. **Refresh the page** to load the new content scripts, then confirm `document.documentElement.getAttribute('data-aleph-build')` matches the build stamp printed by `npm run build` before treating any verification as meaningful.
+3. **Refresh the page** to load the new content scripts, then confirm `document.documentElement.getAttribute('data-aleph-build')` matches the build stamp printed by `npm run build` before treating any verification as meaningful. Wait ~2s between triggering the reload and refreshing: a refresh that races the extension restart skips the manifest CSS injection (document_start) while the JS still injects at document_idle — leaving a fresh stamp but no `content.css`, which fails `rtl-direction` spuriously. If CSS-dependent checks fail right after a reload, refresh once more before investigating.

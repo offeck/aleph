@@ -1,8 +1,6 @@
 import { detectPlatform } from "../shared/platform";
 
 (function () {
-  "use strict";
-
   const PLATFORM = detectPlatform(location.hostname);
   if (!PLATFORM) return;
 
@@ -17,20 +15,32 @@ import { detectPlatform } from "../shared/platform";
   // ── Constants ────────────────────────────────────────────────────────
   const DRAG_HOLD_MS      = 1500;
 
-  const GAMES = {
+  interface GameCallbacks {
+    onGameOver: () => void;
+  }
+
+  interface GameDef {
+    width: number;
+    height: number;
+    start: (container: HTMLElement, callbacks: GameCallbacks) => () => void;
+  }
+
+  const GAMES: Record<string, GameDef> = {
     snake:       { width: 200, height: 200, start: startSnake },
     minesweeper: { width: 180, height: 210, start: startMinesweeper },
   };
 
   // ── Detection ────────────────────────────────────────────────────────
-  const THINKING_SEL = {
+  const THINKING_SEL: Record<string, string> = {
     claude: '[aria-label="Stop response"]',
     chatgpt: '[aria-label="Stop streaming"], [aria-label*="Stop" i]',
     gemini: '.send-button.stop',
   };
 
   function isThinking() {
-    const sel = THINKING_SEL[PLATFORM];
+    // PLATFORM is non-null past the boot guard, but narrowing doesn't reach
+    // into this closure — same guard pattern as the tracker modules.
+    const sel = PLATFORM ? THINKING_SEL[PLATFORM] : undefined;
     return sel ? !!document.querySelector(sel) : false;
   }
 
@@ -81,9 +91,9 @@ import { detectPlatform } from "../shared/platform";
     requestAnimationFrame(() => { overlay.style.opacity = "1"; });
 
     // Start game via standardized interface
-    const callbacks = { onGameOver: dismiss };
+    const callbacks: GameCallbacks = { onGameOver: dismiss };
 
-    let container = overlay;
+    let container: HTMLElement = overlay;
     if (gameName === "snake") {
       const canvas = document.createElement("canvas");
       canvas.width = w;
@@ -94,7 +104,7 @@ import { detectPlatform } from "../shared/platform";
     const cleanup = gameDef.start(container, callbacks);
 
     // ── ESC handler
-    const escHandler = (e) => { if (e.key === "Escape") dismiss(); };
+    const escHandler = (e: KeyboardEvent) => { if (e.key === "Escape") dismiss(); };
     document.addEventListener("keydown", escHandler);
 
     // ── Mouse enter/leave
@@ -109,9 +119,10 @@ import { detectPlatform } from "../shared/platform";
     });
 
     // ── Drag to reposition
-    let dragState = null;
-    let holdTimer = null;
-    let dragOffsetX, dragOffsetY;
+    let dragState: "holding" | "dragging" | null = null;
+    let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
 
     overlay.addEventListener("mousedown", (e) => {
       dragState = "holding";
@@ -128,7 +139,7 @@ import { detectPlatform } from "../shared/platform";
       }, DRAG_HOLD_MS);
     });
 
-    function dragMove(e) {
+    function dragMove(e: MouseEvent) {
       if (dragState !== "dragging") return;
       e.preventDefault();
       const maxLeft = window.innerWidth - overlay.offsetWidth;
@@ -166,8 +177,10 @@ import { detectPlatform } from "../shared/platform";
   }
 
   // ── Snake ────────────────────────────────────────────────────────────
-  function startSnake(canvas, callbacks) {
-    const ctx = canvas.getContext("2d");
+  // spawnGame always hands snake a <canvas> (see the container swap above).
+  function startSnake(container: HTMLElement, callbacks: GameCallbacks) {
+    const canvas = container as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
     const grid = 10;
     const cols = canvas.width / grid;
     const rows = canvas.height / grid;
@@ -175,7 +188,8 @@ import { detectPlatform } from "../shared/platform";
     let dead = false;
     let started = false;
 
-    const snake = { x: grid * 5, y: grid * 5, dx: 0, dy: 0, cells: [], maxCells: 4 };
+    const snake: { x: number; y: number; dx: number; dy: number; cells: { x: number; y: number }[]; maxCells: number } =
+      { x: grid * 5, y: grid * 5, dx: 0, dy: 0, cells: [], maxCells: 4 };
     const apple = {
       x: Math.floor(Math.random() * cols) * grid,
       y: Math.floor(Math.random() * rows) * grid,
@@ -241,7 +255,7 @@ import { detectPlatform } from "../shared/platform";
       }
     }
 
-    const keyHandler = (e) => {
+    const keyHandler = (e: KeyboardEvent) => {
       if (!["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(e.key)) return;
       e.preventDefault();
 
@@ -269,11 +283,11 @@ import { detectPlatform } from "../shared/platform";
   }
 
   // ── Minesweeper ──────────────────────────────────────────────────────
-  function startMinesweeper(container, callbacks) {
+  function startMinesweeper(container: HTMLElement, callbacks: GameCallbacks) {
     const width = 6;
     const bombAmount = 5;
     const cellSize = 28;
-    let squares = [];
+    const squares: HTMLDivElement[] = [];
     let flags = 0;
     let isGameOver = false;
 
@@ -288,7 +302,7 @@ import { detectPlatform } from "../shared/platform";
 
     for (let i = 0; i < width * width; i++) {
       const sq = document.createElement("div");
-      sq.setAttribute("data-id", i);
+      sq.setAttribute("data-id", String(i));
       sq.setAttribute("data-type", shuffled[i]);
       sq.style.cssText =
         "width:" + cellSize + "px;height:" + cellSize + "px;" +
@@ -316,14 +330,14 @@ import { detectPlatform } from "../shared/platform";
       if (!isLeft && i + width < squares.length && squares[i - 1 + width]?.getAttribute("data-type") === "bomb") total++;
       if (!isRight && i + width + 1 < squares.length && squares[i + 1 + width]?.getAttribute("data-type") === "bomb") total++;
       if (i + width < squares.length && squares[i + width].getAttribute("data-type") === "bomb") total++;
-      squares[i].setAttribute("data-count", total);
+      squares[i].setAttribute("data-count", String(total));
     }
 
     container.appendChild(gridEl);
 
-    const COLORS = { 1: "#6ee7b7", 2: "#93c5fd", 3: "#fca5a5", 4: "#c4b5fd" };
+    const COLORS: Record<number, string> = { 1: "#6ee7b7", 2: "#93c5fd", 3: "#fca5a5", 4: "#c4b5fd" };
 
-    function clickCell(sq) {
+    function clickCell(sq: HTMLDivElement) {
       if (isGameOver) return;
       if (sq.getAttribute("data-checked") || sq.getAttribute("data-flag")) return;
       if (sq.getAttribute("data-type") === "bomb") {
@@ -343,18 +357,18 @@ import { detectPlatform } from "../shared/platform";
       sq.style.background = "#22224a";
       sq.style.cursor = "default";
       if (total > 0) {
-        sq.textContent = total;
+        sq.textContent = String(total);
         sq.style.color = COLORS[total] || "#ccc";
       } else {
-        revealNeighbors(parseInt(sq.getAttribute("data-id")));
+        revealNeighbors(parseInt(sq.getAttribute("data-id")!));
       }
       checkForWin();
     }
 
-    function revealNeighbors(id) {
+    function revealNeighbors(id: number) {
       const isLeft = id % width === 0;
       const isRight = id % width === width - 1;
-      const neighbors = [];
+      const neighbors: number[] = [];
       if (!isLeft && id > 0) neighbors.push(id - 1);
       if (!isRight && id < squares.length - 1) neighbors.push(id + 1);
       if (id >= width) neighbors.push(id - width);
@@ -366,7 +380,7 @@ import { detectPlatform } from "../shared/platform";
       setTimeout(() => { neighbors.forEach((n) => clickCell(squares[n])); }, 10);
     }
 
-    function addFlag(sq) {
+    function addFlag(sq: HTMLDivElement) {
       if (isGameOver || sq.getAttribute("data-checked")) return;
       if (!sq.getAttribute("data-flag") && flags < bombAmount) {
         sq.setAttribute("data-flag", "true");

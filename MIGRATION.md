@@ -197,13 +197,13 @@ Eliminate the tolerated implicit-`any` debt in all migrated code: `src/shared/`,
 
 Background: `sync.ts` exports public API + `_mergeUsageDay` (+helpers) for tests, `declare const firebase: any`, behavior identical; `index.ts` statement order: importScripts(4 vendor files) → init guard → `alephSync.init/restoreAuth`; **every background submodule must be side-effect-free at import time** (esbuild hoists bundled imports above the importScripts call — the single riskiest property; verify in SW console). Split `usage` (readLocal/writeLocal→`alephSync.maybePush`, updateUsageDay queue), `metrics`, `remarks`, `cleanup`, `router` (all listeners incl. onMessageExternal + commands + onInstalled/onStartup + storage.onChanged push). Popup: `meters`/`insightsView`/`ui`/`index`. Settings/insights/mini-game become clean TS modules importing shared. Add `mergeUsageDay.spec.ts`, finish `metrics.spec.ts`.
 
-- [ ] build+test green (all 6 spec files plus any new router/sync/popup pure-helper specs); **modules land fully typed** — their paths join `STRICT_PATHS` in the same commit and the budget ratchets to 0 (`any` only at commented raw-JSON/firebase boundaries)
-- [ ] SW console: firebase init order correct, no reorder errors
-- [ ] message round-trips: `insights-get-summary` (popup+insights), insights-* writes, `aleph-sync-status` in settings
-- [ ] `aleph-reload` external message still reloads; Alt+Shift+A works; onInstalled/onStartup clean
+- [x] build+test green — 13 spec files / 108 tests (new: `merge-usage-day`, `metrics`, `popup-meters`); **modules landed fully typed** — `STRICT_PATHS` now `^src/` + `^tests/`, baseline ratcheted to 0, gate prints `0/0 (strict paths: 0)`; `any` only at commented raw-JSON/firebase boundaries
+- [x] SW boot order verified behaviorally: two `aleph-reload` round-trips (second handled by the new `router.ts`) plus a no-op `onMessageExternal` probe returning "port closed" (listener registered ⇒ importScripts → init guard → `registerBackgroundListeners()` ran without reorder errors); direct SW console view remains automation-blocked
+- [ ] message round-trips: `insights-get-summary` (popup+insights), insights-* writes, `aleph-sync-status` in settings — tracker→router sends observed live on all 3 platforms; the page-side round-trips are extension pages (automation-blocked, user-assisted)
+- [ ] `aleph-reload` external still reloads ✓ (verified twice, incl. through the new router); Alt+Shift+A + onInstalled/onStartup console — user-assisted
 - [ ] popup full pass: toggles, theme grid, overrides, sliders, export/import (incl. miniGame), buttons
 - [ ] sync: signed-in `aleph-sync-now` completes (or clean signed-out state)
-- [ ] reload + `no-console-errors` on all 3 platforms
+- [x] reload + `no-console-errors` on all 3 platforms — stamp `2026-06-06T13:02:53.493Z` injected on Claude/ChatGPT/Gemini; full active-session sweep: bidi-math-001 (rtl 51/0, math 48 LTR, katex 48/0 err), bidi-math-003 (rtl 23/0, math 22/0, 0 err), general-001 (rtl 3/0), general-004 + chatgpt-theme-001 (selectors PASS, rtl 3/3) — consoles show only `[Aleph]` info logs. Gotcha discovered: refreshing in the same instant as the extension restart skips manifest-CSS injection (document_start) while JS still injects at idle with a fresh stamp — wait ~2s between reload trigger and page refresh (now noted in CLAUDE.md)
 
 **Rollback:** revert restores `importScripts("sync.js")` + relocated sync together; verify firebase still inits after revert.
 

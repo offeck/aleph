@@ -2,12 +2,12 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 // Two-tier typecheck gate:
-// 1. STRICT paths (everything migrated through Phase 4) tolerate ZERO errors.
-// 2. The remaining (pre-split, Phase 5 pending) entries are budgeted by the
-//    committed baseline count, which may only ratchet downward.
-// When Phase 5 lands typed, fold its paths into STRICT_PATHS and drive the
-// baseline to 0; Phase 6 then replaces this script with raw `tsc --noEmit`.
-const STRICT_PATHS = [/^src\/shared\//, /^src\/tracker\//, /^src\/content\//, /^tests\//];
+// 1. STRICT paths (everything migrated — all of src + tests as of Phase 5)
+//    tolerate ZERO errors.
+// 2. The budget tier is exhausted (baseline 0); the split remains only so a
+//    regression names the offending strict path. Phase 6 replaces this script
+//    with raw `tsc --noEmit`.
+const STRICT_PATHS = [/^src\//, /^tests\//];
 
 const baseline = JSON.parse(readFileSync("tests/typecheck-baseline.json", "utf8"));
 const expected = baseline.expectedErrorCount;
