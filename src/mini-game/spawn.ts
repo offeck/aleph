@@ -1,3 +1,4 @@
+import { MINI_GAME_OVERLAY_ID } from "../shared/domIds";
 import { startSnake } from "./snake";
 import { startMinesweeper } from "./minesweeper";
 
@@ -34,7 +35,7 @@ export function spawnGame() {
   const gameDef = GAMES[gameName];
 
   const overlay = document.createElement("div");
-  overlay.id = "aleph-mini-game";
+  overlay.id = MINI_GAME_OVERLAY_ID;
   const w = gameDef.width;
   const h = gameDef.height;
   overlay.style.cssText =

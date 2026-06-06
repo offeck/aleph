@@ -1,4 +1,6 @@
+import { USER_MESSAGE_SEL } from "../shared/messageMarkers";
 import { detectPlatform } from "../shared/platform";
+import { makeSpawnLatch } from "./latch";
 import { isGameActive, spawnGame } from "./spawn";
 
 (function () {
@@ -27,14 +29,30 @@ import { isGameActive, spawnGame } from "./spawn";
     return sel ? !!document.querySelector(sel) : false;
   }
 
-  // ── Spawn trigger ────────────────────────────────────────────────────
-  let spawnPending = false;
+  // Cycle boundary = USER message count (shared markers in
+  // src/shared/messageMarkers.ts). User bubbles render synchronously at send
+  // and never mount mid-response — unlike assistant nodes, which can appear
+  // after the game already spawned (e.g. ChatGPT thinking models) and would
+  // falsely re-arm the latch during the same cycle.
+  const userMessageCount = () =>
+    document.querySelectorAll(USER_MESSAGE_SEL).length;
 
-  new MutationObserver(() => {
+  // ── Spawn trigger ────────────────────────────────────────────────────
+  // One game per message sent: spawnLatch is spent at spawn and re-arms
+  // only when a new user message appears (see latch.ts) — so losing,
+  // winning, or ESC-dismissing a game mid-response never respawns one.
+  let spawnPending = false;
+  const spawnLatch = makeSpawnLatch();
+  let lastSpawnCheck = 0;
+  let recheckQueued = false;
+
+  function trySpawn() {
     if (!miniGameEnabled) return;
     if (isGameActive()) return;
-    if (!isThinking()) return;
     if (spawnPending) return;
+    lastSpawnCheck = Date.now();
+    if (!isThinking()) return;
+    if (spawnLatch.spent(userMessageCount)) return;
     spawnPending = true;
     console.log("[Aleph MiniGame] thinking detected!");
     setTimeout(() => {
@@ -44,7 +62,28 @@ import { isGameActive, spawnGame } from "./spawn";
       if (isGameActive()) return;
       if (!stillThinking) return;
       console.log("[Aleph MiniGame] spawning game!");
+      spawnLatch.spend(userMessageCount());
       spawnGame();
     }, 500);
+  }
+
+  new MutationObserver(() => {
+    if (!miniGameEnabled) return;
+    if (isGameActive()) return;
+    if (spawnPending) return;
+    // Mutation batches arrive continuously while streaming — throttle the
+    // querySelector work to at most twice per second. A throttled signal is
+    // never dropped: one trailing re-check runs after the window, so a stop
+    // button that appears right after an unrelated mutation (and a thinking
+    // period with no further DOM churn) still spawns.
+    const now = Date.now();
+    if (now - lastSpawnCheck < 500) {
+      if (!recheckQueued) {
+        recheckQueued = true;
+        setTimeout(() => { recheckQueued = false; trySpawn(); }, 500);
+      }
+      return;
+    }
+    trySpawn();
   }).observe(document.body, { childList: true, subtree: true });
 })();
