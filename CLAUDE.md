@@ -197,7 +197,10 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 
 **Export/import settings**: JSON format matching the `DEFAULTS` keys. Import validates keys against `DEFAULTS` to prevent injection of unknown settings.
 
-**Reloading the extension after code changes**: `content.js` exposes the extension ID as `data-aleph-ext-id` on `<html>`. `background.js` has an `onMessageExternal` listener for `{type: "aleph-reload"}` that calls `chrome.runtime.reload()`. From any supported platform page (Claude, ChatGPT, Gemini), run in the browser console or via `javascript_tool`:
+**Reloading the extension after code changes** — the extension runs the **built** bundles in `dist/`, not `src/` directly, so the reload procedure is THREE steps and the build step is mandatory (skipping it silently reloads stale code and invalidates any verification):
+
+1. **Rebuild**: `npm run build` (skip only if you started `npm run dev` watch in this session and it is still running).
+2. **Reload**: the content bundle exposes the extension ID as `data-aleph-ext-id` on `<html>`; the background bundle has an `onMessageExternal` listener for `{type: "aleph-reload"}` that calls `chrome.runtime.reload()`. From any supported platform page (Claude, ChatGPT, Gemini), run in the browser console or via `javascript_tool`:
 ```javascript
 (() => {
   const extId = document.documentElement.getAttribute('data-aleph-ext-id');
@@ -206,4 +209,4 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
   return 'OK: reload triggered for ' + extId;
 })()
 ```
-After reload, refresh the page to load the new content scripts.
+3. **Refresh the page** to load the new content scripts, then confirm your change is actually present (console banner, a probe of the changed behavior, or — once available — the `data-aleph-build` stamp on `<html>`) before treating any verification as meaningful.

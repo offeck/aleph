@@ -145,11 +145,13 @@ Steps (behavior-identical; CSS rule order preserved — rule 11):
 6. `publish.yml`: zip list shrinks to `manifest.json dist/ icons/ vendor/`; required-files check gains `dist/content.css` + `dist/popup.html`.
 7. CLAUDE.md structure bullets: asset paths updated (small touch; full rewrite stays Phase 6).
 8. Optional root tidy (separate commit, gated on grep showing zero inbound references): `COMPETITORS.md`, `EXAMPLES.md`, `store-listing.md` → `docs/`. **Keep at root**: `README.md`, `LICENSE`, `CLAUDE.md` + `AGENTS.md` symlink, `PRIVACY.md` (the Web Store listing may deep-link its GitHub blob URL — verify before ever moving), `MIGRATION.md` (deleted in Phase 6 anyway).
+9. **Build stamp (agent dev-loop affordance)**: `build.mjs` injects `define: { __ALEPH_BUILD__: <ISO timestamp> }`; the content entry sets it as `data-aleph-build` on `<html>` next to `data-aleph-ext-id` and includes it in the console banner. The CLAUDE.md reload procedure (already updated to *build → reload → refresh*) gains a freshness assertion: after refresh, read `data-aleph-build` and confirm it matches the just-finished build — closing the silent-stale-bundle loop end to end for Claude/Codex (both consume the procedure via CLAUDE.md / the AGENTS.md symlink).
 
 - [ ] build emits 7 JS + 4 CSS + 3 HTML into dist/; `npm test` + `npm run typecheck:baseline` green
 - [ ] reload → popup opens from `dist/popup.html` (toolbar click); settings/insights open via popup buttons; settings back-link returns to popup
 - [ ] content.css still injected (path-only change): `theme-applied`, `focus-hidden`, `streaming-attrs`, `rtl-direction` PASS on an RTL session (all depend on content.css rules)
 - [ ] page styling pixel-identical (ui.css extraction is visually invisible): popup/settings/insights eyeball
+- [ ] build stamp round-trip: rebuild → reload → refresh → `data-aleph-build` on `<html>` equals the new build's stamp (and differs from the previous one)
 - [ ] extension ID unchanged; publish zip list reviewed
 
 **Rollback:** revert → assets back at root, paths restored. No storage impact.
@@ -217,6 +219,7 @@ Drive `tsc --noEmit` to zero under full strict; remove `allowJs`; real types rep
 9. **CSS rule order is part of the contract (P2.5/P4):** equal-specificity rules must keep their relative order; split files are imported in original-section order, never alphabetized. Shared `ui.css` may only absorb byte-identical blocks.
 10. **esbuild CSS bundling (P2.5):** `@import` inlining only; no `url()` assets exist in any CSS today (verified) — if one appears later, configure the asset loader before relying on it.
 11. **Pages live in dist/ after P2.5:** `default_popup` and `getURL` targets require a build before the popup is openable — same property the JS bundles already have; watch mode covers the dev loop.
+12. **Silent stale-bundle hazard (agents, every phase):** the `aleph-reload` flow reloads whatever is in `dist/` — an agent that edits `src/` and reloads WITHOUT `npm run build` "verifies" old code with no error anywhere. Mitigations: the CLAUDE.md reload procedure now mandates build-first (Codex reads it via the AGENTS.md symlink), and the P2.5 build stamp makes freshness assertable (`data-aleph-build`). Until the stamp lands, agents confirm freshness by probing the changed behavior itself.
 
 ## Post-migration candidates (explicitly NOT in scope)
 
