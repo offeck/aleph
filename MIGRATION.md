@@ -26,6 +26,7 @@
 8. Firebase init order is load-bearing: the four `importScripts` (app/auth/firestore compat + config) run before any code touching `firebase`/`ALEPH_FIREBASE_CONFIG`; the repo ships a **real** apiKey so the `!== "PLACEHOLDER"` guard genuinely fires — test it.
 9. TypeScript debt is budgeted until Phase 6: count `tsc --noEmit --pretty false` diagnostics by `error TS`, fail CI if the count grows, and update the committed baseline only when the count shrinks in the same phase commit.
 10. Tests are part of every behavioral change: add or update automated coverage for changed logic when practical; when browser-only/manual verification is the only realistic path, record the reason and the manual check. From Phase 2 onward `npm test` must discover real tests.
+11. CSS rule order is behavior: splits preserve original rule order (never alphabetize); shared extractions may only contain byte-identical blocks — intentionally divergent rules (e.g. settings' darker selects) stay per-page.
 
 **Definition of done (per phase):** code committed; `npm run build` green; Phase 1 records raw `npm run typecheck`, Phases 2–5 require `npm run typecheck:baseline`, and Phase 6 requires raw `npm run typecheck`; `npm test` green with relevant tests added/updated for changed behavior; extension reloads via `aleph-reload` with no new console errors; the phase's spot-checks pass; checkboxes ticked in the same commit.
 
@@ -33,21 +34,27 @@
 
 ```
 repo root/
-  manifest.json  popup.html  settings.html  insights.html   (stay; paths -> dist/)
-  *.css  icons/  vendor/                                    (unchanged)
+  manifest.json                      (stays at root forever — identity constraint;
+                                      popup/css paths point into dist/)
+  icons/  vendor/                    (stay at root: the repo root IS the package
+                                      root; /vendor/* paths are load-bearing)
   build.mjs  package.json  tsconfig.json  vitest.config.ts  eslint.config.mjs
-  dist/                                                     (gitignored output)
+  dist/                              (gitignored: JS bundles + bundled CSS + copied HTML)
   src/
     shared/     version.ts platform.ts defaults.ts themes.ts pricing.ts
                 platformMeta.ts dates.ts format.ts rtl.ts metricKeys.ts
-                selectors.ts messages.ts
+                selectors.ts messages.ts ui.css (exact-duplicate page-chrome blocks)
     content/    index.ts settingsStore.ts selectors.ts fonts.ts theme.ts
                 bidi.ts focus.ts streaming.ts latex.ts styles.ts badge.ts
+                content.css (Phase 4 splits into styles/{bidi,streaming,focus,
+                theme-transitions,platform-fixes}.css imported in ORIGINAL ORDER)
     tracker/    index.ts send.ts tokens.ts time.ts messages.ts timing.ts
                 plans.ts usageClaude.ts usageChatgpt.ts usageGemini.ts modelCaps.ts
     background/ index.ts usage.ts metrics.ts remarks.ts cleanup.ts router.ts sync.ts
-    popup/      index.ts meters.ts insightsView.ts ui.ts
-    settings/   index.ts        insights/ index.ts        mini-game/ index.ts
+    popup/      index.ts meters.ts insightsView.ts ui.ts popup.html popup.css
+    settings/   index.ts settings.html settings.css
+    insights/   index.ts insights.html insights.css
+    mini-game/  index.ts
   tests/
     checks.md  sessions.json    (stay; KEEP-IN-SYNC comments repointed)
     unit/      plans.spec.ts codex.spec.ts gemini.spec.ts metrics.spec.ts
@@ -91,9 +98,9 @@ Discriminated union on `type`: content/tracker→bg fire-and-forget (`disabled`,
 
 **`manifest.json`** — content_scripts js: `["vendor/katex/katex.min.js", "dist/content.js", "dist/insights-tracker.js", "dist/mini-game.js"]`; background `"service_worker": "dist/background.js"` and **stay classic** (no `"type":"module"` — module workers can't `importScripts`, which firebase compat needs). Nothing else changes.
 
-**HTML** — `<script src>` → `dist/popup.js` / `dist/settings.js` / `dist/insights.js`. `chrome.runtime.getURL("settings.html")` references unaffected (HTML stays at root).
+**HTML** — Phase 1: `<script src>` → `dist/popup.js` / `dist/settings.js` / `dist/insights.js` (HTML still at root). Phase 2.5 moves the HTML into `src/<page>/` and copies it to `dist/` at build time, with same-dir relative refs (`popup.css`, `popup.js` — siblings in dist/); `manifest.json` `default_popup` and the two `chrome.runtime.getURL(...)` calls in `src/popup/index.ts` switch to `dist/...` paths.
 
-**`publish.yml`** — test job: setup-node@v4 (node 20) + `npm ci`; replace per-file `node --check` with `npm test` + `npm run build`, add `npm run typecheck:baseline` in Phase 2, then switch to raw `npm run typecheck` in Phase 6; required-files check runs after build and looks for `dist/*.js`. Publish job: `npm ci` + `npm run build` before `zip`; zip list swaps loose JS for `dist/` → `zip -r extension.zip manifest.json dist/ popup.html popup.css settings.html settings.css insights.html insights.css content.css icons/ vendor/`. Never `src/`.
+**`publish.yml`** — test job: setup-node@v4 (node 20) + `npm ci`; replace per-file `node --check` with `npm test` + `npm run build`, add `npm run typecheck:baseline` in Phase 2, then switch to raw `npm run typecheck` in Phase 6; required-files check runs after build and looks for `dist/*.js`. Publish job: `npm ci` + `npm run build` before `zip`; zip list swaps loose JS for `dist/` → `zip -r extension.zip manifest.json dist/ popup.html popup.css settings.html settings.css insights.html insights.css content.css icons/ vendor/`. Never `src/`. After Phase 2.5 the loose CSS/HTML disappear from the zip too (dist/ ships them): `zip -r extension.zip manifest.json dist/ icons/ vendor/`.
 
 ## Phases
 
@@ -125,6 +132,28 @@ First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typeche
 
 **Rollback:** revert → consumers back to local literals. No storage/manifest impact.
 
+### Phase 2.5 — Assets: CSS + HTML into src/, built to dist/
+
+Best-practice grounding: extension frameworks (WXT/Plasmo/CRXJS) colocate entrypoint HTML+CSS with their feature's source and keep static pass-through assets at the package root. Our identity-constrained analog: HTML/CSS move into `src/<page>/`, build emits/copies them into `dist/`; `icons/` + `vendor/` stay at the repo root (which IS the package root; `/vendor/*` paths are load-bearing).
+
+Steps (behavior-identical; CSS rule order preserved — rule 11):
+1. `git mv` assets next to their code: `content.css → src/content/content.css` (verbatim; concern-split deferred to Phase 4), `popup.{html,css} → src/popup/`, `settings.{html,css} → src/settings/`, `insights.{html,css} → src/insights/`.
+2. `build.mjs`: add 4 CSS entry points (esbuild bundles `.css` natively, inlines `@import`) → `dist/{content,popup,settings,insights}.css`; add a plain copy step for the 3 HTML files → `dist/*.html`. Edit the source HTML refs to same-dir relative (`<link href="popup.css">`, `<script src="popup.js">` — both siblings in dist/). `settings.html`'s back-link `href="popup.html"` stays valid (same dir).
+3. Extract `src/shared/ui.css` containing **only byte-identical** page-chrome blocks (`.logo`; the shared toggle base) — each page CSS opens with `@import "../shared/ui.css";` so base rules still precede page rules. Divergent blocks (`.field` gap, `select`/range backgrounds `#2a2a4a` vs `#1a1a2e`, settings' toggle `border-top`) **stay per-page** — they differ on purpose.
+4. `manifest.json`: `"default_popup": "dist/popup.html"`; content_scripts `"css": ["dist/content.css"]`.
+5. `src/popup/index.ts`: `getURL("settings.html")` → `getURL("dist/settings.html")`, `getURL("insights.html")` → `getURL("dist/insights.html")`.
+6. `publish.yml`: zip list shrinks to `manifest.json dist/ icons/ vendor/`; required-files check gains `dist/content.css` + `dist/popup.html`.
+7. CLAUDE.md structure bullets: asset paths updated (small touch; full rewrite stays Phase 6).
+8. Optional root tidy (separate commit, gated on grep showing zero inbound references): `COMPETITORS.md`, `EXAMPLES.md`, `store-listing.md` → `docs/`. **Keep at root**: `README.md`, `LICENSE`, `CLAUDE.md` + `AGENTS.md` symlink, `PRIVACY.md` (the Web Store listing may deep-link its GitHub blob URL — verify before ever moving), `MIGRATION.md` (deleted in Phase 6 anyway).
+
+- [ ] build emits 7 JS + 4 CSS + 3 HTML into dist/; `npm test` + `npm run typecheck:baseline` green
+- [ ] reload → popup opens from `dist/popup.html` (toolbar click); settings/insights open via popup buttons; settings back-link returns to popup
+- [ ] content.css still injected (path-only change): `theme-applied`, `focus-hidden`, `streaming-attrs`, `rtl-direction` PASS on an RTL session (all depend on content.css rules)
+- [ ] page styling pixel-identical (ui.css extraction is visually invisible): popup/settings/insights eyeball
+- [ ] extension ID unchanged; publish zip list reviewed
+
+**Rollback:** revert → assets back at root, paths restored. No storage impact.
+
 ### Phase 3 — Split tracker + port fixtures to vitest
 
 Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude`/`usageChatgpt`/`usageGemini`/`modelCaps`; `index.ts` keeps the boot orchestration (3s setTimeout, 60s intervals, detect kickoffs). Export test targets (`normalizeChatgptPlan`, `CHATGPT_PLAN_RANK`, `normalizeCodexBalance`, gemini credits parser, `estimateTokens`). WeakSet/WeakMap and plan-state lets each live in exactly one owning module. Port PR #1 fixtures → `plans.spec.ts`, `codex.spec.ts`, `gemini.spec.ts`.
@@ -139,7 +168,7 @@ Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude
 
 ### Phase 4 — Split content.js (highest-risk split)
 
-`settingsStore.ts` first — mutable settings behind `getSettings()`/`setSettings()` (never `export let` reassigned cross-module). Then `selectors`/`fonts`/`theme`/`bidi` (owns `patching` flag, editor-dir WeakMap, `hintChecked`, `sendHint`)/`focus`/`streaming`/`latex` (large, pure)/`styles`/`badge`; `index.ts` keeps `ensureRootAttributes` (sets `data-aleph-platform` + `data-aleph-ext-id` early), storage `onChanged` listener, `toggle` listener, both MutationObservers, boot chain, banner.
+`settingsStore.ts` first — mutable settings behind `getSettings()`/`setSettings()` (never `export let` reassigned cross-module). Then `selectors`/`fonts`/`theme`/`bidi` (owns `patching` flag, editor-dir WeakMap, `hintChecked`, `sendHint`)/`focus`/`streaming`/`latex` (large, pure)/`styles`/`badge`; `index.ts` keeps `ensureRootAttributes` (sets `data-aleph-platform` + `data-aleph-ext-id` early), storage `onChanged` listener, `toggle` listener, both MutationObservers, boot chain, banner. Also split `src/content/content.css` into `src/content/styles/{bidi,streaming,focus,theme-transitions,platform-fixes}.css` (mirroring its existing section banners at lines 1-106/108-358/360-367/369-380/382-399), with `content.css` reduced to ordered `@import`s **matching the original section order exactly** (rule 11).
 
 - [ ] build+test green; add focused unit tests for extracted pure content logic (RTL detection, theme resolution/style generation, selector unions, latex helpers); `npm run typecheck:baseline` count drops or at least does not grow
 - [ ] reload all 3 platforms; banner present; `data-aleph-ext-id` on `<html>` verified explicitly
@@ -185,6 +214,14 @@ Drive `tsc --noEmit` to zero under full strict; remove `allowJs`; real types rep
 6. **`writeLocal`→`alephSync.maybePush` (P5):** `usage.ts` imports `sync.ts`; no reverse import (cycle).
 7. **Export/import filter (P2):** `Object.keys(DEFAULTS)` gate now includes miniGame — verify round-trip.
 8. **publish zip must ship `dist/` (P1/P6):** dist is gitignored — workflow must build before zip or the zip ships no code.
+9. **CSS rule order is part of the contract (P2.5/P4):** equal-specificity rules must keep their relative order; split files are imported in original-section order, never alphabetized. Shared `ui.css` may only absorb byte-identical blocks.
+10. **esbuild CSS bundling (P2.5):** `@import` inlining only; no `url()` assets exist in any CSS today (verified) — if one appears later, configure the asset loader before relying on it.
+11. **Pages live in dist/ after P2.5:** `default_popup` and `getURL` targets require a build before the popup is openable — same property the JS bundles already have; watch mode covers the dev loop.
+
+## Post-migration candidates (explicitly NOT in scope)
+
+- CSS design tokens: platform colors (`#D97706/#4285F4/#10A37F`) and surface colors repeat ~10× across page CSS and also exist in JS `PLATFORM_COLORS` — converting to CSS custom properties is a behavior-affecting refactor; do it (if at all) after Phase 6 with visual diffing.
+- Moving `icons/`/`vendor/` or generating `manifest.json`: ruled out by the identity constraint and load-bearing absolute paths.
 
 ## Progress-tracking convention
 
