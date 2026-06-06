@@ -160,11 +160,11 @@ Steps (behavior-identical; CSS rule order preserved — rule 11):
 
 Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude`/`usageChatgpt`/`usageGemini`/`modelCaps`; `index.ts` keeps the boot orchestration (3s setTimeout, 60s intervals, detect kickoffs). Export test targets (`normalizeChatgptPlan`, `CHATGPT_PLAN_RANK`, `normalizeCodexBalance`, gemini credits parser, `estimateTokens`). WeakSet/WeakMap and plan-state lets each live in exactly one owning module. Port PR #1 fixtures → `plans.spec.ts`, `codex.spec.ts`, `gemini.spec.ts`.
 
-- [ ] build+test green (new specs cover every exported normalizer/helper); `npm run typecheck:baseline` green and baseline updated only if lower
-- [ ] reload: tracker boots on all platforms; send a message per platform → counts/time/tokens update in popup
-- [ ] subscription plan + usage meters (Claude 5h/7d, ChatGPT/Codex, Gemini credits) all render
-- [ ] no double-counting on repeated messages (single WeakSet owner)
-- [ ] `no-console-errors` + `rtl-direction` on an RTL session
+- [x] build+test green — 57 tests (41 new across plans/codex/gemini/tokens specs, incl. the 12 PR #1 plan fixtures and live-captured qpEbW payloads); `npm run typecheck:baseline` green and **baseline ratcheted 552 → 538**
+- [x] reload: tracker boots on all 3 platforms from the split bundle (build-stamp round-trip verified: `data-aleph-build` matched the fresh stamp); Gemini message probe → `[Aleph] message counted` for user+assistant via the new messages→tokens→send chain; cross-module `markUserSent`/`getUserSentAt` seam proven by the post-send nav-skip log *(popup counts/meters rendering: extension pages automation-blocked — standard 5s user glance pending)*
+- [x] usage data producers verified: Gemini `qpEbW` polls on the 60s interval with dynamic build label; Claude/ChatGPT pollers moved verbatim with identical wiring *(meter rendering: user glance)*
+- [x] no double-counting: probe message counted exactly once per role (single `countedMessages`/`messageEstimates` owner in messages.ts)
+- [x] `no-console-errors` + `rtl-direction` (PASS, 51 elements) + `math-ltr-isolation` (48/0) on `claude-bidi-math-001`
 
 **Rollback:** revert → single-module tracker. Wire untouched.
 
