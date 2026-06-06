@@ -1,4 +1,15 @@
 import { alephSync } from "./sync";
+import { todayKey, usageKeyForDate } from "../shared/dates";
+import {
+  CHATGPT_CODEX_CREDITS_KEY,
+  CHATGPT_CODEX_WORKSPACE_CREDITS_KEY,
+  CHATGPT_CODEX_WORKSPACE_THREADS_KEY,
+  CHATGPT_CODEX_WORKSPACE_TURNS_KEY,
+  chatgptLimitMetricKey,
+  chatgptModelMetricKey,
+  GEMINI_CREDITS_KEY,
+  geminiFeatureMetricKey,
+} from "../shared/metricKeys";
 
 declare function importScripts(...urls: string[]): void;
 declare const firebase: any;
@@ -22,21 +33,6 @@ if (ALEPH_FIREBASE_CONFIG.apiKey !== "PLACEHOLDER") {
 "use strict";
 
 // ── Helpers ──────────────────────────────────────────────
-function localDateString(date = new Date()) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return y + "-" + m + "-" + d;
-}
-
-function usageKeyForDate(date = new Date()) {
-  return "usage_" + localDateString(date);
-}
-
-function todayKey() {
-  return usageKeyForDate();
-}
-
 function emptyPlatformDay() {
   return {
     totalSeconds: 0,
@@ -116,9 +112,9 @@ function collectCodexWorkspaceMetricValues(values, data) {
     credits += metricNumber(row?.totals?.credits) || 0;
   }
   if (threads || turns || credits) {
-    addUsageMetricValue(values, "chatgpt:codex.workspace.threads", threads);
-    addUsageMetricValue(values, "chatgpt:codex.workspace.turns", turns);
-    addUsageMetricValue(values, "chatgpt:codex.workspace.credits", credits);
+    addUsageMetricValue(values, CHATGPT_CODEX_WORKSPACE_THREADS_KEY, threads);
+    addUsageMetricValue(values, CHATGPT_CODEX_WORKSPACE_TURNS_KEY, turns);
+    addUsageMetricValue(values, CHATGPT_CODEX_WORKSPACE_CREDITS_KEY, credits);
   }
 }
 
@@ -128,24 +124,24 @@ function collectUsageMetricValues(platform, usage) {
 
   if (platform === "chatgpt") {
     const chat = usage.chat || usage;
-    // KEEP IN SYNC with popup.js usage meter metric keys.
+    // Metric key builders live in shared/metricKeys.ts.
     for (const ml of (chat?.modelLimits || [])) {
       const id = ml?.model || ml?.name || ml?.feature;
-      if (id != null) addUsageMetricValue(values, "chatgpt:model:" + id, ml?.remaining ?? ml?.used);
+      if (id != null) addUsageMetricValue(values, chatgptModelMetricKey(id), ml?.remaining ?? ml?.used);
     }
     for (const lp of (chat?.limits || [])) {
       const id = lp?.feature || lp?.name;
-      if (id != null) addUsageMetricValue(values, "chatgpt:limit:" + id, lp?.remaining ?? lp?.used);
+      if (id != null) addUsageMetricValue(values, chatgptLimitMetricKey(id), lp?.remaining ?? lp?.used);
     }
     const analytics = usage.codex?.analytics;
-    addUsageMetricValue(values, "chatgpt:codex.credits", analytics?.credits?.remaining);
+    addUsageMetricValue(values, CHATGPT_CODEX_CREDITS_KEY, analytics?.credits?.remaining);
     collectCodexWorkspaceMetricValues(values, analytics?.dailyWorkspaceUsage);
   }
 
   if (platform === "gemini") {
-    addUsageMetricValue(values, "gemini:credits", usage.credits?.remaining);
+    addUsageMetricValue(values, GEMINI_CREDITS_KEY, usage.credits?.remaining);
     for (const feature of (usage.features || [])) {
-      if (feature?.id != null) addUsageMetricValue(values, "gemini:feature:" + feature.id, feature?.remaining ?? feature?.used);
+      if (feature?.id != null) addUsageMetricValue(values, geminiFeatureMetricKey(feature.id), feature?.remaining ?? feature?.used);
     }
   }
 

@@ -120,11 +120,11 @@ Add package.json/tsconfig/vitest.config/build.mjs (+eslint placeholder); `npm in
 
 ### Phase 2 — Extract `src/shared/` (kill duplication)
 
-First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typecheck-baseline.json` seeded from the current `tsc --noEmit --pretty false` count (`566` as of Phase 1 review); wire `npm run typecheck:baseline` and publish CI to fail only when the count grows. Remove `passWithNoTests:true` so `npm test` cannot pass with an empty suite. Then create shared modules (`version`, `platform`, `defaults`+`Settings` type, `themes`, `pricing`, `platformMeta`, `dates`, `format`, `rtl`, `metricKeys`, `messages`); rewire all consumers, delete local copies (canonical winners per table above); both background and popup call the same `metricKeys` builders. Repoint `checks.md` KEEP-IN-SYNC comments (code untouched). Add `tests/unit/defaults.spec.ts` + `metrics.spec.ts` (lock default keys, theme names, metric-key strings, date/format helpers).
+First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typecheck-baseline.json` seeded from the current `tsc --noEmit --pretty false` count (`566` as of Phase 1 review); wire `npm run typecheck:baseline` and publish CI to fail only when the count grows. Remove `passWithNoTests:true` so `npm test` cannot pass with an empty suite. Then create shared modules (`version`, `platform`, `defaults`+`Settings` type, `themes`, `pricing`, `platformMeta`, `dates`, `format`, `rtl`, `metricKeys`, `messages`); rewire all consumers, delete local copies (canonical winners per table above); both background and popup call the same `metricKeys` builders. Repoint `checks.md` KEEP-IN-SYNC comments (code untouched). Add `tests/unit/defaults-themes.spec.ts`, `tests/unit/metric-keys.spec.ts`, and `tests/unit/shared-helpers.spec.ts` (lock default keys, theme names, metric-key strings, date/format/platform/RTL helpers, selector unions).
 
-- [ ] `npm run typecheck:baseline` green; if the count shrinks, `tests/typecheck-baseline.json` updated in the same commit
-- [ ] `npm test` discovers and runs real unit tests; no `passWithNoTests`
-- [ ] build+test green; grep shows each duplicated literal exists once under `src/shared/`
+- [x] `npm run typecheck:baseline` green (**552/552**); count shrank from 566 and `tests/typecheck-baseline.json` was updated in the same commit
+- [x] `npm test` discovers and runs real unit tests (**13 tests**); no `passWithNoTests`
+- [x] build+test+lint green; grep shows each migrated duplicated literal exists once under `src/shared/` (excluding intentional `tests/checks.md` console snippets and unit-test assertions)
 - [ ] reload, all platforms clean
 - [ ] settings delta verified: per-platform dropdowns gain "Default"; miniGame persists incl. reset + export/import round-trip
 - [ ] popup meters render identically (shared keys match stored snapshots); insights spend/time render

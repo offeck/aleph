@@ -36,8 +36,8 @@ jobs:
             console.log('Manifest OK — ' + manifest.name + ' v' + manifest.version);
           "
 
-      - name: Typecheck (advisory until migration Phase 6)
-        run: npm run typecheck || echo "::warning::typecheck has known errors during the TS migration"
+      - name: Typecheck baseline
+        run: npm run typecheck:baseline
 
       - name: Unit tests
         run: npm test

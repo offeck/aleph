@@ -1,49 +1,8 @@
-export {};
+import { DEFAULTS } from "../shared/defaults";
+import { THEME_NAMES } from "../shared/themes";
+
 (function () {
   "use strict";
-
-  const DEFAULTS = {
-    bidiEnabled: true,
-    enableClaude: true,
-    enableChatgpt: true,
-    enableGemini: true,
-    fontFamily: "",
-    fontSize: 0,
-    lineHeight: 0,
-    paragraphSpacing: 0,
-    codeFontSize: 0,
-    codeFontFamily: "",
-    chatWidth: 0,
-    theme: "none",
-    themeClaude: "",
-    themeChatgpt: "",
-    themeGemini: "",
-    focusMode: false,
-    focusHideUpgrade: true,
-    focusHideChips: true,
-    focusHidePromos: true,
-    latexFix: true,
-    streamSmooth: true,
-    streamAnimation: "platform",
-    messageSpacing: 0,
-  };
-
-  const THEME_NAMES = {
-    warmDark: "Warm Dark",
-    coolDark: "Cool Dark",
-    paperLight: "Paper Light",
-    highContrast: "High Contrast",
-    midnight: "Midnight",
-    nord: "Nord",
-    dracula: "Dracula",
-    solarized: "Solarized",
-    rosePine: "Rosé Pine",
-    catppuccin: "Catppuccin",
-    gruvbox: "Gruvbox",
-    oneDark: "One Dark",
-    tokyoNight: "Tokyo Night",
-    githubDark: "GitHub Dark",
-  };
 
   const CHECKBOXES = [
     "bidiEnabled", "enableClaude", "enableChatgpt", "enableGemini",
@@ -74,6 +33,7 @@ export {};
       const sel = document.getElementById(id);
       if (!sel || sel.options.length > 1) return;
       Object.entries(THEME_NAMES).forEach(([key, name]) => {
+        if (key === "none") return;
         const opt = document.createElement("option");
         opt.value = key;
         opt.textContent = name;

@@ -1,33 +1,15 @@
-export {};
+import { dateDaysAgo, localDateString } from "../shared/dates";
+import { detectPlatform } from "../shared/platform";
+import { PRICING } from "../shared/pricing";
+import { countRTLScriptLetters } from "../shared/rtl";
+
 (function () {
   "use strict";
 
-  const host = location.hostname;
-  const PLATFORM =
-    host.includes("claude.ai") ? "claude" :
-    host.includes("chatgpt.com") || host.includes("chat.openai.com") ? "chatgpt" :
-    host.includes("gemini.google.com") ? "gemini" :
-    null;
+  const PLATFORM = detectPlatform(location.hostname);
   if (!PLATFORM) return;
 
-  // RTL script letters only. Digits, punctuation, and standalone marks should
-  // not classify a send as RTL by themselves.
-  // KEEP IN SYNC with RTL_SCRIPT_LETTER_RE in content.js.
-  const RTL_SCRIPT_LETTER_RE_G = /(?=[\p{Script=Hebrew}\p{Script=Arabic}])\p{L}/gu;
-
-  function countRTLScriptLetters(text) {
-    RTL_SCRIPT_LETTER_RE_G.lastIndex = 0;
-    return (text.match(RTL_SCRIPT_LETTER_RE_G) || []).length;
-  }
-
-  // ── Pricing ──────────────────────────────────────────────
-  const PRICING = {
-    claude:  { free: { price: 0, label: "Free" }, pro: { price: 20, label: "Pro" }, max5x: { price: 100, label: "Max 5x" }, max20x: { price: 200, label: "Max 20x" } },
-    chatgpt: { free: { price: 0, label: "Free" }, plus: { price: 20, label: "Plus" }, pro5x: { price: 100, label: "Pro 5x" }, pro20x: { price: 200, label: "Pro 20x" } },
-    gemini:  { free: { price: 0, label: "Free" }, ai_pro: { price: 19.99, label: "AI Pro" }, ai_ultra: { price: 249.99, label: "AI Ultra" } },
-  };
-
-  // ── Message selectors (minimal duplication from content.js) ──
+  // ── Message selectors (tracker-specific subset; content selectors live in shared/selectors.ts) ──
   const MSG_CONTAINER = {
     claude:  [".overflow-y-auto", "[class*='max-w-3xl']"],
     chatgpt: ["main"],
@@ -98,19 +80,6 @@ export {};
       if (el) return el;
     }
     return null;
-  }
-
-  function localDateString(date = new Date()) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + d;
-  }
-
-  function dateDaysAgo(days) {
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return localDateString(d);
   }
 
   function fetchJson(url, options = {}) {

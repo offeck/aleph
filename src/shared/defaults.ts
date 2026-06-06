@@ -1,0 +1,28 @@
+export const DEFAULTS = {
+  bidiEnabled: true,
+  enableClaude: true,
+  enableChatgpt: true,
+  enableGemini: true,
+  fontFamily: "",
+  fontSize: 0,
+  lineHeight: 0,
+  paragraphSpacing: 0,
+  codeFontSize: 0,
+  codeFontFamily: "",
+  chatWidth: 0,
+  theme: "none",
+  themeClaude: "",
+  themeChatgpt: "",
+  themeGemini: "",
+  focusMode: false,
+  focusHideUpgrade: true,
+  focusHideChips: true,
+  focusHidePromos: true,
+  latexFix: true,
+  streamSmooth: true,
+  streamAnimation: "platform",
+  messageSpacing: 0,
+  miniGame: false,
+};
+
+export type Settings = typeof DEFAULTS;

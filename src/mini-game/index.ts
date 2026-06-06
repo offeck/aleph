@@ -1,13 +1,9 @@
-export {};
+import { detectPlatform } from "../shared/platform";
+
 (function () {
   "use strict";
 
-  const host = location.hostname;
-  const PLATFORM =
-    host.includes("claude.ai") ? "claude" :
-    host.includes("chatgpt.com") || host.includes("chat.openai.com") ? "chatgpt" :
-    host.includes("gemini.google.com") ? "gemini" :
-    null;
+  const PLATFORM = detectPlatform(location.hostname);
   if (!PLATFORM) return;
 
   let miniGameEnabled = false;

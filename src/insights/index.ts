@@ -1,43 +1,11 @@
-export {};
+import { usageKeyForDate } from "../shared/dates";
+import { formatTime, formatTokens } from "../shared/format";
+import { PLATFORMS } from "../shared/platform";
+import { PLATFORM_LABELS } from "../shared/platformMeta";
+import { PRICING } from "../shared/pricing";
+
 (function () {
   "use strict";
-
-  const PLATFORM_COLORS = {
-    claude: "#D97706", chatgpt: "#4285F4", gemini: "#10A37F",
-  };
-  const PLATFORM_LABELS = {
-    claude: "Claude", chatgpt: "ChatGPT", gemini: "Gemini",
-  };
-  const PRICING = {
-    claude:  { free: { price: 0, label: "Free" }, pro: { price: 20, label: "Pro" }, max5x: { price: 100, label: "Max 5x" }, max20x: { price: 200, label: "Max 20x" } },
-    chatgpt: { free: { price: 0, label: "Free" }, plus: { price: 20, label: "Plus" }, pro5x: { price: 100, label: "Pro 5x" }, pro20x: { price: 200, label: "Pro 20x" } },
-    gemini:  { free: { price: 0, label: "Free" }, ai_pro: { price: 19.99, label: "AI Pro" }, ai_ultra: { price: 249.99, label: "AI Ultra" } },
-  };
-  const PLATFORMS = ["claude", "chatgpt", "gemini"];
-
-  // ── Helpers ──────────────────────────────────────────────
-  function formatTime(seconds) {
-    if (!seconds || seconds < 60) return seconds ? Math.round(seconds) + "s" : "0m";
-    var m = Math.round(seconds / 60);
-    return m >= 60 ? Math.floor(m / 60) + "h " + (m % 60) + "m" : m + "m";
-  }
-
-  function formatTokens(n) {
-    if (!n) return "~0";
-    if (n >= 1000) return "~" + (n / 1000).toFixed(1) + "K";
-    return "~" + n;
-  }
-
-  function localDateString(date = new Date()) {
-    var y = date.getFullYear();
-    var m = String(date.getMonth() + 1).padStart(2, "0");
-    var d = String(date.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + d;
-  }
-
-  function usageKeyForDate(date = new Date()) {
-    return "usage_" + localDateString(date);
-  }
 
   function normalizeStoredPlan(platform, sub) {
     var plan = (sub && sub.plan) || "free";

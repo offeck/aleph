@@ -1,78 +1,24 @@
-export {};
+import { usageKeyForDate } from "../shared/dates";
+import { DEFAULTS } from "../shared/defaults";
+import { formatTime, formatTokens } from "../shared/format";
+import {
+  CHATGPT_CODEX_CREDITS_KEY,
+  CHATGPT_CODEX_WORKSPACE_KEYS,
+  chatgptLimitMetricKey,
+  chatgptModelMetricKey,
+  GEMINI_CREDITS_KEY,
+  geminiFeatureMetricKey,
+} from "../shared/metricKeys";
+import { PLATFORM_LABELS } from "../shared/platformMeta";
+
 (function () {
   "use strict";
-
-  // Defaults (shared with settings.js and content.js)
-  const DEFAULTS = {
-    bidiEnabled: true,
-    enableClaude: true,
-    enableChatgpt: true,
-    enableGemini: true,
-    fontFamily: "",
-    fontSize: 0,
-    lineHeight: 0,
-    paragraphSpacing: 0,
-    codeFontSize: 0,
-    codeFontFamily: "",
-    chatWidth: 0,
-    theme: "none",
-    themeClaude: "",
-    themeChatgpt: "",
-    themeGemini: "",
-    focusMode: false,
-    focusHideUpgrade: true,
-    focusHideChips: true,
-    focusHidePromos: true,
-    latexFix: true,
-    streamSmooth: true,
-    streamAnimation: "platform",
-    messageSpacing: 0,
-    miniGame: false,
-  };
-
-  const THEME_NAMES = {
-    none: "Default", warmDark: "Warm Dark", coolDark: "Cool Dark",
-    paperLight: "Paper Light", highContrast: "High Contrast", midnight: "Midnight",
-    nord: "Nord", dracula: "Dracula", solarized: "Solarized", rosePine: "Ros\u00e9 Pine",
-    catppuccin: "Catppuccin", gruvbox: "Gruvbox", oneDark: "One Dark",
-    tokyoNight: "Tokyo Night", githubDark: "GitHub Dark",
-  };
-
-  const PLATFORM_COLORS = {
-    claude: "#D97706", chatgpt: "#4285F4", gemini: "#10A37F",
-  };
-  const PLATFORM_LABELS = {
-    claude: "Claude", chatgpt: "ChatGPT", gemini: "Gemini",
-  };
 
   function save(key, value) {
     chrome.storage.sync.set({ [key]: value });
   }
 
   // Insights loading
-  function formatTime(seconds) {
-    if (!seconds || seconds < 60) return seconds ? `${Math.round(seconds)}s` : "0m";
-    const m = Math.round(seconds / 60);
-    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
-  }
-
-  function formatTokens(n) {
-    if (!n) return "~0";
-    if (n >= 1000) return `~${(n / 1000).toFixed(1)}K`;
-    return `~${n}`;
-  }
-
-  function localDateString(date = new Date()) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + d;
-  }
-
-  function usageKeyForDate(date = new Date()) {
-    return "usage_" + localDateString(date);
-  }
-
   function estimatedTokenTotal(day) {
     if (!day) return 0;
     return (day.tokensIn || 0) + (day.tokensOut || 0);
@@ -251,16 +197,16 @@ export {};
       const gptUsage = platformUsage?.chatgpt;
       const GPT_LABELS = { deep_research: "Research", odyssey: "Reasoning", image_gen: "Images" };
       const gptChat = gptUsage?.chat || gptUsage;
-      // KEEP IN SYNC with collectUsageMetricValues() in background.js.
+      // Metric key builders live in shared/metricKeys.ts.
       for (const ml of (gptChat?.modelLimits || []).slice(0, 4)) {
-        const key = "chatgpt:model:" + (ml.model || ml.name || ml.feature);
+        const key = chatgptModelMetricKey(ml.model || ml.name || ml.feature);
         addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${cleanLabel(ml.model, "GPT")}`, ml, "#4285F4", {
           requiresRecentDelta: true,
           changedWithin24h: metricChangedRecently(gptUsage, key),
         });
       }
       for (const lp of (gptChat?.limits || [])) {
-        const key = "chatgpt:limit:" + (lp.feature || lp.name);
+        const key = chatgptLimitMetricKey(lp.feature || lp.name);
         addQuotaMeter(rawMeters.chatgpt, `ChatGPT ${GPT_LABELS[lp.feature] || cleanLabel(lp.feature, "GPT")}`, lp, "#4285F4", {
           requiresRecentDelta: true,
           changedWithin24h: metricChangedRecently(gptUsage, key),
@@ -279,7 +225,7 @@ export {};
           color: "#4285F4",
           alwaysShow: true,
           requiresRecentDelta: true,
-          changedWithin24h: metricChangedRecently(gptUsage, "chatgpt:codex.credits"),
+          changedWithin24h: metricChangedRecently(gptUsage, CHATGPT_CODEX_CREDITS_KEY),
         });
       }
 
@@ -292,11 +238,7 @@ export {};
           color: "#4285F4",
           alwaysShow: true,
           requiresRecentDelta: true,
-          changedWithin24h: anyMetricChangedRecently(gptUsage, [
-            "chatgpt:codex.workspace.turns",
-            "chatgpt:codex.workspace.threads",
-            "chatgpt:codex.workspace.credits",
-          ]),
+          changedWithin24h: anyMetricChangedRecently(gptUsage, CHATGPT_CODEX_WORKSPACE_KEYS),
         });
       }
 
@@ -317,7 +259,7 @@ export {};
       if (asNumber(gemCredits?.limit) > 0) {
         addQuotaMeter(rawMeters.gemini, "Gemini credits", gemCredits, "#10A37F", {
           requiresRecentDelta: true,
-          changedWithin24h: metricChangedRecently(gemUsage, "gemini:credits"),
+          changedWithin24h: metricChangedRecently(gemUsage, GEMINI_CREDITS_KEY),
         });
       } else if (gemUsage?.features?.length > 0) {
         const proChat = gemUsage.features.find((f) => f.id === 4);
@@ -326,7 +268,7 @@ export {};
         for (const f of preferred) {
           addQuotaMeter(rawMeters.gemini, f.name, f, "#10A37F", {
             requiresRecentDelta: true,
-            changedWithin24h: metricChangedRecently(gemUsage, "gemini:feature:" + f.id),
+            changedWithin24h: metricChangedRecently(gemUsage, geminiFeatureMetricKey(f.id)),
           });
         }
         if (preferred.length === 0) {
