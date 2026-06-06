@@ -49,7 +49,7 @@ function patchAll() {
 }
 
 // ── Observer (scoped to relevant mutations) ────────────────────────────
-let timer = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
 function scheduleUpdate() {
   if (patching) return;
   if (timer) clearTimeout(timer);
@@ -87,8 +87,9 @@ if (PLATFORM) {
 
   new MutationObserver((mutations) => {
     for (const m of mutations) {
-      if (m.target === document.head || m.target.closest?.("head")) continue;
-      if (m.target.id === STYLE_ID) continue;
+      const target = m.target as Element;
+      if (target === document.head || target.closest?.("head")) continue;
+      if (target.id === STYLE_ID) continue;
       scheduleUpdate();
       return;
     }

@@ -1,4 +1,13 @@
-export const PRICING = {
+import type { Platform } from "./platform";
+
+export interface PlanPricing {
+  price: number;
+  label: string;
+}
+
+// Plan ids are platform-specific strings (detected or user-overridden),
+// hence the string index per platform.
+export const PRICING: Record<Platform, Record<string, PlanPricing>> = {
   claude: {
     free: { price: 0, label: "Free" },
     pro: { price: 20, label: "Pro" },

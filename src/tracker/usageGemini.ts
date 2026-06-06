@@ -32,7 +32,7 @@ function getGeminiBuildLabel() {
       if (m) return decodeURIComponent(m[0]);
     }
   } catch (e) {}
-  for (const s of document.querySelectorAll("script[src]")) {
+  for (const s of document.querySelectorAll<HTMLScriptElement>("script[src]")) {
     const m = (s.src || "").match(re);
     if (m) return decodeURIComponent(m[0]);
   }
@@ -45,7 +45,7 @@ function getGeminiBuildLabel() {
 // payload its featureDescriptor is empty. Premium usage drains the pool
 // (measured: Pro message ≈ 19 credits, Flash-Lite message 0); per-feature
 // rows ([null, featureId]) are a legacy shape kept as a fallback.
-const GEMINI_FEATURE_NAMES = {
+const GEMINI_FEATURE_NAMES: Record<number, string> = {
   4: "Pro 3.1", 15: "Thinking", 25: "Chat", 7: "Flash",
   13: "Extended", 16: "Agent", 9: "Images", 21: "Image Edit",
   17: "Music 30s", 24: "Screen", 26: "Audio", 14: "Slides",
@@ -53,10 +53,26 @@ const GEMINI_FEATURE_NAMES = {
   3: "Video Pro", 18: "Video", 5: "Video Lite", 12: "Ultra Only",
 };
 
+export interface GeminiFeature {
+  id: number;
+  name: string;
+  limit: number;
+  remaining: number;
+  resetsAt: string | null;
+}
+
+export interface GeminiCredits {
+  limit: number;
+  remaining: number;
+  used: number;
+  resetsAt: string | null;
+}
+
 // Pure parse of the decoded qpEbW payload — exported for unit tests.
-export function parseGeminiQuotas(quotas: any) {
-  const features = [];
-  let credits = null;
+// The payload is raw provider JSON (nested arrays), hence the `any` boundary.
+export function parseGeminiQuotas(quotas: any): { credits: GeminiCredits | null; features: GeminiFeature[] } {
+  const features: GeminiFeature[] = [];
+  let credits: GeminiCredits | null = null;
   if (!Array.isArray(quotas) || !Array.isArray(quotas[0])) return { credits, features };
   for (const q of quotas[0]) {
     if (!Array.isArray(q) || q.length < 6) continue;

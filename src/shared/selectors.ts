@@ -1,4 +1,30 @@
-export const SELECTORS = {
+import type { Platform } from "./platform";
+
+export interface FocusHideSelectors {
+  upgrade: string[];
+  chips: string[];
+  promos: string[];
+}
+
+export interface SelectorSet {
+  text: string[];
+  editor: string[];
+  math: string[];
+  code: string[];
+  message: string[];
+  chatWidth: string[];
+  themeBg: string[];
+  themeText: string[];
+  themeInput: string[];
+  themeCode: string[];
+  themeSidebar: string[];
+  focusHide: FocusHideSelectors;
+  streaming: string[];
+  messageWrapper: string[];
+  chatContainer: string[];
+}
+
+export const SELECTORS: Record<Platform, SelectorSet> = {
   claude: {
     text: [
       ".font-claude-response-body",

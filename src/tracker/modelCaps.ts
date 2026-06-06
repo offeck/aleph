@@ -1,10 +1,10 @@
 import { send } from "./send";
 import { PLATFORM } from "./platform";
 
-export function getCurrentModel() {
+export function getCurrentModel(): string | null {
   if (PLATFORM === "chatgpt") {
     try {
-      const c = document.cookie.split(";").reduce((a, c) => { const [k,...v] = c.trim().split("="); a[k]=v.join("="); return a; }, {});
+      const c = document.cookie.split(";").reduce((a, c) => { const [k,...v] = c.trim().split("="); a[k]=v.join("="); return a; }, {} as Record<string, string>);
       if (c["oai-last-model-config"]) return JSON.parse(decodeURIComponent(c["oai-last-model-config"])).model || "auto";
     } catch (e) {}
   }
@@ -21,7 +21,7 @@ export function pollModelCapabilities() {
     if (PLATFORM === "claude") {
       const cookies = document.cookie.split(";").reduce((a, c) => {
         const [k, ...v] = c.trim().split("="); a[k] = v.join("="); return a;
-      }, {});
+      }, {} as Record<string, string>);
       const orgId = cookies["lastActiveOrg"];
       if (!orgId) return;
       const modelBtn = document.querySelector('[data-testid="model-selector-dropdown"]');
@@ -43,7 +43,7 @@ export function pollModelCapabilities() {
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
           if (!data?.models) return;
-          const models = data.models.map((m) => ({
+          const models = data.models.map((m: Record<string, unknown>) => ({
             slug: m.slug, title: m.title, maxTokens: m.max_tokens,
             tools: m.enabled_tools,
           }));

@@ -9,14 +9,17 @@ export function detectPlatform(hostname: string): Platform | null {
     null;
 }
 
-export function platformSettingSuffix(platform: Platform): string {
-  return platform.charAt(0).toUpperCase() + platform.slice(1);
+export type PlatformEnableKey = `enable${Capitalize<Platform>}`;
+export type PlatformThemeKey = `theme${Capitalize<Platform>}`;
+
+export function platformSettingSuffix(platform: Platform): Capitalize<Platform> {
+  return (platform.charAt(0).toUpperCase() + platform.slice(1)) as Capitalize<Platform>;
 }
 
-export function platformEnableKey(platform: Platform): string {
-  return "enable" + platformSettingSuffix(platform);
+export function platformEnableKey(platform: Platform): PlatformEnableKey {
+  return `enable${platformSettingSuffix(platform)}`;
 }
 
-export function platformThemeKey(platform: Platform): string {
-  return "theme" + platformSettingSuffix(platform);
+export function platformThemeKey(platform: Platform): PlatformThemeKey {
+  return `theme${platformSettingSuffix(platform)}`;
 }

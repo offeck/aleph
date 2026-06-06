@@ -24,7 +24,7 @@
 6. `tests/checks.md` snippet copies of the RTL regex / selector unions stay literal (console snippets can't import); only their KEEP IN SYNC comments get repointed to `src/shared/rtl.ts` / `src/shared/selectors.ts`.
 7. `data-aleph-ext-id` must be set early by the content bundle on every phase (dev reload + regression agent depend on it).
 8. Firebase init order is load-bearing: the four `importScripts` (app/auth/firestore compat + config) run before any code touching `firebase`/`ALEPH_FIREBASE_CONFIG`; the repo ships a **real** apiKey so the `!== "PLACEHOLDER"` guard genuinely fires — test it.
-9. TypeScript debt is budgeted until Phase 6: count `tsc --noEmit --pretty false` diagnostics by `error TS`, fail CI if the count grows, and update the committed baseline only when the count shrinks in the same phase commit.
+9. TypeScript debt is budgeted until Phase 6 — and **strictly-typed paths tolerate zero errors**: `scripts/check-typecheck-baseline.mjs` fails on ANY diagnostic under `src/shared/`, `src/tracker/`, `src/content/`, or `tests/` (everything migrated through Phase 4, fully typed in Phase 4.5), while the remaining pre-split entries are budgeted by the committed count which only ratchets down. `any` is allowed ONLY at raw provider-JSON fetch boundaries (commented as such); everything downstream narrows through typed normalizers and `unknown`+guards. Phase 5 modules must land typed (their paths join the strict list in the same commit); Phase 6 removes the baseline machinery entirely.
 10. Tests are part of every behavioral change: add or update automated coverage for changed logic when practical; when browser-only/manual verification is the only realistic path, record the reason and the manual check. From Phase 2 onward `npm test` must discover real tests.
 11. CSS rule order is behavior: splits preserve original rule order (never alphabetize); shared extractions may only contain byte-identical blocks — intentionally divergent rules (e.g. settings' darker selects) stay per-page.
 
@@ -180,11 +180,23 @@ Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude
 
 **Rollback:** revert → single-file content. No storage/manifest change.
 
+### Phase 4.5 — Proper types for everything through Phase 4 (zero-error strict paths)
+
+Eliminate the tolerated implicit-`any` debt in all migrated code: `src/shared/`, `src/tracker/`, `src/content/`, `tests/`. Type-level changes only (annotations, interfaces, `unknown`+narrowing, no-op casts) — runtime behavior identical; esbuild output unaffected. Shared gains `Theme`, `SelectorSet`/`FocusHideSelectors`, `PlanPricing`, and template-literal setting-key types (`PlatformEnableKey`/`PlatformThemeKey`) so `settings[platformEnableKey(p)]` type-checks. Tracker gains `ClaudePlan`/`ChatgptPlan`/`GeminiPlan` unions, `CodexLimit`/`CodexBalanceSnapshot`, `GeminiFeature`/`GeminiCredits`, `MessageEstimate`, `TrackerMessage`. Content gains `SendHint`, `LatexRegion`/`IsolateRegion`, typed DOM signatures. `any` survives only at raw provider-JSON fetch boundaries, each commented. The baseline script becomes two-tier (rule 9): zero tolerance on these paths, ratcheting budget for the Phase-5-pending entries.
+
+- [x] `tsc` reports **0 errors** in `src/shared/`, `src/tracker/`, `src/content/`, `tests/` (was 172 there; global 528 → 354)
+- [x] upgraded `typecheck:baseline` green — two-tier gate live: `354/354 errors (strict paths: 0)`
+- [x] `npm test` green (80/80, unchanged — typing is behavior-neutral)
+- [x] build clean; extension reloaded with fresh stamp; Claude RTL session spot-check: rtl 51/0, katex 48/0 errors
+- [x] remaining `any` in strict paths: 5, all commented boundaries — `fetchJson` return + the two chatgpt limit normalizers (raw provider JSON), `parseGeminiQuotas` input (raw RPC arrays), the `katex` vendor global declare
+
+**Rollback:** revert → annotations gone, old single-tier baseline restored. Zero runtime impact either way.
+
 ### Phase 5 — Split background + popup; type small pages
 
 Background: `sync.ts` exports public API + `_mergeUsageDay` (+helpers) for tests, `declare const firebase: any`, behavior identical; `index.ts` statement order: importScripts(4 vendor files) → init guard → `alephSync.init/restoreAuth`; **every background submodule must be side-effect-free at import time** (esbuild hoists bundled imports above the importScripts call — the single riskiest property; verify in SW console). Split `usage` (readLocal/writeLocal→`alephSync.maybePush`, updateUsageDay queue), `metrics`, `remarks`, `cleanup`, `router` (all listeners incl. onMessageExternal + commands + onInstalled/onStartup + storage.onChanged push). Popup: `meters`/`insightsView`/`ui`/`index`. Settings/insights/mini-game become clean TS modules importing shared. Add `mergeUsageDay.spec.ts`, finish `metrics.spec.ts`.
 
-- [ ] build+test green (all 6 spec files plus any new router/sync/popup pure-helper specs); bg+popup+pages typed enough that `npm run typecheck:baseline` count drops or at least does not grow
+- [ ] build+test green (all 6 spec files plus any new router/sync/popup pure-helper specs); **modules land fully typed** — their paths join `STRICT_PATHS` in the same commit and the budget ratchets to 0 (`any` only at commented raw-JSON/firebase boundaries)
 - [ ] SW console: firebase init order correct, no reorder errors
 - [ ] message round-trips: `insights-get-summary` (popup+insights), insights-* writes, `aleph-sync-status` in settings
 - [ ] `aleph-reload` external message still reloads; Alt+Shift+A works; onInstalled/onStartup clean
@@ -196,7 +208,7 @@ Background: `sync.ts` exports public API + `_mergeUsageDay` (+helpers) for tests
 
 ### Phase 6 — Strict finish, ESLint, PR CI, docs, cleanup, mark ready
 
-Drive `tsc --noEmit` to zero under full strict; remove `allowJs`; real types replace transitional `any`; remove the baseline file/script or leave `typecheck:baseline` as a strict alias to raw typecheck. ESLint flat config (typescript-eslint recommended; calibrate `no-floating-promises` for the fire-and-forget style). New `.github/workflows/ci.yml` on `pull_request`: `npm ci` → typecheck (required) → test → build; flip publish.yml typecheck to required and keep `npm test` as a required gate that fails on empty suites. Rewrite CLAUDE.md architecture ("no build step" → TS/esbuild reality, dev loop, never move manifest, never edit dist/, where canonical constants live, updated Common Tasks) and codify the test policy for future work. **Delete MIGRATION.md.** Mark PR #2 ready.
+With Phases 4.5/5 having driven all paths to zero, remove `allowJs`; delete the baseline file/script (every path is strict now) and point `typecheck:baseline` at raw `tsc --noEmit`. ESLint flat config (typescript-eslint recommended; calibrate `no-floating-promises` for the fire-and-forget style). New `.github/workflows/ci.yml` on `pull_request`: `npm ci` → typecheck (required) → test → build; flip publish.yml typecheck to required and keep `npm test` as a required gate that fails on empty suites. Rewrite CLAUDE.md architecture ("no build step" → TS/esbuild reality, dev loop, never move manifest, never edit dist/, where canonical constants live, updated Common Tasks) and codify the test policy for future work. **Delete MIGRATION.md.** Mark PR #2 ready.
 
 - [ ] `npm run check` fully green; zero tsc errors, no allowJs; lint clean
 - [ ] transitional typecheck baseline removed or converted to a strict zero-error alias

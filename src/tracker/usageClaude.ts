@@ -9,7 +9,7 @@ export function pollClaudeUsage() {
       const [k, ...v] = c.trim().split("=");
       a[k] = v.join("=");
       return a;
-    }, {});
+    }, {} as Record<string, string>);
     const orgId = cookies["lastActiveOrg"];
     if (!orgId) return;
     fetch("/api/organizations/" + orgId + "/usage", { credentials: "same-origin" })

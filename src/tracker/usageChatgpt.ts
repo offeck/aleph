@@ -3,13 +3,15 @@ import { send } from "./send";
 import { getChatgptAccessToken, refreshChatgptToken } from "./plans";
 
 // ── ChatGPT real usage polling ───────────────────────────
-function fetchJson(url, options = {}) {
+// Raw provider JSON is inherently untyped — `any` is confined to this fetch
+// boundary; everything downstream narrows through the typed normalizers.
+function fetchJson(url: string, options: RequestInit = {}): Promise<any> {
   return fetch(url, options)
     .then((r) => r.ok ? r.json() : Promise.reject(new Error(String(r.status))))
     .catch((e) => ({ __alephError: e?.message || String(e) }));
 }
 
-function normalizeChatgptLimit(lp) {
+function normalizeChatgptLimit(lp: any) {
   return {
     feature: lp.feature_name || lp.feature || lp.name,
     remaining: lp.remaining,
@@ -19,7 +21,7 @@ function normalizeChatgptLimit(lp) {
   };
 }
 
-function normalizeChatgptModelLimit(ml) {
+function normalizeChatgptModelLimit(ml: any) {
   return {
     model: ml.model_slug || ml.model || ml.slug,
     remaining: ml.remaining,
@@ -29,7 +31,7 @@ function normalizeChatgptModelLimit(ml) {
   };
 }
 
-function fetchChatgptChatUsage(token) {
+function fetchChatgptChatUsage(token: string | null) {
   if (!token) return Promise.resolve({ limits: [], modelLimits: [], error: "missing access token" });
   const headers = { "Content-Type": "application/json", Authorization: "Bearer " + token };
   return fetchJson("/backend-api/conversation/init", {
@@ -42,11 +44,16 @@ function fetchChatgptChatUsage(token) {
   });
 }
 
-let cachedCodexUsage = null;
+interface CodexUsagePayload {
+  errors?: Record<string, string>;
+  [endpoint: string]: unknown;
+}
+
+let cachedCodexUsage: CodexUsagePayload | null = null;
 let lastCodexUsagePoll = 0;
 const CODEX_USAGE_POLL_MS = 5 * 60 * 1000;
 
-function fetchCodexUsage(token) {
+function fetchCodexUsage(token: string | null): Promise<CodexUsagePayload> {
   const now = Date.now();
   if (cachedCodexUsage && (now - lastCodexUsagePoll) < CODEX_USAGE_POLL_MS) {
     return Promise.resolve(cachedCodexUsage);
@@ -54,8 +61,8 @@ function fetchCodexUsage(token) {
 
   const start = dateDaysAgo(29);
   const end = localDateString();
-  const headers = token ? { Authorization: "Bearer " + token } : {};
-  const opts = { credentials: "same-origin", headers };
+  const headers: HeadersInit = token ? { Authorization: "Bearer " + token } : {};
+  const opts: RequestInit = { credentials: "same-origin", headers };
   const endpoints = {
     balance: "/backend-api/wham/usage",
     dailyTokenUsage: "/backend-api/wham/usage/daily-token-usage-breakdown?start_date=" + start + "&end_date=" + end + "&group_by=day",
@@ -64,14 +71,15 @@ function fetchCodexUsage(token) {
   };
 
   return Promise.all(Object.entries(endpoints).map(([key, url]) => (
-    fetchJson(url, opts).then((data) => [key, data])
+    fetchJson(url, opts).then((data) => [key, data] as [string, any])
   ))).then((entries) => {
-    const codex = { errors: {} };
+    const errors: Record<string, string> = {};
+    const codex: CodexUsagePayload = { errors };
     for (const [key, data] of entries) {
-      if (data?.__alephError) codex.errors[key] = data.__alephError;
+      if (data?.__alephError) errors[key] = data.__alephError;
       else codex[key] = data;
     }
-    if (Object.keys(codex.errors).length === 0) delete codex.errors;
+    if (Object.keys(errors).length === 0) delete codex.errors;
     if (Object.keys(codex).some((key) => key !== "errors")) {
       cachedCodexUsage = codex;
       lastCodexUsagePoll = now;
@@ -80,50 +88,72 @@ function fetchCodexUsage(token) {
   });
 }
 
-function findFirstValue(obj, names) {
+function findFirstValue(obj: unknown, names: string[]): unknown {
   if (!obj || typeof obj !== "object") return null;
+  const record = obj as Record<string, unknown>;
   for (const name of names) {
-    if (obj[name] != null) return obj[name];
+    if (record[name] != null) return record[name];
   }
   return null;
 }
 
-export function boundedPercent(value) {
+export function boundedPercent(value: unknown): number | null {
   if (value == null || value === "") return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, n));
 }
 
-export function boundedRatio(value) {
+export function boundedRatio(value: unknown): number | null {
   if (value == null || value === "") return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, n >= 0 && n <= 1 ? n * 100 : n));
 }
 
-function findFirstPercent(obj, names) {
+function findFirstPercent(obj: unknown, names: string[]): number | null {
   return boundedPercent(findFirstValue(obj, names));
 }
 
-function findFirstRatio(obj, names) {
+function findFirstRatio(obj: unknown, names: string[]): number | null {
   return boundedRatio(findFirstValue(obj, names));
 }
 
-function textFromValues(obj) {
+function textFromValues(obj: unknown): string {
   if (!obj || typeof obj !== "object") return "";
+  const record = obj as Record<string, unknown>;
   const keys = ["title", "label", "name", "displayName", "display_name", "limitName", "limit_name", "model", "modelSlug", "model_slug", "bucket", "period", "window", "limitType", "limit_type"];
-  return keys.map((k) => obj[k]).filter((v) => typeof v === "string").join(" ");
+  return keys.map((k) => record[k]).filter((v) => typeof v === "string").join(" ");
 }
 
-function codexContextModel(obj, fallback = "") {
-  return findFirstValue(obj, [
+function codexContextModel(obj: unknown, fallback = ""): string {
+  // Values practically come from string fields; cast (not String()) keeps the
+  // original passthrough behavior byte-identical.
+  return (findFirstValue(obj, [
     "model", "modelSlug", "model_slug", "modelName", "model_name", "displayModel", "display_model",
     "limitName", "limit_name", "title", "label", "name", "displayName", "display_name",
-  ]) || fallback || "";
+  ]) || fallback || "") as string;
 }
 
-export function normalizeCodexLimit(obj, context) {
+export interface CodexLimit {
+  type: "limit";
+  title: string;
+  period: string;
+  model: string;
+  remainingPct: number | null;
+  usedPct: number | null;
+  remaining: number | null;
+  limit: number | null;
+  resetsAt: string;
+}
+
+interface CodexContext {
+  model?: string;
+  text?: string;
+  period?: string;
+}
+
+export function normalizeCodexLimit(obj: Record<string, unknown>, context?: CodexContext): CodexLimit | null {
   const text = (textFromValues(obj) + " " + (context?.text || "")).trim();
   if (!/(codex|agentic|usage|limit|quota|weekly|week|hour|5h|spark)/i.test(text + " " + Object.keys(obj).join(" "))) return null;
 
@@ -163,39 +193,40 @@ export function normalizeCodexLimit(obj, context) {
   const model = codexContextModel(obj, context?.model || "");
   return {
     type: "limit",
-    title: findFirstValue(obj, ["title", "label", "name", "displayName", "display_name"]) || "",
+    title: (findFirstValue(obj, ["title", "label", "name", "displayName", "display_name"]) || "") as string,
     period,
     model: String(model || ""),
     remainingPct: normalizedRemainingPct,
     usedPct: normalizedUsedPct,
     remaining: Number.isFinite(remaining) ? remaining : (Number.isFinite(used) && Number.isFinite(limit) ? Math.max(0, limit - used) : null),
     limit: Number.isFinite(limit) ? limit : null,
-    resetsAt: findFirstValue(obj, ["resetsAt", "resets_at", "resetAt", "reset_at", "resetAfter", "reset_after", "resetAfterSeconds", "reset_after_seconds", "resetTime", "reset_time", "resetDate", "reset_date", "nextResetAt", "next_reset_at"]) || "",
+    resetsAt: (findFirstValue(obj, ["resetsAt", "resets_at", "resetAt", "reset_at", "resetAfter", "reset_after", "resetAfterSeconds", "reset_after_seconds", "resetTime", "reset_time", "resetDate", "reset_date", "nextResetAt", "next_reset_at"]) || "") as string,
   };
 }
 
-function codexLimitKey(limit) {
+function codexLimitKey(limit: CodexLimit) {
   return String(limit?.model || limit?.title || "shared").toLowerCase() + ":" + (limit?.period || "");
 }
 
-function addCodexLimit(out, limit) {
+function addCodexLimit(out: CodexLimit[], limit: CodexLimit | null) {
   if (!limit) return;
   const key = codexLimitKey(limit);
   if (!out.some((item) => codexLimitKey(item) === key)) out.push(limit);
 }
 
-function collectCodexRateWindows(rateLimit, out, context = {}) {
+function collectCodexRateWindows(rateLimit: unknown, out: CodexLimit[], context: CodexContext = {}) {
   if (!rateLimit || typeof rateLimit !== "object") return;
-  const windows = [
+  const record = rateLimit as Record<string, unknown>;
+  const windows: Array<[string, string]> = [
     ["primary_window", "5h"],
     ["primaryWindow", "5h"],
     ["secondary_window", "weekly"],
     ["secondaryWindow", "weekly"],
   ];
   for (const [key, period] of windows) {
-    const windowData = rateLimit[key];
+    const windowData = record[key];
     if (!windowData || typeof windowData !== "object") continue;
-    addCodexLimit(out, normalizeCodexLimit(windowData, {
+    addCodexLimit(out, normalizeCodexLimit(windowData as Record<string, unknown>, {
       model: context.model || "",
       period,
       text: "codex usage limit " + period + " " + (context.text || ""),
@@ -203,7 +234,7 @@ function collectCodexRateWindows(rateLimit, out, context = {}) {
   }
 }
 
-function collectExplicitCodexBalanceLimits(balance, out) {
+function collectExplicitCodexBalanceLimits(balance: Record<string, unknown>, out: CodexLimit[]) {
   const rootRateLimit = balance.rate_limit || balance.rateLimit;
   collectCodexRateWindows(rootRateLimit, out, { text: "shared codex rate_limit" });
 
@@ -211,28 +242,30 @@ function collectExplicitCodexBalanceLimits(balance, out) {
   if (!Array.isArray(additional)) return;
   for (const item of additional) {
     if (!item || typeof item !== "object") continue;
-    const model = codexContextModel(item);
-    const rateLimit = item.rate_limit || item.rateLimit || item;
-    collectCodexRateWindows(rateLimit, out, { model, text: "additional codex rate_limit " + textFromValues(item) });
+    const record = item as Record<string, unknown>;
+    const model = codexContextModel(record);
+    const rateLimit = record.rate_limit || record.rateLimit || record;
+    collectCodexRateWindows(rateLimit, out, { model, text: "additional codex rate_limit " + textFromValues(record) });
   }
 }
 
-function unwrapCodexBalancePayload(value, seen = new WeakSet()) {
+function unwrapCodexBalancePayload(value: unknown, seen = new WeakSet<object>()): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || seen.has(value)) return null;
   seen.add(value);
-  if (value.rate_limit || value.rateLimit || value.credits || value.additional_rate_limits || value.additionalRateLimits) {
-    return value;
+  const record = value as Record<string, unknown>;
+  if (record.rate_limit || record.rateLimit || record.credits || record.additional_rate_limits || record.additionalRateLimits) {
+    return record;
   }
   for (const key of ["data", "body", "result", "usage", "balance"]) {
-    const child = value[key];
+    const child = record[key];
     if (!child || typeof child !== "object") continue;
     const unwrapped = unwrapCodexBalancePayload(child, seen);
     if (unwrapped) return unwrapped;
   }
-  return value;
+  return record;
 }
 
-function normalizeCodexScalarLimit(key, value, context) {
+function normalizeCodexScalarLimit(key: string, value: unknown, context: CodexContext): CodexLimit | null {
   const text = String(key || "") + " " + (context?.text || "");
   const pct = /ratio|fraction/i.test(text) ? boundedRatio(value) : boundedPercent(value);
   if (pct == null) return null;
@@ -256,7 +289,7 @@ function normalizeCodexScalarLimit(key, value, context) {
   };
 }
 
-function collectCodexLimits(value, out, seen, depth, context = {}) {
+function collectCodexLimits(value: unknown, out: CodexLimit[], seen: WeakSet<object>, depth: number, context: CodexContext = {}) {
   if (!value || typeof value !== "object" || depth > 8 || out.length >= 12) return;
   if (seen.has(value)) return;
   seen.add(value);
@@ -265,12 +298,13 @@ function collectCodexLimits(value, out, seen, depth, context = {}) {
     return;
   }
 
-  const normalized = normalizeCodexLimit(value, context);
+  const record = value as Record<string, unknown>;
+  const normalized = normalizeCodexLimit(record, context);
   if (normalized) {
     addCodexLimit(out, normalized);
   }
-  const contextModel = codexContextModel(value, context.model || "");
-  for (const [key, child] of Object.entries(value)) {
+  const contextModel = codexContextModel(record, context.model || "");
+  for (const [key, child] of Object.entries(record)) {
     const childText = (context.text || "") + " " + key + " " + (child && typeof child === "object" ? textFromValues(child) : "");
     const scalar = normalizeCodexScalarLimit(key, child, { model: contextModel, text: childText });
     if (scalar) {
@@ -280,7 +314,7 @@ function collectCodexLimits(value, out, seen, depth, context = {}) {
   }
 }
 
-function normalizeCodexCredits(balance) {
+function normalizeCodexCredits(balance: Record<string, unknown>): { remaining: number } | null {
   const credits = findFirstValue(balance, ["credits", "creditBalance", "credit_balance", "creditsRemaining", "credits_remaining", "balance"]);
   if (credits == null) return null;
   if (typeof credits === "object") {
@@ -293,14 +327,21 @@ function normalizeCodexCredits(balance) {
   return Number.isFinite(Number(credits)) ? { remaining: Number(credits) } : null;
 }
 
-export function normalizeCodexBalance(balance) {
-  balance = unwrapCodexBalancePayload(balance);
-  if (!balance || typeof balance !== "object") return null;
-  const limits = [];
-  collectExplicitCodexBalanceLimits(balance, limits);
-  if (limits.length === 0) collectCodexLimits(balance, limits, new WeakSet(), 0);
-  const credits = normalizeCodexCredits(balance);
-  const snapshot = {
+export interface CodexBalanceSnapshot {
+  source: "provider";
+  collectedAt: number;
+  limits: CodexLimit[];
+  credits: { remaining: number } | null;
+}
+
+export function normalizeCodexBalance(balance: unknown): CodexBalanceSnapshot | null {
+  const unwrapped = unwrapCodexBalancePayload(balance);
+  if (!unwrapped || typeof unwrapped !== "object") return null;
+  const limits: CodexLimit[] = [];
+  collectExplicitCodexBalanceLimits(unwrapped, limits);
+  if (limits.length === 0) collectCodexLimits(unwrapped, limits, new WeakSet(), 0);
+  const credits = normalizeCodexCredits(unwrapped);
+  const snapshot: CodexBalanceSnapshot = {
     source: "provider",
     collectedAt: Date.now(),
     limits,
@@ -310,16 +351,16 @@ export function normalizeCodexBalance(balance) {
 }
 
 export function pollChatgptUsage() {
-  const doFetch = (token) => {
+  const doFetch = (token: string | null) => {
     const chatPromise = token ? fetchChatgptChatUsage(token) : Promise.resolve(null);
     Promise.all([chatPromise, fetchCodexUsage(token)])
       .then(([chat, codex]) => {
         const hasCodexData = codex && Object.keys(codex).some((key) => key !== "errors");
         if (!chat && !hasCodexData) return;
-        const codexWithAnalytics = Object.assign({}, codex);
+        const codexWithAnalytics: CodexUsagePayload & { analytics?: CodexBalanceSnapshot } = Object.assign({}, codex);
         const analytics = normalizeCodexBalance(codex.balance);
         if (analytics) codexWithAnalytics.analytics = analytics;
-        const usage = {
+        const usage: Record<string, unknown> = {
           source: "provider",
           codex: codexWithAnalytics,
         };

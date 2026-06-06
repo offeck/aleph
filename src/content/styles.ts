@@ -8,7 +8,7 @@ import { getActiveThemeName, updateColorScheme } from "./theme";
 // ── Style Injector ─────────────────────────────────────────────────────
 export const STYLE_ID = "aleph-dynamic-styles";
 
-export function buildThemeSelector(base, selectors) {
+export function buildThemeSelector(_base: string, selectors: string[]): string {
   return selectors.map(s => `[data-aleph-theme] ${s.trim()}`).join(",\n");
 }
 

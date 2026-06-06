@@ -3,32 +3,40 @@ import { SEL } from "./selectors";
 import { getSettings, isPlatformEnabled } from "./settingsStore";
 
 // ── BiDi Detection ─────────────────────────────────────────────────────
-function isMathNode(node) {
+function isMathNode(node: Element) {
   const tag = node.tagName?.toLowerCase();
   return node.classList?.contains("katex") || node.classList?.contains("katex-display") ||
     tag === "mjx-container" || tag === "code" || tag === "pre";
 }
 
-export function hasRTLScriptText(text) {
+export function hasRTLScriptText(text: string | null | undefined): boolean {
   return RTL_SCRIPT_LETTER_RE.test(text || "");
 }
 
-function hasRTL(el) {
+function hasRTL(el: Element): boolean {
   if (!el) return false;
   for (const c of el.childNodes) {
     if (c.nodeType === 3 && hasRTLScriptText(c.textContent)) return true;
     if (c.nodeType === 1) {
-      if (isMathNode(c)) continue;
-      if (hasRTL(c)) return true;
+      const child = c as Element;
+      if (isMathNode(child)) continue;
+      if (hasRTL(child)) return true;
     }
   }
   return false;
 }
 
 // ── Send hint (set by insights-tracker.js via DOM attribute) ─────────
-let sendHint = null;
+interface SendHint {
+  ts: number;
+  lang: string;
+  len: number;
+  words: number;
+}
+
+let sendHint: SendHint | null = null;
 const HINT_WINDOW = 30000;
-const hintChecked = new WeakSet();
+const hintChecked = new WeakSet<Element>();
 
 function readSendHint() {
   const raw = document.documentElement.getAttribute("data-aleph-send-hint");
@@ -44,7 +52,7 @@ function readSendHint() {
 }
 
 // ── BiDi Patcher ───────────────────────────────────────────────────────
-const editorDirObservers = new WeakMap();
+const editorDirObservers = new WeakMap<Element, MutationObserver>();
 const EDITOR_DIR_BLOCKS = "p, div, li";
 
 export function updateBidiRootAttribute() {
@@ -83,7 +91,7 @@ export function patchBidi() {
   patchEditors();
 }
 
-function setDirAutoForText(el, text) {
+function setDirAutoForText(el: Element, text: string | null | undefined) {
   const hasText = (text || "").trim().length > 0;
   if (hasText && el.getAttribute("dir") !== "auto") {
     el.setAttribute("dir", "auto");
@@ -92,24 +100,25 @@ function setDirAutoForText(el, text) {
   }
 }
 
-function patchEditorDir(ed) {
-  const text = ed.value !== undefined ? ed.value : ed.textContent;
+function patchEditorDir(ed: Element) {
+  const value = (ed as HTMLTextAreaElement).value;
+  const text = value !== undefined ? value : ed.textContent;
   setDirAutoForText(ed, text);
 
-  if (ed.value === undefined) {
+  if (value === undefined) {
     ed.querySelectorAll(EDITOR_DIR_BLOCKS).forEach((child) => {
       setDirAutoForText(child, child.textContent);
     });
   }
 }
 
-function scheduleEditorDirPatch(ed) {
+function scheduleEditorDirPatch(ed: Element) {
   requestAnimationFrame(() => patchEditorDir(ed));
   setTimeout(() => patchEditorDir(ed), 80);
   setTimeout(() => patchEditorDir(ed), 250);
 }
 
-function ensureEditorDirObserver(ed) {
+function ensureEditorDirObserver(ed: Element) {
   if (editorDirObservers.has(ed)) return;
 
   const onInput = () => scheduleEditorDirPatch(ed);

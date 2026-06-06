@@ -1,7 +1,7 @@
 import { countRTLScriptLetters } from "../shared/rtl";
-import { send } from "./send";
+import { send, type TrackerMessage } from "./send";
 import { PLATFORM } from "./platform";
-import { estimateMessage } from "./tokens";
+import { estimateMessage, type MessageEstimate } from "./tokens";
 import { getCurrentModel } from "./modelCaps";
 import { beginResponseTiming, getUserSentAt, markUserSent } from "./timing";
 
@@ -33,7 +33,7 @@ export function setGraceUntil(ts: number) {
 const EDITOR_SEL = "[contenteditable], textarea, #prompt-textarea, .ProseMirror, .ql-editor, rich-textarea";
 let lastEditorText = "";
 
-function captureAndSignal(source) {
+function captureAndSignal(source: string) {
   let text = "";
   for (const sel of [".ProseMirror", "#prompt-textarea", ".ql-editor"]) {
     const ed = document.querySelector(sel);
@@ -69,13 +69,13 @@ function captureAndSignal(source) {
 export function startEditorCapture() {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      if (e.target.closest?.(EDITOR_SEL)) {
+      if ((e.target as Element | null)?.closest?.(EDITOR_SEL)) {
         captureAndSignal("Enter");
       }
     }
   }, true);
   window.addEventListener("click", (e) => {
-    const btn = e.target.closest?.("button");
+    const btn = (e.target as Element | null)?.closest?.("button");
     if (!btn) return;
     const form = btn.closest("form, fieldset, [class*='composer'], [class*='input-container'], [class*='chat-input']");
     if (form && form.querySelector(EDITOR_SEL)) {
@@ -101,7 +101,7 @@ export function startEditorCapture() {
   }, 500);
 }
 
-function classifyMessage(el) {
+function classifyMessage(el: Element): "assistant" | "user" | null {
   for (const s of ASSISTANT_MARKER[PLATFORM]) {
     if (el.matches?.(s) || el.querySelector?.(s)) return "assistant";
   }
@@ -111,9 +111,9 @@ function classifyMessage(el) {
   return null;
 }
 
-const messageEstimates = new WeakMap();
+const messageEstimates = new WeakMap<Element, MessageEstimate>();
 
-function sendMessageEstimate(el, role, isUpdate) {
+function sendMessageEstimate(el: Element, role: string, isUpdate: boolean) {
   const next = estimateMessage(el);
   const prev = messageEstimates.get(el) || {
     totalTokens: 0, textTokens: 0, imageTokens: 0, fileTokens: 0, imageCount: 0, fileCount: 0,
@@ -132,7 +132,7 @@ function sendMessageEstimate(el, role, isUpdate) {
     return;
   }
 
-  const payload: Record<string, any> = {
+  const payload: TrackerMessage = {
     type: "insights-message",
     platform: PLATFORM,
     role,
@@ -161,7 +161,7 @@ function sendMessageEstimate(el, role, isUpdate) {
   send(payload);
 }
 
-function scheduleSettledRecount(el, role) {
+function scheduleSettledRecount(el: Element, role: string) {
   if (role !== "assistant") return;
   let lastText = el.textContent || "";
   let stableChecks = 0;
@@ -181,7 +181,7 @@ function scheduleSettledRecount(el, role) {
   setTimeout(check, 1500);
 }
 
-function processNewMessage(el) {
+function processNewMessage(el: Element) {
   if (countedMessages.has(el)) return;
   countedMessages.add(el);
   const role = classifyMessage(el);
@@ -201,14 +201,15 @@ export function markExistingMessages() {
 // Observe document.body (not a container that SPAs might replace)
 export function startMessageObserver() {
   new MutationObserver((mutations) => {
-    const newMsgs = [];
+    const newMsgs: Element[] = [];
     for (const m of mutations) {
-      if (m.target.id === "aleph-dynamic-styles") continue;
+      if ((m.target as Element).id === "aleph-dynamic-styles") continue;
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) continue;
+        const added = node as Element;
         for (const sel of MSG_WRAPPER[PLATFORM]) {
-          if (node.matches?.(sel)) { newMsgs.push(node); continue; }
-          node.querySelectorAll?.(sel).forEach((el) => newMsgs.push(el));
+          if (added.matches?.(sel)) { newMsgs.push(added); continue; }
+          added.querySelectorAll?.(sel).forEach((el) => newMsgs.push(el));
         }
       }
     }

@@ -3,6 +3,8 @@ import { SEL } from "./selectors";
 import { getSettings } from "./settingsStore";
 import { hasRTLScriptText } from "./bidi";
 
+// Vendored global (vendor/katex/katex.min.js, loaded as a sibling content
+// script) — no type definitions shipped; the only non-boundary `any` allowed.
 declare const katex: any;
 
 // ── LaTeX Fixer ────────────────────────────────────────────────────────
@@ -23,7 +25,21 @@ export const HAS_DOLLAR = /\$[^$]+\$/;
 const HAS_LPAREN = /\\\(/;
 const HAS_LBRACKET = /\\\[/;
 
-function isInsideSkip(node) {
+interface LatexRegion {
+  start: number;
+  end: number;
+  latex: string;
+  display?: boolean;
+}
+
+interface IsolateRegion {
+  start: number;
+  end: number;
+  text: string;
+  type?: string;
+}
+
+function isInsideSkip(node: Node) {
   let el = node.parentElement;
   while (el) {
     if (el.classList && (
@@ -41,14 +57,14 @@ function isInsideSkip(node) {
   return false;
 }
 
-function isMessageStreaming(msg) {
+function isMessageStreaming(msg: Element) {
   if (PLATFORM === "chatgpt") {
     return !!(msg.closest(".result-streaming") || msg.querySelector(".result-streaming"));
   }
   return false;
 }
 
-export function extractLatexExpression(text, cmdStart) {
+export function extractLatexExpression(text: string, cmdStart: number): number {
   let end = cmdStart;
   const len = text.length;
   while (end < len) {
@@ -135,7 +151,7 @@ export function extractLatexExpression(text, cmdStart) {
   return end;
 }
 
-export function expandBackward(text, start) {
+export function expandBackward(text: string, start: number): number {
   let s = start;
   while (s > 0) {
     const ch = text[s - 1];
@@ -152,8 +168,8 @@ export function expandBackward(text, start) {
   return s;
 }
 
-export function findBareLatexRegions(text) {
-  const regions = [];
+export function findBareLatexRegions(text: string): LatexRegion[] {
+  const regions: LatexRegion[] = [];
   LATEX_CMD_RE_G.lastIndex = 0;
   let match;
   while ((match = LATEX_CMD_RE_G.exec(text)) !== null) {
@@ -165,7 +181,7 @@ export function findBareLatexRegions(text) {
     if (/^\\\w+$/.test(latex) && /^\\(?:n|t|r|s|d|w|b|0)$/.test(latex)) continue;
     regions.push({ start, end, latex });
   }
-  const merged = [];
+  const merged: LatexRegion[] = [];
   for (const r of regions.sort((a, b) => a.start - b.start)) {
     const last = merged[merged.length - 1];
     if (last && (r.start <= last.end ||
@@ -179,7 +195,7 @@ export function findBareLatexRegions(text) {
   return merged;
 }
 
-const UNICODE_TO_LATEX = [
+const UNICODE_TO_LATEX: Array<[RegExp, string]> = [
   [/→/g, "\\to "], [/←/g, "\\leftarrow "], [/↔/g, "\\leftrightarrow "],
   [/⇒/g, "\\Rightarrow "], [/⇐/g, "\\Leftarrow "], [/⇔/g, "\\Leftrightarrow "],
   [/≠/g, "\\neq "], [/≤/g, "\\leq "], [/≥/g, "\\geq "],
@@ -198,7 +214,7 @@ const UNICODE_TO_LATEX = [
   [/⊕/g, "\\oplus "], [/⊗/g, "\\otimes "],
 ];
 
-export function cleanMathText(s) {
+export function cleanMathText(s: string): string {
   for (const [re, repl] of UNICODE_TO_LATEX) s = s.replace(re, repl);
   s = s.replace(/,\s*;/g, ";");
   s = s.replace(/;\s*,/g, ";");
@@ -207,11 +223,11 @@ export function cleanMathText(s) {
   return s;
 }
 
-function renderLatexInNode(textNode) {
+function renderLatexInNode(textNode: Text) {
   const text = textNode.textContent;
   if (!text || text.trim().length === 0) return;
 
-  const regions = [];
+  const regions: LatexRegion[] = [];
 
   DELIMITED_RE.lastIndex = 0;
   let dm;
@@ -233,7 +249,7 @@ function renderLatexInNode(textNode) {
   if (regions.length === 0) return;
 
   regions.sort((a, b) => a.start - b.start);
-  const merged = [];
+  const merged: LatexRegion[] = [];
   for (const r of regions) {
     const last = merged[merged.length - 1];
     if (last && (r.start <= last.end ||
@@ -293,7 +309,7 @@ function renderLatexInNode(textNode) {
     wrapper.appendChild(document.createTextNode(text.slice(lastEnd)));
   }
 
-  textNode.parentNode.replaceChild(wrapper, textNode);
+  textNode.parentNode!.replaceChild(wrapper, textNode);
 }
 
 const MATH_PAREN_RE = /\((?=[^()]*[0-9])(?=[^()]*[=<>+\-/])[^()]*\)/g;
@@ -301,11 +317,11 @@ const MATH_PIPE_RE = /\|[^|\n]{1,50}\|/g;
 const MATH_TILDE_RE = /[~∼≁]_?\w+/g;
 const MATH_REPEAT_RE = /(?<![A-Za-z0-9_'])(?:\([^()\n]{1,40}\)[*+?]|[A-Za-z][0-9_']{0,3}[*+]|[0-9]+[*+])/g;
 
-export function findEqRegions(text) {
-  const regions = [];
+export function findEqRegions(text: string): IsolateRegion[] {
+  const regions: IsolateRegion[] = [];
   let start = -1, hasEq = false, hasLetter = false;
   for (let i = 0; i <= text.length;) {
-    const ch = i < text.length ? String.fromCodePoint(text.codePointAt(i)) : null;
+    const ch = i < text.length ? String.fromCodePoint(text.codePointAt(i)!) : null;
     const nextI = ch ? i + ch.length : i + 1;
     if (start === -1) {
       if (ch && !hasRTLScriptText(ch) && ch !== '\n' && ch !== ' ') {
@@ -344,7 +360,7 @@ export function findEqRegions(text) {
   return regions;
 }
 
-function collectRegions(re, text, regions, type, skipRTL) {
+function collectRegions(re: RegExp, text: string, regions: IsolateRegion[], type?: string, skipRTL?: boolean) {
   re.lastIndex = 0;
   let match;
   while ((match = re.exec(text)) !== null) {
@@ -353,7 +369,7 @@ function collectRegions(re, text, regions, type, skipRTL) {
   }
 }
 
-function hasMathCandidate(re, text, skipRTL) {
+function hasMathCandidate(re: RegExp, text: string, skipRTL?: boolean) {
   re.lastIndex = 0;
   let match;
   while ((match = re.exec(text)) !== null) {
@@ -362,9 +378,9 @@ function hasMathCandidate(re, text, skipRTL) {
   return false;
 }
 
-function isolateMathText(textNode) {
-  const text = textNode.textContent;
-  const regions = [];
+function isolateMathText(textNode: Text) {
+  const text = textNode.textContent || "";
+  const regions: IsolateRegion[] = [];
 
   regions.push(...findEqRegions(text).map(r => ({ ...r, type: "eq" })));
   collectRegions(MATH_PAREN_RE, text, regions, undefined, true);
@@ -374,7 +390,7 @@ function isolateMathText(textNode) {
 
   if (regions.length === 0) return;
   regions.sort((a, b) => a.start - b.start);
-  const merged = [];
+  const merged: IsolateRegion[] = [];
   for (const r of regions) {
     const last = merged[merged.length - 1];
     if (last && r.start < last.end) continue;
@@ -408,10 +424,10 @@ function isolateMathText(textNode) {
   if (lastEnd < text.length) {
     wrapper.appendChild(document.createTextNode(text.slice(lastEnd)));
   }
-  textNode.parentNode.replaceChild(wrapper, textNode);
+  textNode.parentNode!.replaceChild(wrapper, textNode);
 }
 
-export function shouldIsolateMathText(txt) {
+export function shouldIsolateMathText(txt: string): boolean {
   return hasMathCandidate(MATH_PAREN_RE, txt, true) ||
          hasMathCandidate(MATH_PIPE_RE, txt, true) ||
          (MATH_TILDE_RE.lastIndex = 0, MATH_TILDE_RE.test(txt)) ||
@@ -424,8 +440,8 @@ export function patchMathText() {
   document.querySelectorAll(messageSel).forEach((msg) => {
     if (isMessageStreaming(msg)) return;
     const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-    const mathTextNodes = [];
-    let node;
+    const mathTextNodes: Text[] = [];
+    let node: Node | null;
     while ((node = walker.nextNode())) {
       if (isInsideSkip(node)) continue;
       const txt = node.textContent;
@@ -434,7 +450,7 @@ export function patchMathText() {
         continue;
       }
       if (shouldIsolateMathText(txt)) {
-        mathTextNodes.push(node);
+        mathTextNodes.push(node as Text);
       }
     }
     mathTextNodes.forEach(isolateMathText);
@@ -447,14 +463,14 @@ export function patchLatex() {
   document.querySelectorAll(messageSel).forEach((msg) => {
     if (isMessageStreaming(msg)) return;
     const walker = document.createTreeWalker(msg, NodeFilter.SHOW_TEXT);
-    const latexNodes = [];
-    let node;
+    const latexNodes: Text[] = [];
+    let node: Node | null;
     while ((node = walker.nextNode())) {
       if (isInsideSkip(node)) continue;
       const txt = node.textContent;
       if (!txt || txt.trim().length === 0) continue;
       if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
-        latexNodes.push(node);
+        latexNodes.push(node as Text);
       }
     }
     latexNodes.forEach(renderLatexInNode);

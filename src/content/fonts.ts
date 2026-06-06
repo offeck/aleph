@@ -1,5 +1,5 @@
 // ── Google Fonts map ───────────────────────────────────────────────────
-const GOOGLE_FONTS = {
+const GOOGLE_FONTS: Record<string, string> = {
   "Rubik": "Rubik:wght@400;500;700",
   "Heebo": "Heebo:wght@400;500;700",
   "Assistant": "Assistant:wght@400;600;700",
@@ -17,7 +17,7 @@ const GOOGLE_FONTS = {
   "IBM Plex Mono": "IBM+Plex+Mono:wght@400;500;700",
 };
 
-export function loadFont(fontName) {
+export function loadFont(fontName: string) {
   if (!fontName || !GOOGLE_FONTS[fontName]) return;
   const id = "aleph-font-" + fontName.replace(/\s+/g, "-").toLowerCase();
   if (document.getElementById(id)) return;

@@ -11,14 +11,14 @@ export const TOKEN_RATIOS = {
   gemini:  { latin: 4.2, rtl: 2.2, code: 3.0, whitespace: 5.0 },
 };
 
-export function estimateTokens(text) {
+export function estimateTokens(text: string | null | undefined): number {
   if (!text) return 0;
   const ratios = TOKEN_RATIOS[PLATFORM] || TOKEN_RATIOS.chatgpt;
 
   let tokens = 0;
 
   // Extract code blocks first — they tokenize differently (operators, indentation)
-  const codeBlocks = [];
+  const codeBlocks: string[] = [];
   const withoutCode = text.replace(/```[\s\S]*?```|`[^`]+`/g, (m) => {
     codeBlocks.push(m);
     return "";
@@ -43,22 +43,22 @@ export function estimateTokens(text) {
 // varies on Gemini. Count <img> tags inside messages and add to estimate.
 export const IMG_TOKEN_COST = { claude: 1600, chatgpt: 1600, gemini: 1200 };
 
-function isContentImage(img) {
+function isContentImage(img: HTMLImageElement) {
   if (img.closest?.('[data-testid*="avatar" i], [class*="avatar" i], [aria-label*="avatar" i]')) return false;
-  const w = img.naturalWidth || parseInt(img.getAttribute("width"), 10) || 0;
-  const h = img.naturalHeight || parseInt(img.getAttribute("height"), 10) || 0;
+  const w = img.naturalWidth || parseInt(img.getAttribute("width") || "", 10) || 0;
+  const h = img.naturalHeight || parseInt(img.getAttribute("height") || "", 10) || 0;
   return !w || !h || (w * h) >= 4096;
 }
 
-function countFileAttachments(el) {
+function countFileAttachments(el: Element) {
   const selector = '[data-testid*="file" i], [aria-label*="file" i], a[href*="/backend-api/files/"], a[href*="attachment"], [class*="attachment" i]';
   const candidates = Array.from(el.querySelectorAll(selector));
-  const identities = new Set();
-  const noHrefCandidates = [];
+  const identities = new Set<string | Element>();
+  const noHrefCandidates: Element[] = [];
   for (const node of candidates) {
     const link = node.matches?.('a[href*="/backend-api/files/"], a[href*="attachment"]')
-      ? node
-      : node.querySelector?.('a[href*="/backend-api/files/"], a[href*="attachment"]');
+      ? (node as HTMLAnchorElement)
+      : node.querySelector?.<HTMLAnchorElement>('a[href*="/backend-api/files/"], a[href*="attachment"]');
     if (link?.href) identities.add("href:" + link.href);
     else noHrefCandidates.push(node);
   }
@@ -70,9 +70,19 @@ function countFileAttachments(el) {
   return identities.size;
 }
 
-export function estimateMessage(el) {
+export interface MessageEstimate {
+  text: string;
+  textTokens: number;
+  imageTokens: number;
+  fileTokens: number;
+  imageCount: number;
+  fileCount: number;
+  totalTokens: number;
+}
+
+export function estimateMessage(el: Element): MessageEstimate {
   const text = el.textContent || "";
-  const images = Array.from(el.querySelectorAll("img")).filter(isContentImage);
+  const images = Array.from(el.querySelectorAll<HTMLImageElement>("img")).filter(isContentImage);
   const fileCount = countFileAttachments(el);
   const textTokens = estimateTokens(text);
   const imageTokens = images.length * (IMG_TOKEN_COST[PLATFORM] || 1600);

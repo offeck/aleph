@@ -1,4 +1,19 @@
-export const THEMES = {
+export interface Theme {
+  bg: string;
+  bgSecondary: string;
+  bgTertiary: string;
+  text: string;
+  textMuted: string;
+  accent: string;
+  border: string;
+  codeBg: string;
+  codeBorder: string;
+  inputBg: string;
+}
+
+// Indexed by theme name; looked up dynamically with names coming from
+// settings, hence the string index signature ("none" maps to null).
+export const THEMES: Record<string, Theme | null> = {
   none: null,
   warmDark: {
     bg: "#1c1917", bgSecondary: "#292524", bgTertiary: "#1a1614",

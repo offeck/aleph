@@ -4,17 +4,30 @@ import { PLATFORM } from "./platform";
 
 // ── Subscription & model detection ───────────────────────
 
+export type ClaudePlan = "free" | "pro" | "max5x" | "max20x";
+export type ChatgptPlan = "free" | "plus" | "pro5x" | "pro20x";
+export type GeminiPlan = "free" | "ai_pro" | "ai_ultra";
+
+interface PlanDetection {
+  plan: string;
+  model: string | null;
+}
+
+function parseCookies(): Record<string, string> {
+  return document.cookie.split(";").reduce((a, c) => {
+    const [k, ...v] = c.trim().split("=");
+    a[k] = v.join("=");
+    return a;
+  }, {} as Record<string, string>);
+}
+
 // Claude: primary detection via /api/organizations/{orgId} (uses session cookie, no API key).
 // Returns rate_limit_tier like "default_claude_max_20x", "default_claude_pro", etc.
-let claudeApiPlan = null;
+let claudeApiPlan: ClaudePlan | null = null;
 export function detectClaudeViaApi() {
   if (claudeApiPlan) return;
   try {
-    const cookies = document.cookie.split(";").reduce((a, c) => {
-      const [k, ...v] = c.trim().split("=");
-      a[k] = v.join("=");
-      return a;
-    }, {});
+    const cookies = parseCookies();
     const orgId = cookies["lastActiveOrg"];
     if (!orgId) return;
     fetch("/api/organizations/" + orgId, { credentials: "same-origin" })
@@ -32,7 +45,7 @@ export function detectClaudeViaApi() {
   } catch (e) {}
 }
 
-function detectClaude() {
+function detectClaude(): PlanDetection {
   const modelBtn = document.querySelector('[data-testid="model-selector-dropdown"]');
   const ariaLabel = modelBtn?.getAttribute("aria-label") || "";
   const model = ariaLabel.replace(/^Model:\s*/i, "").trim() || null;
@@ -61,20 +74,20 @@ function detectClaude() {
 // ChatGPT: detect plan via /api/auth/session which returns the real plan_type
 // with just cookies (no bearer token needed for this endpoint).
 // Also retrieves the access token needed for usage polling.
-let chatgptApiPlan = null;
-export const CHATGPT_PLAN_RANK = { free: 0, plus: 1, pro5x: 2, pro20x: 3 };
+let chatgptApiPlan: ChatgptPlan | null = null;
+export const CHATGPT_PLAN_RANK: Record<ChatgptPlan, number> = { free: 0, plus: 1, pro5x: 2, pro20x: 3 };
 
-function setChatgptApiPlan(plan) {
+function setChatgptApiPlan(plan: ChatgptPlan | null) {
   if (!plan) return;
   if (!chatgptApiPlan || (CHATGPT_PLAN_RANK[plan] || 0) > (CHATGPT_PLAN_RANK[chatgptApiPlan] || 0)) {
     chatgptApiPlan = plan;
   }
 }
 
-function collectChatgptPlanSignals(value, depth = 0, includeChildren = false) {
+function collectChatgptPlanSignals(value: unknown, depth = 0, includeChildren = false): string[] {
   if (!value || depth > 3) return [];
   if (typeof value !== "object") return [String(value)];
-  const signals = [];
+  const signals: string[] = [];
   for (const [key, child] of Object.entries(value)) {
     const relevantKey = /plan|tier|billing|subscription|price|amount|product|sku|seat|license|account|workspace/i.test(key);
     if (!includeChildren && !relevantKey) continue;
@@ -91,7 +104,7 @@ function collectChatgptPlanSignals(value, depth = 0, includeChildren = false) {
 // Known ChatGPT price points only. Plus ($20) is detected via text, not price,
 // to avoid collisions with junk numerics. Bands cover dollars and cents-encoded
 // forms (n/100). Returns a plan string or null — never a bare number.
-export function planFromPriceNumber(n) {
+export function planFromPriceNumber(n: number): ChatgptPlan | null {
   if (!Number.isFinite(n)) return null;
   for (const v of [n, n / 100]) {
     if (v >= 190 && v <= 260) return "pro20x";
@@ -106,9 +119,9 @@ export function planFromPriceNumber(n) {
 const CHATGPT_PRICE_KEY_RE =
   /(?:\b(?:price|cost)\b|(?:billing|monthly|unit|plan|sub|subscription)[_-]?(?:price|amount|cost)|amount[_-](?:due|cents|usd|total|gross|net)|(?:price|amount)[_-]?cents)[a-z0-9_.:= -]{0,40}?(\d+(?:\.\d+)?)/gi;
 
-function extractChatgptPlanPrice(text) {
+function extractChatgptPlanPrice(text: string): ChatgptPlan | null {
   CHATGPT_PRICE_KEY_RE.lastIndex = 0;
-  let best = null;
+  let best: ChatgptPlan | null = null;
   let match;
   while ((match = CHATGPT_PRICE_KEY_RE.exec(text))) {
     const plan = planFromPriceNumber(Number(match[1]));
@@ -118,7 +131,7 @@ function extractChatgptPlanPrice(text) {
   return best;
 }
 
-export function normalizeChatgptPlan(raw, context = {}) {
+export function normalizeChatgptPlan(raw: string | null | undefined, context: { signals?: string[] } = {}): ChatgptPlan | null {
   const text = [raw, ...(context.signals || [])].filter(Boolean).join(" ").toLowerCase();
   const pricePlan = extractChatgptPlanPrice(text);
   if (pricePlan) return pricePlan;
@@ -145,9 +158,9 @@ function detectChatgptDomPlan() {
 // Two-step auth: /api/auth/session returns a bearer token (works with cookies),
 // then /backend-api/conversation/init with that token returns real limits.
 // Without the token, the API returns guest data even for Plus users.
-let chatgptAccessToken = null;
+let chatgptAccessToken: string | null = null;
 
-export function getChatgptAccessToken() {
+export function getChatgptAccessToken(): string | null {
   return chatgptAccessToken;
 }
 
@@ -173,7 +186,7 @@ export function detectChatgptViaApi() {
     if (!token) {
       // Fallback: infer from model cookie
       try {
-        const c = document.cookie.split(";").reduce((a, c) => { const [k,...v] = c.trim().split("="); a[k]=v.join("="); return a; }, {});
+        const c = parseCookies();
         if (c["oai-last-model-config"]) {
           const m = JSON.parse(decodeURIComponent(c["oai-last-model-config"])).model || "";
           if (/^o3$/.test(m)) setChatgptApiPlan("pro5x");
@@ -184,15 +197,11 @@ export function detectChatgptViaApi() {
   });
 }
 
-function detectChatgpt() {
-  let model = null;
+function detectChatgpt(): PlanDetection {
+  let model: string | null = null;
 
   try {
-    const cookies = document.cookie.split(";").reduce((acc, c) => {
-      const [k, ...v] = c.trim().split("=");
-      acc[k] = v.join("=");
-      return acc;
-    }, {});
+    const cookies = parseCookies();
     if (cookies["oai-last-model-config"]) {
       const cfg = JSON.parse(decodeURIComponent(cookies["oai-last-model-config"]));
       model = cfg.model || null;
@@ -214,9 +223,9 @@ function detectChatgpt() {
   return { plan: "free", model };
 }
 
-function detectGemini() {
-  let plan = "free";
-  let model = null;
+function detectGemini(): PlanDetection {
+  let plan: GeminiPlan = "free";
+  let model: string | null = null;
 
   // Primary: the mode switch button in the input area shows the active model
   const switchBtn = document.querySelector(".input-area-switch");
@@ -260,7 +269,7 @@ function detectGemini() {
 
 export function detectSubscription() {
   try {
-    let result = null;
+    let result: PlanDetection | null = null;
     if (PLATFORM === "claude") result = detectClaude();
     else if (PLATFORM === "chatgpt") result = detectChatgpt();
     else if (PLATFORM === "gemini") result = detectGemini();

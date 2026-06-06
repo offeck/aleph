@@ -1,14 +1,15 @@
 import { platformThemeKey } from "../shared/platform";
+import type { Theme } from "../shared/themes";
 import { PLATFORM } from "./platform";
 import { getSettings } from "./settingsStore";
 
-export function getActiveThemeName() {
+export function getActiveThemeName(): string {
   const settings = getSettings();
   const platformKey = platformThemeKey(PLATFORM);
   return settings[platformKey] || settings.theme || "none";
 }
 
-export function isLightTheme(theme) {
+export function isLightTheme(theme: Theme | null): boolean | null {
   if (!theme) return null;
   const r = parseInt(theme.bg.slice(1, 3), 16);
   const g = parseInt(theme.bg.slice(3, 5), 16);
@@ -16,9 +17,9 @@ export function isLightTheme(theme) {
   return (r * 299 + g * 587 + b * 114) / 1000 > 128;
 }
 
-export function updateColorScheme(theme) {
+export function updateColorScheme(theme: Theme | null) {
   const scheme = theme ? (isLightTheme(theme) ? "light" : "dark") : null;
-  let meta = document.querySelector('meta[name="color-scheme"][data-aleph]');
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"][data-aleph]');
   if (scheme) {
     if (!meta) {
       meta = document.createElement("meta");
