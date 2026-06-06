@@ -112,7 +112,7 @@ Add package.json/tsconfig/vitest.config/build.mjs (+eslint placeholder); `npm in
 - [x] unpacked reload at repo root → **extension ID unchanged** (`odaeo…` before/after), settings + history intact
 - [x] all 3 platforms load (`data-aleph-*` attributes set; tracker logs from `dist/insights-tracker.js`), no new errors
 - [x] SW healthy: firebase importScripts (root-absolute paths) boots; verified via second `aleph-reload` round-trip handled by the NEW background bundle + live insights message flow
-- [ ] popup/settings/insights pages render and read storage *(extension pages are blocked to browser automation — needs a 5s human glance; bundles built, paths verified, SW message path alive)*
+- [x] popup/settings/insights pages render and read storage *(user-verified 2026-06-06 during the Phase 5 live pass: all three pages render with real stored data)*
 - [x] `aleph-reload` round-trip works (twice; second through the new bundle)
 - [x] full `checks.md` sweep on RTL Claude session `claude-bidi-math-001`: rtl-direction PASS (51), math-ltr-isolation PASS (48), latex-rendered PASS (48/0 errors), streaming-attrs PASS, no-console-errors PASS
 
@@ -126,8 +126,8 @@ First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typeche
 - [x] `npm test` discovers and runs real unit tests (**13 tests**); no `passWithNoTests`
 - [x] build+test+lint green; grep shows each migrated duplicated literal exists once under `src/shared/` (excluding intentional `tests/checks.md` console snippets and unit-test assertions)
 - [x] reload, all platforms clean *(verified during Phase 2.5 testing: `aleph-reload` + refresh on Claude/ChatGPT/Gemini — platform attrs set, build stamp fresh, no console errors)*
-- [ ] settings delta verified: per-platform dropdowns gain "Default"; miniGame persists incl. reset + export/import round-trip *(extension pages blocked to automation — needs human glance)*
-- [ ] popup meters render identically (shared keys match stored snapshots); insights spend/time render *(extension pages blocked to automation — needs human glance)*
+- [x] settings delta verified: per-platform dropdowns gain "Default"; miniGame persists incl. reset + export/import round-trip *(user-verified 2026-06-06: dropdowns show "Default"; exported JSON contains `miniGame`; re-import OK)*
+- [x] popup meters render identically (shared keys match stored snapshots); insights spend/time render *(user-verified 2026-06-06: popup meters + insights dashboard render with historical data)*
 - [x] `checks.md` RTL sweep passes *(claude-bidi-math-001, post-Phase-2.5 bundle: 51 RTL / 48 math / 48 katex, no console errors)*
 
 **Rollback:** revert → consumers back to local literals. No storage/manifest impact.
@@ -174,7 +174,7 @@ Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude
 
 - [x] build+test green — 80 tests (23 new: latex pure helpers, theme resolution via vi.mock'd platform, buildThemeSelector, CSS import-order assertion); **baseline ratcheted 538 → 528**; built `dist/content.css` rule content verified **byte-identical** pre/post split
 - [x] reload all 3 platforms from the split bundle (build-stamp round-trip on each); `data-aleph-ext-id` on `<html>` verified explicitly
-- [ ] **live settings path** *(user-assisted: popup + chrome.commands unreachable by automation — flip a theme in the popup with a page open → content reacts without reload; Alt+Shift+A → badge OFF)*
+- [x] **live settings path** *(user-verified 2026-06-06: theme flipped in the popup recolors the open page live without reload; Alt+Shift+A → badge OFF, again → restores)*
 - [x] checks on `claude-bidi-math-001`: `rtl-direction` PASS (51 — also proves split bidi.css loads), `math-ltr-isolation` PASS (48/0), `latex-rendered` PASS (48 katex, 0 errors), `streaming-attrs` PASS, `selectors-match` PASS, `no-console-errors` PASS; `theme-applied` SKIP (no theme set — expected). Arabic-specific session not available — Hebrew + the shared regex path covered; deferred to Phase 6 final regression
 - [x] `#aleph-dynamic-styles` present with correct (empty-at-defaults) content; typography/chat-width rules generate from the same applyStyles path covered by buildThemeSelector spec. **Deviation note:** `patching` flag lives with `patchAll()` in index.ts (orchestrator reentrancy guard), not bidi.ts
 
@@ -199,10 +199,10 @@ Background: `sync.ts` exports public API + `_mergeUsageDay` (+helpers) for tests
 
 - [x] build+test green — 13 spec files / 108 tests (new: `merge-usage-day`, `metrics`, `popup-meters`); **modules landed fully typed** — `STRICT_PATHS` now `^src/` + `^tests/`, baseline ratcheted to 0, gate prints `0/0 (strict paths: 0)`; `any` only at commented raw-JSON/firebase boundaries
 - [x] SW boot order verified behaviorally: two `aleph-reload` round-trips (second handled by the new `router.ts`) plus a no-op `onMessageExternal` probe returning "port closed" (listener registered ⇒ importScripts → init guard → `registerBackgroundListeners()` ran without reorder errors); direct SW console view remains automation-blocked
-- [ ] message round-trips: `insights-get-summary` (popup+insights), insights-* writes, `aleph-sync-status` in settings — tracker→router sends observed live on all 3 platforms; the page-side round-trips are extension pages (automation-blocked, user-assisted)
-- [ ] `aleph-reload` external still reloads ✓ (verified twice, incl. through the new router); Alt+Shift+A + onInstalled/onStartup console — user-assisted
-- [ ] popup full pass: toggles, theme grid, overrides, sliders, export/import (incl. miniGame), buttons
-- [ ] sync: signed-in `aleph-sync-now` completes (or clean signed-out state)
+- [x] message round-trips: `insights-get-summary` (popup+insights), insights-* writes, `aleph-sync-status` in settings — tracker→router sends observed live on all 3 platforms; page-side round-trips user-verified 2026-06-06 (popup meters + insights dashboard render summaries; settings shows correct signed-in state)
+- [x] `aleph-reload` external still reloads ✓ (verified twice, incl. through the new router; re-verified 2026-06-06 with stamp round-trip 14:37→18:17); Alt+Shift+A toggle + clean SW console (onInstalled/onStartup boot) user-verified 2026-06-06
+- [x] popup full pass: toggles, theme grid, overrides, sliders, export/import (incl. miniGame), buttons — user-verified 2026-06-06 (live theme apply, "Default" in overrides, mini-game spawns and despawns via toggle)
+- [x] sync: signed-in `aleph-sync-now` completes (or clean signed-out state) — user-verified 2026-06-06: signed-in "Sync now" completed without error
 - [x] reload + `no-console-errors` on all 3 platforms — stamp `2026-06-06T13:02:53.493Z` injected on Claude/ChatGPT/Gemini; full active-session sweep: bidi-math-001 (rtl 51/0, math 48 LTR, katex 48/0 err), bidi-math-003 (rtl 23/0, math 22/0, 0 err), general-001 (rtl 3/0), general-004 + chatgpt-theme-001 (selectors PASS, rtl 3/3) — consoles show only `[Aleph]` info logs. Gotcha discovered: refreshing in the same instant as the extension restart skips manifest-CSS injection (document_start) while JS still injects at idle with a fresh stamp — wait ~2s between reload trigger and page refresh (now noted in CLAUDE.md)
 
 **Rollback:** revert restores `importScripts("sync.js")` + relocated sync together; verify firebase still inits after revert.
@@ -215,7 +215,7 @@ With Phases 4.5/5 having driven all paths to zero, remove `allowJs`; delete the 
 - [x] `npm run check` fully green — typecheck 0 errors with `allowJs` removed (and `build.mjs` dropped from include — it was never type-checked), lint clean (typescript-eslint syntactic recommended; calibrations: allowEmptyCatch, caughtErrors none + `_` args, no-explicit-any off for commented boundaries, skipRegExps for the NBSP plan-detection regexes, allowTernary; one trivial source fix: `let end`→`const end` in `src/content/latex.ts`), 112 tests, build clean
 - [x] transitional typecheck baseline removed — `scripts/check-typecheck-baseline.mjs` + `tests/typecheck-baseline.json` + the npm script deleted; publish.yml now runs raw `npm run typecheck` + new `Lint` step
 - [x] CI and CLAUDE.md require tests for behavioral changes — new `.github/workflows/ci.yml` (pull_request: typecheck/lint/test/build); CLAUDE.md §6 states the CI gate and keeps the impractical-automation escape hatch
-- [ ] PR CI green on the PR; publish.yml reviewed (build precedes zip; dist/ in, src/ out — reviewed ✓, zip list unchanged)
+- [x] PR CI green on the PR (CI `check` run SUCCESS on PR #2, 2026-06-06); publish.yml reviewed (build precedes zip; dist/ in, src/ out — reviewed ✓, zip list unchanged)
 - [ ] final full regression: all `checks.md` checks on RTL Claude + ChatGPT + Gemini; popup/settings/insights/sync/mini-game; extension ID unchanged; storage intact
 - [ ] MIGRATION.md deleted; CLAUDE.md updated ✓ (final architecture, module maps, TS+lint policy, 14 themes, single-source RTL regex, fixed Common Tasks paths; AGENTS.md symlink resolves ✓) — deletion lands as the final commit
 - [ ] PR #2 marked ready → **merge after user approval**
