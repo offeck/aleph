@@ -25,8 +25,9 @@
 7. `data-aleph-ext-id` must be set early by the content bundle on every phase (dev reload + regression agent depend on it).
 8. Firebase init order is load-bearing: the four `importScripts` (app/auth/firestore compat + config) run before any code touching `firebase`/`ALEPH_FIREBASE_CONFIG`; the repo ships a **real** apiKey so the `!== "PLACEHOLDER"` guard genuinely fires — test it.
 9. TypeScript debt is budgeted until Phase 6: count `tsc --noEmit --pretty false` diagnostics by `error TS`, fail CI if the count grows, and update the committed baseline only when the count shrinks in the same phase commit.
+10. Tests are part of every behavioral change: add or update automated coverage for changed logic when practical; when browser-only/manual verification is the only realistic path, record the reason and the manual check. From Phase 2 onward `npm test` must discover real tests.
 
-**Definition of done (per phase):** code committed; `npm run build` green; Phase 1 records raw `npm run typecheck`, Phases 2–5 require `npm run typecheck:baseline`, and Phase 6 requires raw `npm run typecheck`; `npm test` green; extension reloads via `aleph-reload` with no new console errors; the phase's spot-checks pass; checkboxes ticked in the same commit.
+**Definition of done (per phase):** code committed; `npm run build` green; Phase 1 records raw `npm run typecheck`, Phases 2–5 require `npm run typecheck:baseline`, and Phase 6 requires raw `npm run typecheck`; `npm test` green with relevant tests added/updated for changed behavior; extension reloads via `aleph-reload` with no new console errors; the phase's spot-checks pass; checkboxes ticked in the same commit.
 
 ## Target layout (end state)
 
@@ -82,7 +83,7 @@ Discriminated union on `type`: content/tracker→bg fire-and-forget (`disabled`,
 
 **`tsconfig.json`** — ES2022, module ESNext, moduleResolution Bundler, lib ES2022+DOM+DOM.Iterable+WebWorker, types chrome+node, `strict:true`, noUnusedLocals/Parameters, isolatedModules, verbatimModuleSyntax, `noEmit:true` (esbuild emits), transitional `allowJs:true` (removed Phase 6). During Phases 2–5 the gate is build+test green plus no growth in the `tsc` diagnostic baseline. Phase 6 drives it to zero.
 
-**`vitest.config.ts`** — node environment, `tests/unit/**/*.spec.ts`. Pure modules (`metricKeys`, `metrics`, `plans`, codex/gemini normalizers, sync `_mergeUsageDay`) get `export`ed by the splits — behavior-neutral since bundled IIFEs leak no globals.
+**`vitest.config.ts`** — node environment, `tests/unit/**/*.spec.ts`. Phase 1 may temporarily use `passWithNoTests:true`; Phase 2 removes it so empty test suites fail. Pure modules (`metricKeys`, `metrics`, `plans`, codex/gemini normalizers, sync `_mergeUsageDay`) get `export`ed by the splits — behavior-neutral since bundled IIFEs leak no globals.
 
 **`package.json`** — private, type module; scripts: `build` (node build.mjs), `dev` (--dev --watch), `typecheck` (tsc --noEmit), `test` (vitest run), `lint` (eslint .), `check` (typecheck+lint+test+build once Phase 6 is strict). Phase 2 adds `typecheck:baseline` (runs `scripts/check-typecheck-baseline.mjs`). devDeps: esbuild, typescript, vitest, @types/chrome, @types/node, eslint, typescript-eslint. Commit `package-lock.json`.
 
@@ -112,9 +113,10 @@ Add package.json/tsconfig/vitest.config/build.mjs (+eslint placeholder); `npm in
 
 ### Phase 2 — Extract `src/shared/` (kill duplication)
 
-First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typecheck-baseline.json` seeded from the current `tsc --noEmit --pretty false` count (`566` as of Phase 1 review); wire `npm run typecheck:baseline` and publish CI to fail only when the count grows. Then create shared modules (`version`, `platform`, `defaults`+`Settings` type, `themes`, `pricing`, `platformMeta`, `dates`, `format`, `rtl`, `metricKeys`, `messages`); rewire all consumers, delete local copies (canonical winners per table above); both background and popup call the same `metricKeys` builders. Repoint `checks.md` KEEP-IN-SYNC comments (code untouched). Add `tests/unit/defaults.spec.ts` + `metrics.spec.ts` (lock key strings).
+First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typecheck-baseline.json` seeded from the current `tsc --noEmit --pretty false` count (`566` as of Phase 1 review); wire `npm run typecheck:baseline` and publish CI to fail only when the count grows. Remove `passWithNoTests:true` so `npm test` cannot pass with an empty suite. Then create shared modules (`version`, `platform`, `defaults`+`Settings` type, `themes`, `pricing`, `platformMeta`, `dates`, `format`, `rtl`, `metricKeys`, `messages`); rewire all consumers, delete local copies (canonical winners per table above); both background and popup call the same `metricKeys` builders. Repoint `checks.md` KEEP-IN-SYNC comments (code untouched). Add `tests/unit/defaults.spec.ts` + `metrics.spec.ts` (lock default keys, theme names, metric-key strings, date/format helpers).
 
 - [ ] `npm run typecheck:baseline` green; if the count shrinks, `tests/typecheck-baseline.json` updated in the same commit
+- [ ] `npm test` discovers and runs real unit tests; no `passWithNoTests`
 - [ ] build+test green; grep shows each duplicated literal exists once under `src/shared/`
 - [ ] reload, all platforms clean
 - [ ] settings delta verified: per-platform dropdowns gain "Default"; miniGame persists incl. reset + export/import round-trip
@@ -127,7 +129,7 @@ First add `scripts/check-typecheck-baseline.mjs` plus a committed `tests/typeche
 
 Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude`/`usageChatgpt`/`usageGemini`/`modelCaps`; `index.ts` keeps the boot orchestration (3s setTimeout, 60s intervals, detect kickoffs). Export test targets (`normalizeChatgptPlan`, `CHATGPT_PLAN_RANK`, `normalizeCodexBalance`, gemini credits parser, `estimateTokens`). WeakSet/WeakMap and plan-state lets each live in exactly one owning module. Port PR #1 fixtures → `plans.spec.ts`, `codex.spec.ts`, `gemini.spec.ts`.
 
-- [ ] build+test green (new specs); `npm run typecheck:baseline` green and baseline updated only if lower
+- [ ] build+test green (new specs cover every exported normalizer/helper); `npm run typecheck:baseline` green and baseline updated only if lower
 - [ ] reload: tracker boots on all platforms; send a message per platform → counts/time/tokens update in popup
 - [ ] subscription plan + usage meters (Claude 5h/7d, ChatGPT/Codex, Gemini credits) all render
 - [ ] no double-counting on repeated messages (single WeakSet owner)
@@ -139,7 +141,7 @@ Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude
 
 `settingsStore.ts` first — mutable settings behind `getSettings()`/`setSettings()` (never `export let` reassigned cross-module). Then `selectors`/`fonts`/`theme`/`bidi` (owns `patching` flag, editor-dir WeakMap, `hintChecked`, `sendHint`)/`focus`/`streaming`/`latex` (large, pure)/`styles`/`badge`; `index.ts` keeps `ensureRootAttributes` (sets `data-aleph-platform` + `data-aleph-ext-id` early), storage `onChanged` listener, `toggle` listener, both MutationObservers, boot chain, banner.
 
-- [ ] build+test green; content typed enough that `npm run typecheck:baseline` count drops or at least does not grow
+- [ ] build+test green; add focused unit tests for extracted pure content logic (RTL detection, theme resolution/style generation, selector unions, latex helpers); `npm run typecheck:baseline` count drops or at least does not grow
 - [ ] reload all 3 platforms; banner present; `data-aleph-ext-id` on `<html>` verified explicitly
 - [ ] **live settings path**: change theme/font/focus in popup with page open → content reacts without page reload
 - [ ] checks: `rtl-direction` (Hebrew AND Arabic), `math-ltr-isolation`, `latex-rendered`, `theme-applied`, `focus-hidden`, `streaming-attrs`, `selectors-match`, `no-console-errors`
@@ -151,7 +153,7 @@ Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude
 
 Background: `sync.ts` exports public API + `_mergeUsageDay` (+helpers) for tests, `declare const firebase: any`, behavior identical; `index.ts` statement order: importScripts(4 vendor files) → init guard → `alephSync.init/restoreAuth`; **every background submodule must be side-effect-free at import time** (esbuild hoists bundled imports above the importScripts call — the single riskiest property; verify in SW console). Split `usage` (readLocal/writeLocal→`alephSync.maybePush`, updateUsageDay queue), `metrics`, `remarks`, `cleanup`, `router` (all listeners incl. onMessageExternal + commands + onInstalled/onStartup + storage.onChanged push). Popup: `meters`/`insightsView`/`ui`/`index`. Settings/insights/mini-game become clean TS modules importing shared. Add `mergeUsageDay.spec.ts`, finish `metrics.spec.ts`.
 
-- [ ] build+test green (all 6 spec files); bg+popup+pages typed enough that `npm run typecheck:baseline` count drops or at least does not grow
+- [ ] build+test green (all 6 spec files plus any new router/sync/popup pure-helper specs); bg+popup+pages typed enough that `npm run typecheck:baseline` count drops or at least does not grow
 - [ ] SW console: firebase init order correct, no reorder errors
 - [ ] message round-trips: `insights-get-summary` (popup+insights), insights-* writes, `aleph-sync-status` in settings
 - [ ] `aleph-reload` external message still reloads; Alt+Shift+A works; onInstalled/onStartup clean
@@ -163,10 +165,11 @@ Background: `sync.ts` exports public API + `_mergeUsageDay` (+helpers) for tests
 
 ### Phase 6 — Strict finish, ESLint, PR CI, docs, cleanup, mark ready
 
-Drive `tsc --noEmit` to zero under full strict; remove `allowJs`; real types replace transitional `any`; remove the baseline file/script or leave `typecheck:baseline` as a strict alias to raw typecheck. ESLint flat config (typescript-eslint recommended; calibrate `no-floating-promises` for the fire-and-forget style). New `.github/workflows/ci.yml` on `pull_request`: `npm ci` → typecheck (required) → test → build; flip publish.yml typecheck to required. Rewrite CLAUDE.md architecture ("no build step" → TS/esbuild reality, dev loop, never move manifest, never edit dist/, where canonical constants live, updated Common Tasks). **Delete MIGRATION.md.** Mark PR #2 ready.
+Drive `tsc --noEmit` to zero under full strict; remove `allowJs`; real types replace transitional `any`; remove the baseline file/script or leave `typecheck:baseline` as a strict alias to raw typecheck. ESLint flat config (typescript-eslint recommended; calibrate `no-floating-promises` for the fire-and-forget style). New `.github/workflows/ci.yml` on `pull_request`: `npm ci` → typecheck (required) → test → build; flip publish.yml typecheck to required and keep `npm test` as a required gate that fails on empty suites. Rewrite CLAUDE.md architecture ("no build step" → TS/esbuild reality, dev loop, never move manifest, never edit dist/, where canonical constants live, updated Common Tasks) and codify the test policy for future work. **Delete MIGRATION.md.** Mark PR #2 ready.
 
 - [ ] `npm run check` fully green; zero tsc errors, no allowJs; lint clean
 - [ ] transitional typecheck baseline removed or converted to a strict zero-error alias
+- [ ] CI and CLAUDE.md require tests for behavioral changes, or an explicit documented reason when automation is impractical
 - [ ] PR CI green on the PR; publish.yml reviewed (build precedes zip; dist/ in, src/ out)
 - [ ] final full regression: all `checks.md` checks on RTL Claude + ChatGPT + Gemini; popup/settings/insights/sync/mini-game; extension ID unchanged; storage intact
 - [ ] MIGRATION.md deleted; CLAUDE.md updated; `AGENTS.md` symlink still resolves

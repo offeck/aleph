@@ -34,7 +34,15 @@
 - Every changed line should trace directly to the request
 - Don't refactor things that aren't broken
 
-### 6. Verify Everything — No Regressions
+### 6. Tests Are Part of the Change
+- Every behavioral change must add or update automated coverage that would fail before the change, unless automation is genuinely impractical
+- Bug fixes need a failing unit test, regression check, or `tests/sessions.json` entry before the fix when possible
+- Shared logic, parsers, metric keys, defaults, storage merge behavior, plan/usage normalizers, and formatting helpers require Vitest unit tests
+- DOM and visual behavior should be covered through `tests/checks.md`, `tests/sessions.json`, or a browser regression check; if only manual verification is possible, state why
+- Documentation-only and mechanical config changes do not need new tests, but still require a clear verification note
+- Never report `npm test` as meaningful if it passed only because no tests existed
+
+### 7. Verify Everything — No Regressions
 This extension has tightly interconnected features (BiDi, themes, focus mode, streaming, fonts, chat width). A change to one can silently break others.
 
 Before reporting any change as complete:
@@ -49,7 +57,7 @@ Before reporting any change as complete:
    - Touched `applyStyles()` → verify typography, code blocks, chat width still work
 6. **State what wasn't tested**: If you can't verify something (e.g., no browser access), explicitly say so — never assume a change is safe
 
-### 7. Goal-Driven Execution
+### 8. Goal-Driven Execution
 - Transform tasks into verifiable success criteria before starting
 - For multi-step tasks, state a brief plan with verification steps:
   ```
