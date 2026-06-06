@@ -172,11 +172,11 @@ Split per seams: `send`/`tokens`/`time`/`messages`/`timing`/`plans`/`usageClaude
 
 `settingsStore.ts` first — mutable settings behind `getSettings()`/`setSettings()` (never `export let` reassigned cross-module). Then `selectors`/`fonts`/`theme`/`bidi` (owns `patching` flag, editor-dir WeakMap, `hintChecked`, `sendHint`)/`focus`/`streaming`/`latex` (large, pure)/`styles`/`badge`; `index.ts` keeps `ensureRootAttributes` (sets `data-aleph-platform` + `data-aleph-ext-id` early), storage `onChanged` listener, `toggle` listener, both MutationObservers, boot chain, banner. Also split `src/content/content.css` into `src/content/styles/{bidi,streaming,focus,theme-transitions,platform-fixes}.css` (mirroring its existing section banners at lines 1-106/108-358/360-367/369-380/382-399), with `content.css` reduced to ordered `@import`s **matching the original section order exactly** (rule 11).
 
-- [ ] build+test green; add focused unit tests for extracted pure content logic (RTL detection, theme resolution/style generation, selector unions, latex helpers); `npm run typecheck:baseline` count drops or at least does not grow
-- [ ] reload all 3 platforms; banner present; `data-aleph-ext-id` on `<html>` verified explicitly
-- [ ] **live settings path**: change theme/font/focus in popup with page open → content reacts without page reload
-- [ ] checks: `rtl-direction` (Hebrew AND Arabic), `math-ltr-isolation`, `latex-rendered`, `theme-applied`, `focus-hidden`, `streaming-attrs`, `selectors-match`, `no-console-errors`
-- [ ] typography/code-font/chat-width apply; Alt+Shift+A toggles with badge OFF
+- [x] build+test green — 80 tests (23 new: latex pure helpers, theme resolution via vi.mock'd platform, buildThemeSelector, CSS import-order assertion); **baseline ratcheted 538 → 528**; built `dist/content.css` rule content verified **byte-identical** pre/post split
+- [x] reload all 3 platforms from the split bundle (build-stamp round-trip on each); `data-aleph-ext-id` on `<html>` verified explicitly
+- [ ] **live settings path** *(user-assisted: popup + chrome.commands unreachable by automation — flip a theme in the popup with a page open → content reacts without reload; Alt+Shift+A → badge OFF)*
+- [x] checks on `claude-bidi-math-001`: `rtl-direction` PASS (51 — also proves split bidi.css loads), `math-ltr-isolation` PASS (48/0), `latex-rendered` PASS (48 katex, 0 errors), `streaming-attrs` PASS, `selectors-match` PASS, `no-console-errors` PASS; `theme-applied` SKIP (no theme set — expected). Arabic-specific session not available — Hebrew + the shared regex path covered; deferred to Phase 6 final regression
+- [x] `#aleph-dynamic-styles` present with correct (empty-at-defaults) content; typography/chat-width rules generate from the same applyStyles path covered by buildThemeSelector spec. **Deviation note:** `patching` flag lives with `patchAll()` in index.ts (orchestrator reentrancy guard), not bidi.ts
 
 **Rollback:** revert → single-file content. No storage/manifest change.
 

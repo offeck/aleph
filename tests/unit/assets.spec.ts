@@ -33,4 +33,10 @@ describe("extension asset paths", () => {
       expect(css.startsWith('@import "../shared/ui.css";')).toBe(true);
     }
   });
+
+  it("imports content style sections in the original rule order (rule 11)", () => {
+    const css = readText("src/content/content.css");
+    const imports = [...css.matchAll(/@import "\.\/styles\/([a-z-]+)\.css";/g)].map((m) => m[1]);
+    expect(imports).toEqual(["bidi", "streaming", "focus", "theme-transitions", "platform-fixes"]);
+  });
 });

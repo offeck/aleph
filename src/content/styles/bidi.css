@@ -1,0 +1,101 @@
+/* ══════════════════════════════════════════════════════════════════════
+ *  BiDi Rules
+ * ══════════════════════════════════════════════════════════════════════ */
+
+[data-aleph-rtl="true"] {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: isolate !important;
+}
+
+/* Editors use dir="auto" plus plaintext fallback so each paragraph can resolve
+   its base direction even when a host editor strips child dir attributes. */
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"],
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"] p,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"] div,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] [contenteditable="true"] li,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] textarea,
+[data-aleph-bidi-enabled="true"][data-aleph-platform] input[type="text"] {
+  unicode-bidi: plaintext !important;
+}
+
+/* Math: ALWAYS LTR */
+.katex, .katex-display, span.katex-display,
+.katex-html, .katex-mathml, mjx-container,
+.math-inline, .math-display {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+span.katex-display, .katex-display,
+mjx-container[display="true"], .math-display {
+  text-align: center !important;
+  display: block !important;
+  width: 100% !important;
+}
+
+[data-aleph-rtl="true"] .katex,
+[data-aleph-rtl="true"] .katex-display,
+[data-aleph-rtl="true"] mjx-container,
+[data-aleph-rtl="true"] .math-inline,
+[data-aleph-rtl="true"] .math-display {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+/* Code inside RTL: stay LTR */
+[data-aleph-rtl="true"] pre,
+[data-aleph-rtl="true"] code,
+[data-aleph-rtl="true"] .code-block,
+[data-aleph-rtl="true"] .code-block__code {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
+
+/* Paragraph-level RTL: plaintext (from generic rule above) auto-detects
+   base direction from content. This lets math expressions like {a,b}⁰ = {ε}
+   render correctly — neutral chars (=, parentheses) resolve naturally
+   within LTR runs instead of being forced RTL by embed. */
+
+/* Inline elements inside RTL paragraphs: use plaintext so each element
+   auto-detects its own direction from content. Prevents BiDi neutral chars
+   (=, (, ), {, }) from leaking RTL direction across element boundaries.
+   E.g. <strong>{a,b}⁰</strong> detects LTR from 'a', renders correctly. */
+[data-aleph-rtl="true"] strong,
+[data-aleph-rtl="true"] em {
+  unicode-bidi: plaintext !important;
+}
+
+/* Inside math regions, strong/em should inherit isolation, not get plaintext */
+[data-aleph-math-isolated] strong,
+[data-aleph-math-isolated] em,
+[data-aleph-latex-rendered] strong,
+[data-aleph-latex-rendered] em {
+  unicode-bidi: inherit !important;
+}
+
+[data-aleph-math-isolated] bdi {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+/* RTL lists */
+ul:has(> [data-aleph-rtl="true"]),
+ol:has(> [data-aleph-rtl="true"]) {
+  direction: rtl !important;
+  padding-right: 2rem !important;
+  padding-left: 0 !important;
+}
+ul:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]),
+ol:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]) {
+  unicode-bidi: plaintext !important;
+}
+
+/* RTL tables */
+[data-aleph-rtl="true"] table { direction: rtl !important; }
+[data-aleph-rtl="true"] table code {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+

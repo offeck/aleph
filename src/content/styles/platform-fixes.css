@@ -1,0 +1,17 @@
+/* ══════════════════════════════════════════════════════════════════════
+ *  Platform-specific structural fixes
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* Claude */
+[data-aleph-platform="claude"] [data-aleph-rtl="true"] .inline-flex {
+  float: left;
+}
+
+/* ChatGPT / Gemini: no additional override — plaintext handles all cases */
+
+[data-aleph-platform="gemini"] [data-aleph-rtl="true"] code-block {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  display: block !important;
+  text-align: left !important;
+}
