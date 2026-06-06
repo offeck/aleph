@@ -192,6 +192,28 @@
       "source": "conversation:2026-06-04",
       "addedAt": "2026-06-04",
       "status": "active"
+    },
+    {
+      "id": "claude-general-005",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/4aa7dcce-0959-49e0-85ef-b51a74279b57",
+      "description": "Ending a mini-game (loss/win/ESC) while the assistant was still thinking immediately respawned a new game — gameActive (cleared by dismiss() on every end path) was the only spawn guard. Fixed with a per-cycle spawn latch in the shared trigger (src/mini-game/index.ts + latch.ts): spent at spawn, re-arms only when the USER message count grows past the spawn-time snapshot (count-snapshot pattern from claude-general-002; user bubbles render at send and never mount mid-response, unlike assistant nodes which can appear after spawn and would falsely re-arm). Tolerant of mid-response stop-button flicker and conversation truncation. Caps spawns at one per send across all end paths and all three platforms.",
+      "category": "general",
+      "checks": ["no-console-errors"],
+      "source": "conversation:2026-06-06",
+      "addedAt": "2026-06-06",
+      "status": "fixed"
+    },
+    {
+      "id": "claude-general-006",
+      "platform": "claude",
+      "url": "https://claude.ai/chat/ff6e8804-b357-402e-b9ce-3ddbc7f69ad0",
+      "description": "Long Hebrew conversation hard-froze the renderer (main thread saturated for minutes, 100% repro ~10-20s after load): every patchAll() re-scanned the entire conversation (patchBidi hasRTL walks + patchLatex/patchMathText TreeWalker passes), latex DOM writes re-triggered the body observer (the patching flag cannot catch microtask-delivered records), and the 3s/500ms intervals queued passes back-to-back once a pass exceeded the interval. Fixed by per-element/per-message exact-text gates (src/content/rescan.ts wired into bidi.ts/latex.ts), filtering Aleph-authored mutations in the content observer, replacing ul:has(>[data-aleph-rtl]) CSS with the JS-set ul[data-aleph-rtl-list] attribute, gating the tracker settled-recount, and de-quadraticing countFileAttachments; then the scheduler was made fully reactive — no standing 3s/500ms intervals, mutation-scoped passes (120ms debounce + 500ms maxWait), 12ms time-sliced passes with dirty-root re-queue, a self-canceling drain only while streaming-pending/hint work exists, and one 30s attribute heartbeat. Validated: 0 longtasks over 36s settled on the 1012-RTL-element conversation.",
+      "category": "general",
+      "checks": ["rtl-direction", "no-console-errors", "selectors-match"],
+      "source": "conversation:2026-06-06",
+      "addedAt": "2026-06-06",
+      "status": "fixed"
     }
   ]
 }
