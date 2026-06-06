@@ -98,4 +98,3 @@ ol:has(> [data-aleph-rtl="true"]) > li:not([data-aleph-rtl]) {
   direction: ltr !important;
   unicode-bidi: isolate !important;
 }
-

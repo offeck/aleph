@@ -269,6 +269,7 @@ function detectGemini(): PlanDetection {
 
 export function detectSubscription() {
   try {
+    if (!PLATFORM) return;
     let result: PlanDetection | null = null;
     if (PLATFORM === "claude") result = detectClaude();
     else if (PLATFORM === "chatgpt") result = detectChatgpt();

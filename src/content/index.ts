@@ -15,6 +15,7 @@ declare const __ALEPH_BUILD__: string;
 // supported platform (manifest matches keep this always-true in practice).
 
 function ensureRootAttributes() {
+  if (!PLATFORM) return;
   document.documentElement.setAttribute("data-aleph-platform", PLATFORM);
   document.documentElement.setAttribute("data-aleph-build", __ALEPH_BUILD__);
   if (chrome?.runtime?.id) document.documentElement.setAttribute("data-aleph-ext-id", chrome.runtime.id);
@@ -75,7 +76,7 @@ if (PLATFORM) {
   // ── Toggle handler (keyboard shortcut) ─────────────────────────────────
   if (chrome?.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg.type === "toggle") {
+      if (msg.type === "toggle" && PLATFORM) {
         const key = "enable" + PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1);
         const newVal = !isPlatformEnabled();
         if (chrome?.storage?.sync) {

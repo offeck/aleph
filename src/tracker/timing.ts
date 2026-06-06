@@ -54,7 +54,7 @@ export function startResponseTiming() {
   setInterval(() => {
     if (!userSentAt || !responseTimingActive) return;
     const elapsed = Date.now() - userSentAt;
-    const sel = THINKING_SEL[PLATFORM];
+    const sel = PLATFORM ? THINKING_SEL[PLATFORM] : undefined;
 
     if (!thinkingStartedAt) {
       if (sel && document.querySelector(sel)) {

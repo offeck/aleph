@@ -13,7 +13,7 @@ export const TOKEN_RATIOS = {
 
 export function estimateTokens(text: string | null | undefined): number {
   if (!text) return 0;
-  const ratios = TOKEN_RATIOS[PLATFORM] || TOKEN_RATIOS.chatgpt;
+  const ratios = (PLATFORM && TOKEN_RATIOS[PLATFORM]) || TOKEN_RATIOS.chatgpt;
 
   let tokens = 0;
 
@@ -85,7 +85,7 @@ export function estimateMessage(el: Element): MessageEstimate {
   const images = Array.from(el.querySelectorAll<HTMLImageElement>("img")).filter(isContentImage);
   const fileCount = countFileAttachments(el);
   const textTokens = estimateTokens(text);
-  const imageTokens = images.length * (IMG_TOKEN_COST[PLATFORM] || 1600);
+  const imageTokens = images.length * ((PLATFORM && IMG_TOKEN_COST[PLATFORM]) || 1600);
   const fileTokens = 0;
   return {
     text,

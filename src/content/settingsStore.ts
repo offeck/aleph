@@ -29,6 +29,9 @@ export function loadSettings() {
 }
 
 export function isPlatformEnabled() {
+  // No platform (node / unmatched host): nothing is disabled — mirrors the
+  // pre-split behavior where the lookup key simply missed every setting.
+  if (!PLATFORM) return true;
   const key = platformEnableKey(PLATFORM);
   return settings[key] !== false;
 }

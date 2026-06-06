@@ -5,8 +5,8 @@ import { getSettings } from "./settingsStore";
 
 export function getActiveThemeName(): string {
   const settings = getSettings();
-  const platformKey = platformThemeKey(PLATFORM);
-  return settings[platformKey] || settings.theme || "none";
+  const platformOverride = PLATFORM ? settings[platformThemeKey(PLATFORM)] : "";
+  return platformOverride || settings.theme || "none";
 }
 
 export function isLightTheme(theme: Theme | null): boolean | null {

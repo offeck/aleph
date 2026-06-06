@@ -189,6 +189,7 @@ Eliminate the tolerated implicit-`any` debt in all migrated code: `src/shared/`,
 - [x] `npm test` green (80/80, unchanged — typing is behavior-neutral)
 - [x] build clean; extension reloaded with fresh stamp; Claude RTL session spot-check: rtl 51/0, katex 48/0 errors
 - [x] remaining `any` in strict paths: 5, all commented boundaries — `fetchJson` return + the two chatgpt limit normalizers (raw provider JSON), `parseGeminiQuotas` input (raw RPC arrays), the `katex` vendor global declare
+- [x] review hardening: `PLATFORM` is honestly `Platform | null` (no module-level cast); platform-keyed indexing narrows locally with browser-no-op guards that mirror the pre-split null behavior; the single remaining boundary cast is `SEL` in `src/content/selectors.ts`, documented as boot-gated. Split CSS files trimmed of trailing blank lines (`git diff --check` clean)
 
 **Rollback:** revert → annotations gone, old single-tier baseline restored. Zero runtime impact either way.
 

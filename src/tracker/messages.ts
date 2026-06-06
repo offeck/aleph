@@ -102,6 +102,7 @@ export function startEditorCapture() {
 }
 
 function classifyMessage(el: Element): "assistant" | "user" | null {
+  if (!PLATFORM) return null;
   for (const s of ASSISTANT_MARKER[PLATFORM]) {
     if (el.matches?.(s) || el.querySelector?.(s)) return "assistant";
   }
@@ -191,6 +192,7 @@ function processNewMessage(el: Element) {
 }
 
 export function markExistingMessages() {
+  if (!PLATFORM) return;
   let count = 0;
   for (const sel of MSG_WRAPPER[PLATFORM]) {
     document.querySelectorAll(sel).forEach((el) => { countedMessages.add(el); count++; });
@@ -200,6 +202,8 @@ export function markExistingMessages() {
 
 // Observe document.body (not a container that SPAs might replace)
 export function startMessageObserver() {
+  const platform = PLATFORM;
+  if (!platform) return;
   new MutationObserver((mutations) => {
     const newMsgs: Element[] = [];
     for (const m of mutations) {
@@ -207,7 +211,7 @@ export function startMessageObserver() {
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) continue;
         const added = node as Element;
-        for (const sel of MSG_WRAPPER[PLATFORM]) {
+        for (const sel of MSG_WRAPPER[platform]) {
           if (added.matches?.(sel)) { newMsgs.push(added); continue; }
           added.querySelectorAll?.(sel).forEach((el) => newMsgs.push(el));
         }

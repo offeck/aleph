@@ -1,6 +1,6 @@
 import { detectPlatform, type Platform } from "../shared/platform";
 
-// Guarded so vitest (node) can import content modules transitively; in the
-// browser the manifest only matches supported hosts, and index.ts gates boot
-// on a truthy PLATFORM, so the cast is safe everywhere code actually runs.
-export const PLATFORM = (typeof location !== "undefined" ? detectPlatform(location.hostname) : null) as Platform;
+// Honest nullable type: null under node (vitest) and on unmatched hosts.
+// index.ts gates all boot work on a truthy PLATFORM; platform-dependent
+// helpers either narrow locally or take the documented SEL boundary.
+export const PLATFORM: Platform | null = typeof location !== "undefined" ? detectPlatform(location.hostname) : null;
