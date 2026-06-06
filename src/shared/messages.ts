@@ -1,5 +1,3 @@
-import type { Platform } from "./platform";
-
 // Message field lists describe what senders actually put on the wire today
 // (tracker/content) and what the background router reads — they must never
 // be used to change wire shapes (MIGRATION rule: types describe, not change).
@@ -31,7 +29,7 @@ export interface InsightsMessagePayload {
 }
 
 export type ContentToBackgroundMessage =
-  | { type: "disabled"; platform: Platform }
+  | { type: "disabled" }
   | { type: "badge"; count: number }
   | { type: "insights-time"; platform: string; seconds: number; hour: number }
   | { type: "insights-send-analytics"; platform: string; lang?: string; length?: number; words?: number; timestamp?: number }
