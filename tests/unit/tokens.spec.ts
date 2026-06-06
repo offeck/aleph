@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateTokens, IMG_TOKEN_COST, TOKEN_RATIOS } from "../../src/tracker/tokens";
+import { countContainmentRoots, estimateTokens, IMG_TOKEN_COST, TOKEN_RATIOS } from "../../src/tracker/tokens";
 
 // In node PLATFORM resolves to null, so estimateTokens falls back to the
 // chatgpt ratios (latin 4.0, rtl 1.7, whitespace 5.5, code 2.5) — deterministic.
@@ -37,5 +37,31 @@ describe("token cost tables", () => {
     for (const table of [TOKEN_RATIOS, IMG_TOKEN_COST]) {
       expect(Object.keys(table).sort()).toEqual(["chatgpt", "claude", "gemini"]);
     }
+  });
+});
+
+describe("countContainmentRoots", () => {
+  // Minimal Element stand-ins — only parentElement is consulted.
+  const el = (parentElement: object | null = null) =>
+    ({ parentElement }) as unknown as Element;
+
+  it("returns 0 for empty input", () => {
+    expect(countContainmentRoots([])).toBe(0);
+  });
+
+  it("counts independent nodes", () => {
+    expect(countContainmentRoots([el(), el()])).toBe(2);
+  });
+
+  it("collapses nested candidates into their outermost root", () => {
+    const outer = el();
+    const mid = el(outer);
+    const inner = el(mid);
+    expect(countContainmentRoots([outer, mid, inner])).toBe(1);
+  });
+
+  it("keeps nodes whose ancestors are not candidates", () => {
+    const nonCandidate = el();
+    expect(countContainmentRoots([el(nonCandidate), el(nonCandidate)])).toBe(2);
   });
 });

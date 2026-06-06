@@ -53,21 +53,33 @@ function isContentImage(img: HTMLImageElement) {
 function countFileAttachments(el: Element) {
   const selector = '[data-testid*="file" i], [aria-label*="file" i], a[href*="/backend-api/files/"], a[href*="attachment"], [class*="attachment" i]';
   const candidates = Array.from(el.querySelectorAll(selector));
-  const identities = new Set<string | Element>();
+  const hrefs = new Set<string>();
   const noHrefCandidates: Element[] = [];
   for (const node of candidates) {
     const link = node.matches?.('a[href*="/backend-api/files/"], a[href*="attachment"]')
       ? (node as HTMLAnchorElement)
       : node.querySelector?.<HTMLAnchorElement>('a[href*="/backend-api/files/"], a[href*="attachment"]');
-    if (link?.href) identities.add("href:" + link.href);
+    if (link?.href) hrefs.add("href:" + link.href);
     else noHrefCandidates.push(node);
   }
-  for (const node of noHrefCandidates) {
-    if (!noHrefCandidates.some((other) => other !== node && other.contains?.(node))) {
-      identities.add(node);
+  return hrefs.size + countContainmentRoots(noHrefCandidates);
+}
+
+// Count elements not contained by another element in the list — nested
+// attachment chips collapse into their outermost candidate. Ancestor-climb
+// against a Set instead of pairwise contains() so big messages stay
+// O(n·depth) rather than O(n²). Exported for unit tests.
+export function countContainmentRoots(nodes: Element[]): number {
+  const set = new Set(nodes);
+  let roots = 0;
+  for (const node of nodes) {
+    let contained = false;
+    for (let p = node.parentElement; p; p = p.parentElement) {
+      if (set.has(p)) { contained = true; break; }
     }
+    if (!contained) roots++;
   }
-  return identities.size;
+  return roots;
 }
 
 export interface MessageEstimate {

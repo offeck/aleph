@@ -1,3 +1,4 @@
+import { USER_MESSAGE_MARKERS } from "../shared/messageMarkers";
 import { countRTLScriptLetters } from "../shared/rtl";
 import { send, type TrackerMessage } from "./send";
 import { PLATFORM } from "./platform";
@@ -16,11 +17,7 @@ const ASSISTANT_MARKER = {
   chatgpt: ["[data-message-author-role='assistant']"],
   gemini:  [".response-content", ".model-response-text", "message-content"],
 };
-const USER_MARKER = {
-  claude:  ["[data-testid='user-message']"],
-  chatgpt: ["[data-message-author-role='user']"],
-  gemini:  [".query-content", ".user-query"],
-};
+const USER_MARKER = USER_MESSAGE_MARKERS;
 
 // ── Message counting + token estimation ──────────────────
 const countedMessages = new WeakSet();
@@ -162,15 +159,32 @@ function sendMessageEstimate(el: Element, role: string, isUpdate: boolean) {
   send(payload);
 }
 
+// Images change a message's estimate without any text change (naturalWidth
+// arrives when the file loads; isContentImage reads it) — fingerprint the
+// img population so settling images still trigger a recount.
+function imgSettleState(el: Element): number {
+  const imgs = el.querySelectorAll<HTMLImageElement>("img");
+  let complete = 0;
+  imgs.forEach((img) => { if (img.complete) complete++; });
+  return imgs.length * 1000 + complete;
+}
+
 function scheduleSettledRecount(el: Element, role: string) {
   if (role !== "assistant") return;
   let lastText = el.textContent || "";
+  let lastImgs = imgSettleState(el);
   let stableChecks = 0;
   let checks = 0;
   const check = () => {
     if (!document.contains(el)) return;
-    sendMessageEstimate(el, role, true);
+    // Skip the expensive estimate while neither the text nor the image
+    // population changed since the previous tick.
     const currentText = el.textContent || "";
+    const currentImgs = imgSettleState(el);
+    if (checks === 0 || currentText !== lastText || currentImgs !== lastImgs) {
+      sendMessageEstimate(el, role, true);
+    }
+    lastImgs = currentImgs;
     if (currentText === lastText) stableChecks++;
     else {
       stableChecks = 0;
@@ -229,22 +243,31 @@ export function startMessageObserver() {
   }).observe(document.body, { childList: true, subtree: true });
 }
 
-// Re-mark existing messages on SPA navigation (URL change within same tab)
+// Re-mark existing messages on SPA navigation (URL change within same tab).
+// Event-driven via the Navigation API (Baseline since early 2026); the 2s
+// URL poll remains only as the fallback where the API is unavailable.
 export function startNavRemark() {
   let lastUrl = location.href;
-  setInterval(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      if ((Date.now() - getUserSentAt()) < 15000) {
-        console.log("[Aleph] nav after send — skip marking");
-      } else {
-        graceUntil = Date.now() + 2000;
-        markExistingMessages();
-        setTimeout(markExistingMessages, 500);
-        setTimeout(markExistingMessages, 1000);
-        setTimeout(markExistingMessages, 2000);
-        setTimeout(markExistingMessages, 3000);
-      }
+  const onNav = () => {
+    if (location.href === lastUrl) return;
+    lastUrl = location.href;
+    if ((Date.now() - getUserSentAt()) < 15000) {
+      console.log("[Aleph] nav after send — skip marking");
+    } else {
+      graceUntil = Date.now() + 2000;
+      markExistingMessages();
+      setTimeout(markExistingMessages, 500);
+      setTimeout(markExistingMessages, 1000);
+      setTimeout(markExistingMessages, 2000);
+      setTimeout(markExistingMessages, 3000);
     }
-  }, 2000);
+  };
+  // Narrowing cast: the Navigation API isn't in our TS lib set.
+  const nav = (window as unknown as { navigation?: EventTarget }).navigation;
+  if (nav) {
+    // navigatesuccess fires after the navigation commits (URL updated).
+    nav.addEventListener("navigatesuccess", onNav);
+  } else {
+    setInterval(onNav, 2000);
+  }
 }
