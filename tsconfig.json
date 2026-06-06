@@ -13,8 +13,7 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
-    "allowJs": true
+    "noEmit": true
   },
-  "include": ["src", "tests/unit", "build.mjs", "vitest.config.ts"]
+  "include": ["src", "tests/unit", "vitest.config.ts"]
 }

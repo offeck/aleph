@@ -211,12 +211,13 @@ Background: `sync.ts` exports public API + `_mergeUsageDay` (+helpers) for tests
 
 With Phases 4.5/5 having driven all paths to zero, remove `allowJs`; delete the baseline file/script (every path is strict now) and point `typecheck:baseline` at raw `tsc --noEmit`. ESLint flat config (typescript-eslint recommended; calibrate `no-floating-promises` for the fire-and-forget style). New `.github/workflows/ci.yml` on `pull_request`: `npm ci` → typecheck (required) → test → build; flip publish.yml typecheck to required and keep `npm test` as a required gate that fails on empty suites. Rewrite CLAUDE.md architecture ("no build step" → TS/esbuild reality, dev loop, never move manifest, never edit dist/, where canonical constants live, updated Common Tasks) and codify the test policy for future work. **Delete MIGRATION.md.** Mark PR #2 ready.
 
-- [ ] `npm run check` fully green; zero tsc errors, no allowJs; lint clean
-- [ ] transitional typecheck baseline removed or converted to a strict zero-error alias
-- [ ] CI and CLAUDE.md require tests for behavioral changes, or an explicit documented reason when automation is impractical
-- [ ] PR CI green on the PR; publish.yml reviewed (build precedes zip; dist/ in, src/ out)
+- [x] (scope added at user request) settings/insights/mini-game split into modules — settings `controls`/`syncUi`, insights `subscriptions`/`charts`, mini-game `spawn`(owns gameActive)/`snake`/`minesweeper`; verbatim moves, +4 tests (`insights-plans.spec.ts`, 112 total); reload-verified with fresh stamp `2026-06-06T14:17:45.786Z` (rtl 51/0, css applied, console clean)
+- [x] `npm run check` fully green — typecheck 0 errors with `allowJs` removed (and `build.mjs` dropped from include — it was never type-checked), lint clean (typescript-eslint syntactic recommended; calibrations: allowEmptyCatch, caughtErrors none + `_` args, no-explicit-any off for commented boundaries, skipRegExps for the NBSP plan-detection regexes, allowTernary; one trivial source fix: `let end`→`const end` in `src/content/latex.ts`), 112 tests, build clean
+- [x] transitional typecheck baseline removed — `scripts/check-typecheck-baseline.mjs` + `tests/typecheck-baseline.json` + the npm script deleted; publish.yml now runs raw `npm run typecheck` + new `Lint` step
+- [x] CI and CLAUDE.md require tests for behavioral changes — new `.github/workflows/ci.yml` (pull_request: typecheck/lint/test/build); CLAUDE.md §6 states the CI gate and keeps the impractical-automation escape hatch
+- [ ] PR CI green on the PR; publish.yml reviewed (build precedes zip; dist/ in, src/ out — reviewed ✓, zip list unchanged)
 - [ ] final full regression: all `checks.md` checks on RTL Claude + ChatGPT + Gemini; popup/settings/insights/sync/mini-game; extension ID unchanged; storage intact
-- [ ] MIGRATION.md deleted; CLAUDE.md updated; `AGENTS.md` symlink still resolves
+- [ ] MIGRATION.md deleted; CLAUDE.md updated ✓ (final architecture, module maps, TS+lint policy, 14 themes, single-source RTL regex, fixed Common Tasks paths; AGENTS.md symlink resolves ✓) — deletion lands as the final commit
 - [ ] PR #2 marked ready → **merge after user approval**
 
 ## Riskiest steps (read before the relevant phase)

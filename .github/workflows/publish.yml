@@ -36,8 +36,11 @@ jobs:
             console.log('Manifest OK — ' + manifest.name + ' v' + manifest.version);
           "
 
-      - name: Typecheck baseline
-        run: npm run typecheck:baseline
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
 
       - name: Unit tests
         run: npm test

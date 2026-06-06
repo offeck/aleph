@@ -8,7 +8,6 @@
     "build": "node build.mjs",
     "dev": "node build.mjs --dev --watch",
     "typecheck": "tsc --noEmit",
-    "typecheck:baseline": "node scripts/check-typecheck-baseline.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

@@ -174,7 +174,7 @@ export function findBareLatexRegions(text: string): LatexRegion[] {
   let match;
   while ((match = LATEX_CMD_RE_G.exec(text)) !== null) {
     let start = match.index;
-    let end = extractLatexExpression(text, start);
+    const end = extractLatexExpression(text, start);
     start = expandBackward(text, start);
     const latex = text.slice(start, end).trim();
     if (latex.length <= 1) continue;
