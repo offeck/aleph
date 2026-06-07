@@ -68,26 +68,30 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
       "display:flex;align-items:center;justify-content:center;" +
       "font-size:13px;font-weight:bold;color:#ccc;user-select:none;";
 
-    sq.addEventListener("click", () => clickCell(sq));
+    // Chording is an explicit user gesture, so it dispatches HERE — never
+    // inside clickCell, which is also invoked programmatically by the
+    // deferred flood-reveal and by chord opens themselves. Routing chords
+    // through clickCell would make every flood pass over an already-revealed
+    // number auto-chord it (detonating bombs next to misplaced flags with no
+    // user action).
+    sq.addEventListener("click", () => {
+      if (sq.getAttribute("data-checked")) chordCell(sq);
+      else clickCell(sq);
+    });
     sq.addEventListener("contextmenu", (e) => { e.preventDefault(); addFlag(sq); });
 
     gridEl.appendChild(sq);
     squares.push(sq);
   }
 
+  // Counts use the same neighborIds as flood-reveal and chording — chording
+  // trusts data-count, so adjacency must have a single source of truth.
   for (let i = 0; i < squares.length; i++) {
     if (squares[i].getAttribute("data-type") !== "valid") continue;
     let total = 0;
-    const isLeft = i % width === 0;
-    const isRight = i % width === width - 1;
-    if (!isLeft && i > 0 && squares[i - 1].getAttribute("data-type") === "bomb") total++;
-    if (!isRight && i > width - 1 && squares[i + 1 - width].getAttribute("data-type") === "bomb") total++;
-    if (i >= width && squares[i - width].getAttribute("data-type") === "bomb") total++;
-    if (!isLeft && i > width && squares[i - 1 - width].getAttribute("data-type") === "bomb") total++;
-    if (!isRight && i < squares.length - 1 && squares[i + 1].getAttribute("data-type") === "bomb") total++;
-    if (!isLeft && i + width < squares.length && squares[i - 1 + width]?.getAttribute("data-type") === "bomb") total++;
-    if (!isRight && i + width + 1 < squares.length && squares[i + 1 + width]?.getAttribute("data-type") === "bomb") total++;
-    if (i + width < squares.length && squares[i + width].getAttribute("data-type") === "bomb") total++;
+    for (const n of neighborIds(i, width, squares.length)) {
+      if (squares[n].getAttribute("data-type") === "bomb") total++;
+    }
     squares[i].setAttribute("data-count", String(total));
   }
 
@@ -97,11 +101,10 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
 
   function clickCell(sq: HTMLDivElement) {
     if (isGameOver) return;
-    if (sq.getAttribute("data-flag")) return;
-    if (sq.getAttribute("data-checked")) {
-      chordCell(sq);
-      return;
-    }
+    // Hard no-op on revealed/flagged cells: revealNeighbors' deferred clicks
+    // and chord opens depend on this (see the click listener for why chord
+    // dispatch must not happen here).
+    if (sq.getAttribute("data-checked") || sq.getAttribute("data-flag")) return;
     if (sq.getAttribute("data-type") === "bomb") {
       isGameOver = true;
       console.log("[Aleph MiniGame] minesweeper: bomb hit!");
@@ -137,6 +140,7 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
   // under wrong flags end the game and zeros flood-reveal, as in the real
   // game. No-op when the flags don't match the number.
   function chordCell(sq: HTMLDivElement) {
+    if (isGameOver) return;
     const count = parseInt(sq.getAttribute("data-count") || "0");
     const neighbors = neighborIds(parseInt(sq.getAttribute("data-id")!), width, squares.length).map((n) => ({
       id: n,
@@ -162,10 +166,15 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
 
   function checkForWin() {
     let matches = 0;
+    let revealed = 0;
     for (let i = 0; i < squares.length; i++) {
       if (squares[i].getAttribute("data-flag") && squares[i].getAttribute("data-type") === "bomb") matches++;
+      if (squares[i].getAttribute("data-checked")) revealed++;
     }
-    if (matches === bombAmount) {
+    // Win by flagging every bomb, or — like the real game — by revealing
+    // every safe cell. Without the reveal win, chording a board clean would
+    // dead-end with nothing left to do but ESC.
+    if (matches === bombAmount || revealed === squares.length - bombAmount) {
       isGameOver = true;
       console.log("[Aleph MiniGame] minesweeper: you won!");
       setTimeout(callbacks.onGameOver, 600);
