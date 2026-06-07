@@ -1,5 +1,45 @@
 import type { GameCallbacks } from "./spawn";
 
+// ── Board helpers (pure — exported for unit tests) ───────────────────
+
+// All in-bounds neighbors of `id` on a width-wide grid with `cellCount`
+// cells. Shared by flood-reveal and chording.
+export function neighborIds(id: number, width: number, cellCount: number): number[] {
+  const isLeft = id % width === 0;
+  const isRight = id % width === width - 1;
+  const ids: number[] = [];
+  if (!isLeft) ids.push(id - 1);
+  if (!isRight && id + 1 < cellCount) ids.push(id + 1);
+  if (id >= width) {
+    ids.push(id - width);
+    if (!isLeft) ids.push(id - width - 1);
+    if (!isRight) ids.push(id - width + 1);
+  }
+  if (id + width < cellCount) {
+    ids.push(id + width);
+    if (!isLeft) ids.push(id + width - 1);
+    if (!isRight) ids.push(id + width + 1);
+  }
+  return ids;
+}
+
+export interface NeighborState {
+  id: number;
+  flagged: boolean;
+  checked: boolean;
+}
+
+// Chording rule: clicking a revealed number whose adjacent flag count equals
+// that number opens every unflagged, unrevealed neighbor (a misplaced flag
+// makes this click hit a bomb — same as the real game). Returns the ids to
+// open, or [] when the flag count doesn't match.
+export function chordTargets(neighbors: NeighborState[], count: number): number[] {
+  if (count <= 0) return [];
+  const flagged = neighbors.filter((n) => n.flagged).length;
+  if (flagged !== count) return [];
+  return neighbors.filter((n) => !n.flagged && !n.checked).map((n) => n.id);
+}
+
 // ── Minesweeper ──────────────────────────────────────────────────────
 export function startMinesweeper(container: HTMLElement, callbacks: GameCallbacks) {
   const width = 6;
@@ -28,26 +68,30 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
       "display:flex;align-items:center;justify-content:center;" +
       "font-size:13px;font-weight:bold;color:#ccc;user-select:none;";
 
-    sq.addEventListener("click", () => clickCell(sq));
+    // Chording is an explicit user gesture, so it dispatches HERE — never
+    // inside clickCell, which is also invoked programmatically by the
+    // deferred flood-reveal and by chord opens themselves. Routing chords
+    // through clickCell would make every flood pass over an already-revealed
+    // number auto-chord it (detonating bombs next to misplaced flags with no
+    // user action).
+    sq.addEventListener("click", () => {
+      if (sq.getAttribute("data-checked")) chordCell(sq);
+      else clickCell(sq);
+    });
     sq.addEventListener("contextmenu", (e) => { e.preventDefault(); addFlag(sq); });
 
     gridEl.appendChild(sq);
     squares.push(sq);
   }
 
+  // Counts use the same neighborIds as flood-reveal and chording — chording
+  // trusts data-count, so adjacency must have a single source of truth.
   for (let i = 0; i < squares.length; i++) {
     if (squares[i].getAttribute("data-type") !== "valid") continue;
     let total = 0;
-    const isLeft = i % width === 0;
-    const isRight = i % width === width - 1;
-    if (!isLeft && i > 0 && squares[i - 1].getAttribute("data-type") === "bomb") total++;
-    if (!isRight && i > width - 1 && squares[i + 1 - width].getAttribute("data-type") === "bomb") total++;
-    if (i >= width && squares[i - width].getAttribute("data-type") === "bomb") total++;
-    if (!isLeft && i > width && squares[i - 1 - width].getAttribute("data-type") === "bomb") total++;
-    if (!isRight && i < squares.length - 1 && squares[i + 1].getAttribute("data-type") === "bomb") total++;
-    if (!isLeft && i + width < squares.length && squares[i - 1 + width]?.getAttribute("data-type") === "bomb") total++;
-    if (!isRight && i + width + 1 < squares.length && squares[i + 1 + width]?.getAttribute("data-type") === "bomb") total++;
-    if (i + width < squares.length && squares[i + width].getAttribute("data-type") === "bomb") total++;
+    for (const n of neighborIds(i, width, squares.length)) {
+      if (squares[n].getAttribute("data-type") === "bomb") total++;
+    }
     squares[i].setAttribute("data-count", String(total));
   }
 
@@ -57,6 +101,9 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
 
   function clickCell(sq: HTMLDivElement) {
     if (isGameOver) return;
+    // Hard no-op on revealed/flagged cells: revealNeighbors' deferred clicks
+    // and chord opens depend on this (see the click listener for why chord
+    // dispatch must not happen here).
     if (sq.getAttribute("data-checked") || sq.getAttribute("data-flag")) return;
     if (sq.getAttribute("data-type") === "bomb") {
       isGameOver = true;
@@ -84,18 +131,23 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
   }
 
   function revealNeighbors(id: number) {
-    const isLeft = id % width === 0;
-    const isRight = id % width === width - 1;
-    const neighbors: number[] = [];
-    if (!isLeft && id > 0) neighbors.push(id - 1);
-    if (!isRight && id < squares.length - 1) neighbors.push(id + 1);
-    if (id >= width) neighbors.push(id - width);
-    if (id + width < squares.length) neighbors.push(id + width);
-    if (!isLeft && id > width) neighbors.push(id - width - 1);
-    if (!isRight && id > width - 1) neighbors.push(id - width + 1);
-    if (!isLeft && id + width < squares.length) neighbors.push(id + width - 1);
-    if (!isRight && id + width + 1 < squares.length) neighbors.push(id + width + 1);
+    const neighbors = neighborIds(id, width, squares.length);
     setTimeout(() => { neighbors.forEach((n) => clickCell(squares[n])); }, 10);
+  }
+
+  // Chord (clicked an already-revealed number): when its adjacent flag count
+  // matches, open all unflagged unrevealed neighbors via clickCell — bombs
+  // under wrong flags end the game and zeros flood-reveal, as in the real
+  // game. No-op when the flags don't match the number.
+  function chordCell(sq: HTMLDivElement) {
+    if (isGameOver) return;
+    const count = parseInt(sq.getAttribute("data-count") || "0");
+    const neighbors = neighborIds(parseInt(sq.getAttribute("data-id")!), width, squares.length).map((n) => ({
+      id: n,
+      flagged: !!squares[n].getAttribute("data-flag"),
+      checked: !!squares[n].getAttribute("data-checked"),
+    }));
+    chordTargets(neighbors, count).forEach((n) => clickCell(squares[n]));
   }
 
   function addFlag(sq: HTMLDivElement) {
@@ -114,10 +166,15 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
 
   function checkForWin() {
     let matches = 0;
+    let revealed = 0;
     for (let i = 0; i < squares.length; i++) {
       if (squares[i].getAttribute("data-flag") && squares[i].getAttribute("data-type") === "bomb") matches++;
+      if (squares[i].getAttribute("data-checked")) revealed++;
     }
-    if (matches === bombAmount) {
+    // Win by flagging every bomb, or — like the real game — by revealing
+    // every safe cell. Without the reveal win, chording a board clean would
+    // dead-end with nothing left to do but ESC.
+    if (matches === bombAmount || revealed === squares.length - bombAmount) {
       isGameOver = true;
       console.log("[Aleph MiniGame] minesweeper: you won!");
       setTimeout(callbacks.onGameOver, 600);
