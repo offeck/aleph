@@ -30,7 +30,7 @@ Key files:
 Key patterns:
 - `SELECTORS[platform]` — Per-platform CSS selectors for text, editor, math, code, message, streaming, focus, theme targets.
 - `hasHebrew(el)` — Walks childNodes, tests text against `/[֐-׿]/`, skips katex/mjx/code/pre. Sets `data-aleph-rtl="true"`.
-- `patchAll()` — Called by MutationObserver (debounced 120ms + 3s interval). Applies BiDi attributes, focus hiding, streaming attributes.
+- `patchAll()` — Called by MutationObserver (debounced 120ms with a 500ms max-wait; 12ms sliced scans resumed by a 30ms continuation timer). Applies BiDi attributes, focus hiding, streaming attributes.
 - `applyStyles()` — Builds CSS string from settings, injects into `#aleph-dynamic-styles`.
 - `THEMES` object — Ten+ color presets applied via CSS custom properties on `[data-aleph-theme]`.
 

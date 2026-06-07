@@ -3,7 +3,7 @@ import { RTL_SCRIPT_LETTER_RE } from "../shared/rtl";
 import { blockDir, buildEditorBidiCss, SCOPE_ATTR, type EditorScopeBlocks } from "./editorBidi";
 import { SEL } from "./selectors";
 import { getSettings, isPlatformEnabled } from "./settingsStore";
-import { collectCandidates, notifyPending, textOf } from "./rescan";
+import { collectCandidates, drainWithPriority, makePendingQueue, notifyPending, textOf, type DrainVerdict } from "./rescan";
 
 // ── BiDi Detection ─────────────────────────────────────────────────────
 function isMathNode(node: Element) {
@@ -83,27 +83,54 @@ export function updateBidiRootAttribute() {
 // otherwise un-mark an element forever.
 const bidiSeen = new WeakMap<Element, { text: string; rtl: boolean }>();
 
-// roots: mutated elements from the observer (scoped pass), or null for a
-// full-document pass — see collectCandidates in rescan.ts. Returns elements
-// left unprocessed when the time budget (`deadline`, performance.now()
-// epoch) ran out — the caller re-queues them for a continuation slice.
+// Slice queues (see makePendingQueue in rescan.ts): candidates are collected
+// once per event/full pass and drained by cursor on continuation slices —
+// never re-collected. eventQueue (fresh dirty-root candidates) always drains
+// before backlogQueue (full-pass enumeration + slice leftovers), so newly
+// mutated content never waits behind a large boot backlog.
+const bidiEventQueue = makePendingQueue();
+const bidiBacklogQueue = makePendingQueue();
+
+export function hasBidiSliceWork(): boolean {
+  return bidiEventQueue.size() > 0 || bidiBacklogQueue.size() > 0;
+}
+
+// Called by patchAll while bidi is disabled: pending slice/hint work from
+// when it was enabled would otherwise keep hasBidiSliceWork()/
+// hasPendingHintWork() true forever — re-arming the 30ms continuation and
+// 500ms drain in a perpetual no-op loop (patchBidi never runs to drain
+// them). Re-enabling triggers a full pass, which rebuilds from scratch.
+export function resetBidiSliceWork(): void {
+  bidiEventQueue.reset();
+  bidiBacklogQueue.reset();
+  hintApplied.clear();
+}
+
+// roots: mutated elements from the observer (event pass), null for a
+// full-document pass, or [] for continuation/drain slices (no collection —
+// drain the queues only). budgetMs bounds this scanner's scan phase; the
+// deadline is computed after collection so collection cost can't consume it.
 // eventPass: false on continuation/drain slices — those only advance our own
 // decoration work, so the list sweep and editor scan (which react to real
 // page mutations) are deferred to the next event-driven pass.
-export function patchBidi(roots: Element[] | null = null, deadline = 0, eventPass = true): Element[] {
+export function patchBidi(roots: Element[] | null = null, budgetMs = 0, eventPass = true): void {
   readSendHint();
   const textSel = SEL.text.join(", ");
-  const remainder: Element[] = [];
-  // Hard-progress rule: the first element that needs real work runs even if
-  // the budget is already spent — a slice always advances, so no element can
-  // livelock the continuation chain. hasRTL itself stays atomic per element:
-  // it early-exits on the first RTL character and skips math/code subtrees,
-  // so its worst case is bounded by one message body's text, not the page.
-  let processedOne = false;
+  if (roots === null) {
+    // Full pass supersedes any half-drained slice state.
+    bidiEventQueue.reset();
+    bidiBacklogQueue.reset();
+    bidiBacklogQueue.merge(document.querySelectorAll(textSel));
+  } else if (roots.length) {
+    bidiEventQueue.merge(collectCandidates(roots, textSel));
+  }
+
   let rtlChanged = false;
-  for (const el of collectCandidates(roots, textSel)) {
-    if (processedOne && deadline && performance.now() > deadline) { remainder.push(el); continue; }
-    if (el.closest(".katex") || el.closest("mjx-container")) continue;
+  // hasRTL stays atomic per element: it early-exits on the first RTL
+  // character and skips math/code subtrees, so its worst case is bounded by
+  // one message body's text, not the page.
+  const process = (el: Element): DrainVerdict => {
+    if (el.closest(".katex") || el.closest("mjx-container")) return "skip";
     const text = textOf(el);
     const prev = bidiSeen.get(el);
     if (prev && prev.text === text) {
@@ -115,9 +142,8 @@ export function patchBidi(roots: Element[] | null = null, deadline = 0, eventPas
         reconcileListParent(el);
         rtlChanged = true;
       }
-      continue;
+      return "skip";
     }
-    processedOne = true;
     const has = el.getAttribute("data-aleph-rtl");
     if (!has && sendHint && sendHint.lang === "rtl" && !hintChecked.has(el)) {
       hintChecked.add(el);
@@ -143,7 +169,11 @@ export function patchBidi(roots: Element[] | null = null, deadline = 0, eventPas
     }
     reconcileListParent(el);
     bidiSeen.set(el, { text, rtl: el.getAttribute("data-aleph-rtl") === "true" });
-  }
+    return "done";
+  };
+
+  const deadline = budgetMs ? performance.now() + budgetMs : 0;
+  drainWithPriority(bidiEventQueue, bidiBacklogQueue, process, deadline);
 
   // Re-validate optimistic hint marks: confirmed by real RTL text → done;
   // hint window closed (sendHint null) with still no RTL text → remove the
@@ -183,7 +213,6 @@ export function patchBidi(roots: Element[] | null = null, deadline = 0, eventPas
   // re-syncs the scoped stylesheet (read-compute-compare — see syncEditors),
   // which also covers programmatically populated drafts.
   if (eventPass) syncEditors();
-  return remainder;
 }
 
 // Lists: mark the parent list of RTL items with a plain attribute so the

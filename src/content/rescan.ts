@@ -35,6 +35,149 @@ export function debounceDelay(now: number, firstAt: number, quietMs: number, max
   return Math.max(0, Math.min(quietMs, untilMax));
 }
 
+// Timer/now indirection so the scheduler is deterministically unit-testable
+// (vi fake timers auto-fire due timers and cannot model "a microtask-delivered
+// notify clears the due 0ms timer before its task runs").
+export interface SchedulerHooks {
+  now(): number;
+  set(fn: () => void, ms: number): unknown;
+  clear(id: unknown): void;
+}
+
+// Debounced mutation scheduler with a hard max-wait. The starvation fix lives
+// in the `delay <= 0` branch: once the max-wait deadline is reached, notify()
+// must NOT clear-and-reinstall the pending timer — every prior install used
+// debounceDelay, so the pending timer's fire time is already ≤ firstAt +
+// maxWaitMs and clearing it is what let sustained mutation churn postpone the
+// pass forever (trace signature: 2,623 zero-delay installs vs ~81 fires).
+export function makeMutationScheduler(
+  fire: () => void,
+  quietMs: number,
+  maxWaitMs: number,
+  hooks?: Partial<SchedulerHooks>,
+): { notify(): void } {
+  const h: SchedulerHooks = {
+    now: () => Date.now(),
+    set: (fn, ms) => setTimeout(fn, ms),
+    clear: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
+    ...hooks,
+  };
+  let timer: unknown = null;
+  let firstAt = 0;
+  const onFire = () => {
+    timer = null;
+    fire();
+  };
+  return {
+    notify() {
+      const now = h.now();
+      if (timer !== null) {
+        const delay = debounceDelay(now, firstAt, quietMs, maxWaitMs);
+        if (delay <= 0) return; // max-wait reached — let the pending timer fire
+        h.clear(timer);
+        timer = h.set(onFire, delay);
+      } else {
+        firstAt = now;
+        timer = h.set(onFire, debounceDelay(now, firstAt, quietMs, maxWaitMs));
+      }
+    },
+  };
+}
+
+// ── Pending work queue (slice continuation) ────────────────────────────
+// Scanner-owned candidate queues: collected once per event/full pass, then
+// drained across 30ms continuation slices by cursor — never re-collected
+// (the former continuationRoots design re-ran collectCandidates over the
+// whole remaining set every slice: O(N) collection per slice, O(N²) total).
+//   "skip" — no real work (gate-skip/excluded); drop and keep going even
+//            past the deadline, so a backlog of finished elements clears
+//            in one slice.
+//   "done" — real work done; drop; the next item honors the deadline.
+//   "keep" — real work done but the element is unfinished (latex message
+//            interrupted mid-TreeWalker); it STAYS at the cursor and the
+//            slice ends — the next drain resumes on the same element.
+export type DrainVerdict = "skip" | "done" | "keep";
+
+export interface PendingQueue {
+  merge(items: Iterable<Element>): void;
+  drain(process: (el: Element) => DrainVerdict, deadline: number): boolean;
+  size(): number;
+  reset(): void;
+}
+
+// Priority drain: backlog only runs when the event queue is fully drained
+// AND budget remains. Each queue carries its own hard-progress rule, so
+// draining them back-to-back unconditionally would let backlog process an
+// extra item after event work already exhausted the slice (weakening both
+// fresh-work priority and the per-scanner budget). A skipped backlog is not
+// starved — the event queue is empty by the next slice, which reaches it.
+export function drainWithPriority(
+  eventQ: PendingQueue,
+  backlogQ: PendingQueue,
+  process: (el: Element) => DrainVerdict,
+  deadline: number,
+): void {
+  const eventHasMore = eventQ.drain(process, deadline);
+  if (eventHasMore) return;
+  if (deadline && performance.now() > deadline) return;
+  backlogQ.drain(process, deadline);
+}
+
+export function makePendingQueue(): PendingQueue {
+  let items: Element[] = [];
+  let cursor = 0;
+  const queued = new Set<Element>(); // mirror of items[cursor..] for O(1) dedupe
+  return {
+    // Dedupe only against the not-yet-processed tail: already-drained
+    // elements re-queue legitimately (their text may have changed again);
+    // the scanners' text gates make any residual duplicate a cheap skip.
+    merge(add) {
+      for (const el of add) {
+        if (!queued.has(el)) {
+          queued.add(el);
+          items.push(el);
+        }
+      }
+    },
+    drain(process, deadline) {
+      let didWork = false;
+      while (cursor < items.length) {
+        const el = items[cursor];
+        if (!el.isConnected) {
+          queued.delete(el);
+          cursor++;
+          continue;
+        }
+        // Hard-progress: real work happens at least once per slice; only
+        // real work arms the deadline stop ("skip" verdicts never do).
+        if (didWork && deadline && performance.now() > deadline) break;
+        const verdict = process(el);
+        if (verdict === "keep") {
+          didWork = true;
+          break; // stays at the cursor and in the dedupe set
+        }
+        queued.delete(el);
+        cursor++;
+        if (verdict === "done") didWork = true;
+      }
+      // Compaction: drop the consumed prefix so drained Element refs don't
+      // accumulate for the queue's lifetime (the old continuationRoots Set
+      // was cleared every pass; a cursor alone would be a new leak).
+      if (cursor > 0) {
+        items = items.slice(cursor);
+        cursor = 0;
+      }
+      return items.length > 0;
+    },
+    size: () => items.length - cursor,
+    reset() {
+      items = [];
+      cursor = 0;
+      queued.clear();
+    },
+  };
+}
+
 // Pending-work notification: scanners call notifyPending() when they park
 // observer-invisible work (ChatGPT streaming-end class changes, hint-window
 // expiry); index.ts registers the self-canceling drain at boot. The
@@ -63,26 +206,22 @@ export function collectCandidates(roots: Element[] | null, sel: string): Iterabl
 
 export interface PatchRootQueues {
   dirtyRoots: Set<Element>;
-  continuationRoots: Set<Element>;
   fullPassNeeded: boolean;
 }
 
+// Continuation/drain passes (eventPass=false) carry no roots: slice leftovers
+// live in the scanners' own pending queues now. Invariants preserved: a
+// non-event pass never consumes a queued full pass and never steals dirty
+// roots from the next event pass.
 export function takePatchRoots(queues: PatchRootQueues, eventPass: boolean): Element[] | null {
-  if (eventPass && queues.fullPassNeeded) {
+  if (!eventPass) return [];
+  if (queues.fullPassNeeded) {
     queues.fullPassNeeded = false;
     queues.dirtyRoots.clear();
-    queues.continuationRoots.clear();
     return null;
   }
-
-  if (eventPass) {
-    const roots = Array.from(queues.dirtyRoots);
-    queues.dirtyRoots.clear();
-    return roots;
-  }
-
-  const roots = Array.from(queues.continuationRoots);
-  queues.continuationRoots.clear();
+  const roots = Array.from(queues.dirtyRoots);
+  queues.dirtyRoots.clear();
   return roots;
 }
 

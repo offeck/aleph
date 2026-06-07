@@ -98,7 +98,7 @@ TypeScript source lives in `src/`, bundled by esbuild (`node build.mjs`, or `npm
 
 **Settings** — Stored in `chrome.storage.sync`. Defaults defined in `DEFAULTS` (`src/shared/defaults.ts`); the content script reads them through the `settingsStore` singleton (`src/content/settingsStore.ts`). Live updates via `chrome.storage.onChanged` listener. Export/import via JSON.
 
-**MutationObserver** — Watches `document.body` for `childList`, `subtree`, `characterData` changes. Filters out head/style mutations. Debounced at 120ms + 3s interval fallback.
+**MutationObserver** — Watches `document.body` for `childList`, `subtree`, `characterData` changes. Filters out head/style mutations. Reactive scheduling (`makeMutationScheduler` in `src/content/rescan.ts`): 120ms quiet-window debounce with a 500ms max-wait that cannot be starved by sustained churn; scanners drain 12ms-budgeted slices from their own pending queues (`makePendingQueue`), resumed by a 30ms continuation timer; a 500ms self-canceling drain revisits observer-invisible work (streaming-parked messages, hint expiry); one 30s attribute-recovery heartbeat.
 
 **Font loading** — `GOOGLE_FONTS` map covers Hebrew, Arabic-script, general text, and code fonts (Fira Code, JetBrains Mono, etc.). `loadFont()` injects a `<link>` tag to Google Fonts API on demand.
 

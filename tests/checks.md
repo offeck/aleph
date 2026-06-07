@@ -4,7 +4,7 @@ Run each check via `mcp__claude-in-chrome__javascript_tool`. Each returns `PASS:
 
 ## Runner notes
 
-Run checks only after the conversation has rendered — wait ~3-5s after page load before running any check. The extension runs at `document_idle` and marks elements asynchronously (120ms-debounced MutationObserver + 3s interval fallback), so a check run too early sees an unsettled DOM.
+Run checks only after the conversation has rendered — wait ~3-5s after page load before running any check. The extension runs at `document_idle` and marks elements asynchronously (120ms-debounced MutationObserver with a 500ms max-wait, plus 12ms-budgeted sliced scans resumed every 30ms), so a check run too early sees an unsettled DOM.
 
 Zero-element results are suspect: if a check FAILs purely on a zero-element count, or returns the "page not settled" SKIP, wait 3s and re-run it once before recording the result. Other SKIPs never need a re-run.
 

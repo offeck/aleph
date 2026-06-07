@@ -736,7 +736,7 @@ function hasHebrew(el) {
 
 **Math isolation**: Full KaTeX rendering of bare LaTeX expressions + `<bdi dir="ltr">` wrapping for equations/math text.
 
-**MutationObserver**: Debounced at 120ms, childList + subtree + characterData, excludes head/style mutations. 3-second interval fallback.
+**MutationObserver**: Debounced at 120ms with a 500ms max-wait (sustained churn can't starve passes), childList + subtree + characterData, excludes head/style mutations. 12ms-budgeted sliced scans resumed by a 30ms continuation timer; 500ms self-canceling drain for observer-invisible work; 30s attribute-recovery heartbeat.
 
 ### 4.2 Competitor Approaches
 
@@ -756,7 +756,7 @@ function hasHebrew(el) {
 
 | Extension | Mutations Watched | Debounce | Performance Strategy |
 |---|---|---|---|
-| **Aleph** | childList, subtree, characterData | 120ms + 3s interval | Skip head/style mutations |
+| **Aleph** | childList, subtree, characterData | 120ms + 500ms max-wait | Skip head/style mutations; 12ms sliced scans + 30ms continuation |
 | **Now2ai** | childList, subtree, attributes (filtered) | None | WeakMap element tracking |
 | **AI Chat RTL Support** | childList, subtree | None | Fires on `addedNodes` only |
 | **Smart RTL Fixer** | No MutationObserver | N/A | One-shot CSS injection |

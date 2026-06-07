@@ -2,7 +2,7 @@ import { PLATFORM } from "./platform";
 import { SEL } from "./selectors";
 import { getSettings } from "./settingsStore";
 import { hasRTLScriptText } from "./bidi";
-import { collectCandidates, makeTextGate, notifyPending, textOf } from "./rescan";
+import { collectCandidates, drainWithPriority, makePendingQueue, makeTextGate, notifyPending, textOf, type DrainVerdict, type PendingQueue } from "./rescan";
 
 // Vendored global (vendor/katex/katex.min.js, loaded as a sibling content
 // script) — no type definitions shipped; the only non-boundary `any` allowed.
@@ -446,13 +446,15 @@ export function shouldIsolateMathText(txt: string): boolean {
 const mathTextSeen = makeTextGate();
 const latexSeen = makeTextGate();
 
-// Messages skipped while streaming (ChatGPT's .result-streaming): the
+// Messages parked while streaming (ChatGPT's .result-streaming): the
 // stream ending is a class change the body observer doesn't see, so a
 // scoped pass would never revisit them. Parking a message calls
 // notifyPending(), which starts index.ts's self-canceling drain; the drain
-// re-runs passes (roots=[]) until these sets empty.
-const mathTextPending = new Set<Element>();
-const latexPending = new Set<Element>();
+// re-runs passes (roots=[]) until these sets empty. Distinct from the slice
+// queues below — park sets drive the 500ms drain, slice queues drive the
+// 30ms continuation.
+const mathTextStreamParked = new Set<Element>();
+const latexStreamParked = new Set<Element>();
 
 interface ScanProgress {
   text: string;
@@ -521,29 +523,65 @@ function scanTextNodes(
   return { complete: true };
 }
 
+// Park sets only — the drain's self-cancel condition. Slice-queue work is
+// reported separately via hasLatexSliceWork() and driven by the 30ms
+// continuation; wiring them together would keep the 500ms drain alive for
+// the whole duration of a large backlog.
 export function hasPendingLatexWork(): boolean {
-  return latexPending.size > 0 || mathTextPending.size > 0;
+  return latexStreamParked.size > 0 || mathTextStreamParked.size > 0;
+}
+
+export function hasLatexSliceWork(): boolean {
+  return (
+    latexMode.eventQueue.size() > 0 ||
+    latexMode.backlogQueue.size() > 0 ||
+    mathTextMode.eventQueue.size() > 0 ||
+    mathTextMode.backlogQueue.size() > 0
+  );
+}
+
+// Called by patchAll while the owning feature is disabled: pending slice or
+// stream-parked work from when it was enabled would otherwise keep
+// hasLatexSliceWork()/hasPendingLatexWork() true forever — re-arming the
+// 30ms continuation and 500ms drain in a perpetual no-op loop (the scanner
+// never runs to drain them). Re-enabling triggers a full pass, which
+// rebuilds from scratch.
+function resetModeWork(mode: ScanMode): void {
+  mode.eventQueue.reset();
+  mode.backlogQueue.reset();
+  mode.streamParked.clear();
+}
+
+export function resetLatexSliceWork(): void {
+  resetModeWork(latexMode);
+}
+
+export function resetMathTextSliceWork(): void {
+  resetModeWork(mathTextMode);
 }
 
 // One parameterized runner for both scan modes — they differ only in what
 // counts as actionable, how a node is processed, and which per-mode stores
-// they use. Returns elements left unprocessed when the time budget
-// (`deadline`, performance.now() epoch) ran out; the caller re-queues them
-// as dirty roots for a continuation slice, and the per-mode progress maps
-// resume inside the interrupted message instead of starting its TreeWalker
-// from the top again.
+// they use. Candidates are collected once per event/full pass into the
+// mode's queues and drained by cursor on continuation slices; a message
+// interrupted mid-scan stays at the cursor ("keep") and resumes via its
+// mode.progress anchor instead of restarting its TreeWalker from the top.
 interface ScanMode {
   gate: ReturnType<typeof makeTextGate>;
-  pending: Set<Element>;
+  streamParked: Set<Element>;
   progress: WeakMap<Element, ScanProgress>;
+  eventQueue: PendingQueue;
+  backlogQueue: PendingQueue;
   isActionable(txt: string): boolean;
   processNode(node: Text): Node | null;
 }
 
 const mathTextMode: ScanMode = {
   gate: mathTextSeen,
-  pending: mathTextPending,
+  streamParked: mathTextStreamParked,
   progress: mathTextProgress,
+  eventQueue: makePendingQueue(),
+  backlogQueue: makePendingQueue(),
   isActionable: (txt) => {
     if (LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt)) {
       return false;
@@ -555,48 +593,70 @@ const mathTextMode: ScanMode = {
 
 const latexMode: ScanMode = {
   gate: latexSeen,
-  pending: latexPending,
+  streamParked: latexStreamParked,
   progress: latexProgress,
+  eventQueue: makePendingQueue(),
+  backlogQueue: makePendingQueue(),
   isActionable: (txt) =>
     LATEX_CMD_RE.test(txt) || HAS_DOLLAR.test(txt) || HAS_LPAREN.test(txt) || HAS_LBRACKET.test(txt),
   processNode: renderLatexInNode,
 };
 
-function runScan(mode: ScanMode, roots: Element[] | null, deadline: number): Element[] {
+function runScan(mode: ScanMode, roots: Element[] | null, budgetMs: number): void {
   const messageSel = SEL.message.join(", ");
-  const candidates = new Set<Element>();
-  for (const m of collectCandidates(roots, messageSel)) candidates.add(m);
-  mode.pending.forEach((m) => { if (m.isConnected) candidates.add(m); });
-  mode.pending.clear();
-  const remainder: Element[] = [];
-  let processedOne = false;
-  for (const msg of candidates) {
-    if (processedOne && deadline && performance.now() > deadline) { remainder.push(msg); continue; }
-    if (isMessageStreaming(msg)) { mode.pending.add(msg); notifyPending(); continue; }
+  if (roots === null) {
+    // Full pass supersedes any half-drained slice state.
+    mode.eventQueue.reset();
+    mode.backlogQueue.reset();
+    mode.backlogQueue.merge(document.querySelectorAll(messageSel));
+  } else if (roots.length) {
+    mode.eventQueue.merge(collectCandidates(roots, messageSel));
+  }
+  // Park re-entry on EVERY pass — including continuation and the 500ms
+  // drain. The stream ending is a class change the body observer never
+  // sees, so no event pass will come for it; the drain exists precisely to
+  // revisit these. Still-streaming messages re-park via the process
+  // callback, so hasPendingLatexWork() can reach zero and the drain
+  // self-cancels.
+  if (mode.streamParked.size) {
+    const parked = [...mode.streamParked].filter((m) => m.isConnected);
+    mode.streamParked.clear();
+    mode.eventQueue.merge(parked);
+  }
+
+  const deadline = budgetMs ? performance.now() + budgetMs : 0;
+  const process = (msg: Element): DrainVerdict => {
+    if (isMessageStreaming(msg)) {
+      mode.streamParked.add(msg);
+      notifyPending();
+      return "skip";
+    }
     const text = textOf(msg);
     const anchor = getScanAnchor(mode.progress, msg, text);
-    if (!anchor && !mode.gate.changed(msg, text)) continue;
-    processedOne = true;
+    if (!anchor && !mode.gate.changed(msg, text)) return "skip";
     const result = scanTextNodes(msg, anchor, deadline, mode.isActionable, mode.processNode);
     // Single post-scan read — the text only changes via our own processNode
     // mutations within this synchronous call.
     const after = textOf(msg);
     if (!result.complete && result.anchor) {
+      // Interrupted mid-message: stay at the cursor; the next slice resumes
+      // from the saved anchor instead of restarting the TreeWalker.
       saveScanAnchor(mode.progress, msg, after, result.anchor);
-      remainder.push(msg);
-      continue;
+      return "keep";
     }
     mode.progress.delete(msg);
     mode.gate.mark(msg, after);
-  }
-  return remainder;
+    return "done";
+  };
+
+  drainWithPriority(mode.eventQueue, mode.backlogQueue, process, deadline);
 }
 
-export function patchMathText(roots: Element[] | null = null, deadline = 0): Element[] {
-  return runScan(mathTextMode, roots, deadline);
+export function patchMathText(roots: Element[] | null = null, budgetMs = 0): void {
+  runScan(mathTextMode, roots, budgetMs);
 }
 
-export function patchLatex(roots: Element[] | null = null, deadline = 0): Element[] {
-  if (typeof katex === "undefined" || !getSettings().latexFix) return [];
-  return runScan(latexMode, roots, deadline);
+export function patchLatex(roots: Element[] | null = null, budgetMs = 0): void {
+  if (typeof katex === "undefined" || !getSettings().latexFix) return;
+  runScan(latexMode, roots, budgetMs);
 }

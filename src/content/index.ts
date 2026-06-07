@@ -1,13 +1,13 @@
 import { VERSION } from "../shared/version";
 import { updateBadge } from "./badge";
-import { cleanupEditorDir, hasPendingHintWork, patchBidi, updateBidiRootAttribute } from "./bidi";
+import { cleanupEditorDir, hasBidiSliceWork, hasPendingHintWork, patchBidi, resetBidiSliceWork, updateBidiRootAttribute } from "./bidi";
 import { applyFocusMode } from "./focus";
-import { hasPendingLatexWork, patchLatex, patchMathText } from "./latex";
+import { hasLatexSliceWork, hasPendingLatexWork, patchLatex, patchMathText, resetLatexSliceWork, resetMathTextSliceWork } from "./latex";
 import { PLATFORM } from "./platform";
 import { applySettingsChange, getSettings, isPlatformEnabled, loadSettings } from "./settingsStore";
 import { applyStreamSmooth } from "./streaming";
 import { applyStyles, STYLE_ID } from "./styles";
-import { debounceDelay, isAlephAuthored, setOnPending, takePatchRoots, type PatchRootQueues } from "./rescan";
+import { isAlephAuthored, makeMutationScheduler, setOnPending, takePatchRoots, type PatchRootQueues } from "./rescan";
 
 declare const __ALEPH_BUILD__: string;
 
@@ -28,12 +28,11 @@ let patching = false;
 
 // Dirty-set: the observer records mutated elements and the scanners process
 // only those subtrees/ancestors (see collectCandidates in rescan.ts), so
-// per-pass cost tracks what changed, not total conversation size. Continuation
-// leftovers live in their own queue so a non-event slice cannot consume real
-// mutation roots before focus/editor/list event work sees them.
+// per-pass cost tracks what changed, not total conversation size. Slice
+// leftovers live in the scanners' own pending queues (see makePendingQueue),
+// collected once per pass and drained by cursor on continuation slices.
 const rootQueues: PatchRootQueues = {
   dirtyRoots: new Set<Element>(),
-  continuationRoots: new Set<Element>(),
   fullPassNeeded: true,
 };
 
@@ -94,36 +93,42 @@ function patchAll(eventPass = true) {
   patching = true;
   try {
     const roots = takePatchRoots(rootQueues, eventPass);
-    const deadline = performance.now() + SLICE_BUDGET_MS;
     const settings = getSettings();
-    const leftovers: Element[] = [];
-    if (settings.bidiEnabled) leftovers.push(...patchBidi(roots, deadline, eventPass));
-    else cleanupEditorDir();
+    // Each scanner collects its candidates once (event/full passes only) and
+    // drains them under its own SLICE_BUDGET_MS deadline computed after
+    // collection — see makePendingQueue in rescan.ts. Disabled features must
+    // discard their pending slice/park/hint work: a disabled scanner never
+    // drains, so stale work would re-arm the continuation/drain timers in a
+    // perpetual no-op loop.
+    if (settings.bidiEnabled) patchBidi(roots, SLICE_BUDGET_MS, eventPass);
+    else {
+      resetBidiSliceWork();
+      cleanupEditorDir();
+    }
     if (settings.focusMode && eventPass) applyFocusMode();
-    if (settings.latexFix) leftovers.push(...patchLatex(roots, deadline));
-    if (settings.bidiEnabled) leftovers.push(...patchMathText(roots, deadline));
+    if (settings.latexFix) patchLatex(roots, SLICE_BUDGET_MS);
+    else resetLatexSliceWork();
+    if (settings.bidiEnabled) patchMathText(roots, SLICE_BUDGET_MS);
+    else resetMathTextSliceWork();
     if (settings.streamSmooth) {
       applyStreamSmooth();
       ensureStreamAnimAttr();
     }
-    if (leftovers.length) {
-      for (const el of leftovers) rootQueues.continuationRoots.add(el);
-      scheduleContinuation();
-    }
+    if (hasBidiSliceWork() || hasLatexSliceWork()) scheduleContinuation();
   } finally {
     patching = false;
   }
 }
 
 // ── Observer (scoped to relevant mutations) ────────────────────────────
-let timer: ReturnType<typeof setTimeout> | null = null;
-let firstMutationAt = 0;
+// Debounce with a hard max-wait; the factory (rescan.ts) refuses to clear a
+// pending timer once the max-wait deadline is reached, so sustained mutation
+// churn (streaming) can no longer starve patchAll by perpetually
+// re-installing zero-delay timers.
+const scheduler = makeMutationScheduler(() => patchAll(), QUIET_MS, MAX_WAIT_MS);
 function scheduleUpdate() {
   if (patching) return;
-  const now = Date.now();
-  if (timer) clearTimeout(timer);
-  else firstMutationAt = now;
-  timer = setTimeout(() => { timer = null; patchAll(); }, debounceDelay(now, firstMutationAt, QUIET_MS, MAX_WAIT_MS));
+  scheduler.notify();
 }
 
 if (PLATFORM) {
