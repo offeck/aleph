@@ -214,6 +214,17 @@
       "source": "conversation:2026-06-06",
       "addedAt": "2026-06-06",
       "status": "fixed"
+    },
+    {
+      "id": "claude-general-007",
+      "platform": "claude",
+      "url": "https://claude.ai/new",
+      "description": "Composer feedback loop (c7bb26f): per-editor MutationObserver + uncoalesced rAF/80ms/250ms fan-out wrote dir='auto' onto ProseMirror-managed composer nodes; PM reverted each write (re-render + setSelection/collapse), the observer saw the revert, and the cycle self-sustained at ~300Hz whenever text sat in the composer — even on a 0-message page. Trace: 2,907 rAF fires / 7.5s main-thread in 12.3s, INP 1543ms, 830ms tasks; Grammarly amplified by re-instrumenting per round. Fix: Aleph never writes into contenteditable subtrees — RTL blocks are styled via an Aleph-owned head stylesheet (src/shared/domIds.ts EDITOR_BIDI_STYLE_ID) using scope-attribute + :nth-child selectors (src/content/editorBidi.ts), recomputed from input/compositionend through one coalesced rAF plus a read-compute-compare sync on event passes (string-compare write guard); textarea/input keep direct dir='auto' (no childList feedback possible).",
+      "category": "general",
+      "checks": ["composer-bidi-performance", "no-console-errors"],
+      "source": "conversation:2026-06-07",
+      "addedAt": "2026-06-07",
+      "status": "fixed"
     }
   ]
 }

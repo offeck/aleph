@@ -118,6 +118,77 @@ Use `mcp__claude-in-chrome__read_console_messages` with pattern `Aleph|aleph` an
 })()
 ```
 
+## `composer-bidi-performance`
+
+Async check, takes ~12s, **requires a visible tab** (hidden tabs throttle timers and never fire rAF, so the cadence stalls and a loop couldn't manifest anyway). Detects the composer write→revert feedback loop (c7bb26f regression) and verifies composer RTL behavior survives. Warmup exists because claude.ai/new has a known one-time ~1.5s first-input lazy-init burst that is NOT extension cost — never measure the first keystrokes after page load. The loop detector runs cross-world: a `javascript_tool` rAF patch can't see the content script's isolated world, but the loop's host re-renders are DOM mutations visible from any world, so the silence window counts composer-subtree mutation records — and fails only on the *sustained* signature (churn in both 1s halves), not on incidental site/extension bursts. On Gemini, `execCommand` may not reach Quill — the check SKIPs if typed text doesn't land (drive the Quill API manually per Testing Notes).
+
+```javascript
+(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  if (!document.documentElement.hasAttribute('data-aleph-bidi-enabled')) return 'SKIP: BiDi not enabled';
+  const ed = document.querySelector('.ProseMirror, #prompt-textarea, .ql-editor');
+  if (!ed) return 'SKIP: no composer found (page not settled?)';
+  const type = (t) => { ed.focus(); document.execCommand('insertText', false, t); };
+  const clearAll = () => { ed.focus(); document.execCommand('selectAll'); document.execCommand('delete'); };
+
+  // Warmup: absorb the platform's first-input lazy-init burst, then clear.
+  type('abc');
+  await sleep(2000);
+  clearAll();
+  await sleep(500);
+
+  // Typing window (~5s): Hebrew, char by char.
+  const typingTasks = [];
+  const obs = new PerformanceObserver((l) => typingTasks.push(...l.getEntries()));
+  obs.observe({ type: 'longtask' });
+  const hebrew = 'שלום עולם זהו מבחן ביצועים של העורך'.split('');
+  for (const ch of hebrew) { type(ch); await sleep(120); }
+  obs.disconnect();
+  if (!(ed.textContent || '').includes('שלום')) { clearAll(); return 'SKIP: execCommand typing did not reach the editor (Gemini: use the Quill API)'; }
+
+  // Behavior: the Hebrew block must be RTL and right-aligned.
+  const block = Array.from(ed.querySelectorAll(':scope > p, :scope > div, :scope > li'))
+    .find((b) => (b.textContent || '').includes('שלום')) || ed;
+  const cs = getComputedStyle(block);
+  const behaviorOk = cs.direction === 'rtl';
+  const alignOk = cs.textAlign === 'right' || cs.textAlign === 'start';
+
+  // Silence window: 2s grace, then 2s measured in two 1s halves. The loop
+  // signature is SUSTAINED churn (a live write→revert loop produces hundreds
+  // of records per second in every half); an incidental burst from the site
+  // or another extension lands in one half and is tolerated.
+  await sleep(2000);
+  const silenceTasks = [];
+  const obs2 = new PerformanceObserver((l) => silenceTasks.push(...l.getEntries()));
+  obs2.observe({ type: 'longtask' });
+  const mutTimes = [];
+  const silenceStart = performance.now();
+  const mo = new MutationObserver((recs) => { recs.forEach(() => mutTimes.push(performance.now() - silenceStart)); });
+  mo.observe(ed, { childList: true, subtree: true, attributes: true, characterData: true });
+  await sleep(2000);
+  mo.disconnect();
+  obs2.disconnect();
+  clearAll();
+
+  const issues = [];
+  const halfA = mutTimes.filter((t) => t < 1000).length;
+  const halfB = mutTimes.filter((t) => t >= 1000).length;
+  if ((halfA > 25 && halfB > 25) || mutTimes.length > 200) {
+    issues.push('sustained composer churn with no input: ' + halfA + '+' + halfB + ' mutation records across both silence halves (feedback loop)');
+  }
+  const slowSilence = silenceTasks.filter((t) => t.duration >= 150);
+  if (silenceTasks.length >= 2 || slowSilence.length) {
+    issues.push(silenceTasks.length + ' longtasks during silence window' + (slowSilence.length ? ' (max ' + Math.round(Math.max(...slowSilence.map((t) => t.duration))) + 'ms)' : ''));
+  }
+  const slow = typingTasks.filter((t) => t.duration > 150);
+  if (typingTasks.length > 3) issues.push(typingTasks.length + ' longtasks while typing');
+  if (slow.length) issues.push('longtask of ' + Math.round(Math.max(...slow.map((t) => t.duration))) + 'ms while typing');
+  if (!behaviorOk) issues.push('Hebrew composer block has direction: ' + cs.direction + ' instead of rtl');
+  if (behaviorOk && !alignOk) issues.push('Hebrew composer block has text-align: ' + cs.textAlign);
+  return issues.length ? 'FAIL: ' + issues.join('; ') : 'PASS: composer RTL ok, no loop (mutations=' + mutations + ', typing longtasks=' + typingTasks.length + ')';
+})()
+```
+
 ## `selectors-match`
 
 ```javascript

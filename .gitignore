@@ -4,3 +4,4 @@ node_modules/
 *.zip
 .claude/settings.local.json
 dist/
+Trace-*.json.gz

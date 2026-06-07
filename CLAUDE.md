@@ -150,7 +150,7 @@ Hides upgrade banners, promos, and UI clutter via `data-aleph-hidden` attribute 
 3. If fixing a known bug: update its `status` to `"fixed"`
 4. Write the updated file
 
-**Valid check IDs**: `rtl-direction`, `math-ltr-isolation`, `no-console-errors`, `latex-rendered`, `theme-applied`, `focus-hidden`, `streaming-attrs`, `selectors-match`
+**Valid check IDs**: `rtl-direction`, `math-ltr-isolation`, `no-console-errors`, `latex-rendered`, `theme-applied`, `focus-hidden`, `streaming-attrs`, `selectors-match`, `composer-bidi-performance`
 
 **Valid categories**: `bidi-text`, `bidi-math`, `latex-rendering`, `theme`, `streaming`, `focus-mode`, `selector-breakage`, `general`
 
@@ -188,6 +188,8 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 **`streaming-attrs`** — `data-aleph-stream-enabled` and `data-aleph-stream-anim` attributes on `<html>`.
 
 **`selectors-match`** — `[data-aleph-platform]` always required; `[data-aleph-rtl]` only when the conversation contains RTL-script text; `[data-aleph-theme]` only when a theme is set.
+
+**`composer-bidi-performance`** — async, ~12s, requires a visible tab: types Hebrew into the composer (after a warmup that absorbs the platform's first-input lazy-init burst) and FAILs on the composer feedback-loop signature (*sustained* composer-subtree churn across both halves of a no-input silence window, repeated/long silence longtasks, longtask churn while typing) or on broken composer RTL behavior (Hebrew block not `direction: rtl`).
 
 ## Common Tasks
 

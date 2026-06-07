@@ -1,4 +1,6 @@
+import { EDITOR_BIDI_STYLE_ID } from "../shared/domIds";
 import { RTL_SCRIPT_LETTER_RE } from "../shared/rtl";
+import { blockDir, buildEditorBidiCss, SCOPE_ATTR, type EditorScopeBlocks } from "./editorBidi";
 import { SEL } from "./selectors";
 import { getSettings, isPlatformEnabled } from "./settingsStore";
 import { collectCandidates, notifyPending, textOf } from "./rescan";
@@ -64,7 +66,6 @@ function readSendHint() {
 }
 
 // ── BiDi Patcher ───────────────────────────────────────────────────────
-const editorDirObservers = new WeakMap<Element, MutationObserver>();
 const EDITOR_DIR_BLOCKS = "p, div, li";
 
 export function updateBidiRootAttribute() {
@@ -178,9 +179,10 @@ export function patchBidi(roots: Element[] | null = null, deadline = 0, eventPas
     });
   }
 
-  // New editors only appear via real page mutations; once attached they
-  // self-maintain through their own listeners/observer.
-  if (eventPass) patchEditors();
+  // Editor sync on event passes: attaches input listeners to new editors and
+  // re-syncs the scoped stylesheet (read-compute-compare — see syncEditors),
+  // which also covers programmatically populated drafts.
+  if (eventPass) syncEditors();
   return remainder;
 }
 
@@ -212,48 +214,125 @@ function setDirAutoForText(el: Element, text: string | null | undefined) {
   }
 }
 
-function patchEditorDir(ed: Element) {
-  const value = (ed as HTMLTextAreaElement).value;
-  const text = value !== undefined ? value : ed.textContent;
-  setDirAutoForText(ed, text);
+// ── Composer BiDi (loop-safe by construction) ──────────────────────────
+// Aleph never writes into contenteditable subtrees: ProseMirror/Quill
+// reconcile them and revert foreign dir attributes, which (with the former
+// per-editor MutationObserver + rAF/80ms/250ms fan-out) self-sustained a
+// ~300Hz write→revert loop whenever the composer held text. Instead, RTL
+// blocks are styled from an Aleph-owned <style> in document.head (the body
+// observer never sees it) keyed by a scope attribute on the nearest
+// non-contenteditable ancestor (attribute mutations aren't observed either).
+// Recomputation is event-driven (input/compositionend → one coalesced rAF)
+// plus the read-compute-compare sync on event passes; the stylesheet is
+// rewritten only when the computed CSS string changes, so a host re-render
+// that alters nothing settles in silence. Known limitation: :nth-child
+// indexes can be stale for ≤ one event-pass cadence after non-input DOM
+// reshuffles; the next input event or event pass re-syncs.
+const editorListenersAttached = new WeakSet<Element>();
+const editorHealed = new WeakSet<Element>();
+const editorScopeIds = new WeakMap<Element, string>();
+let nextScopeId = 1;
+let editorSyncPending = false;
 
-  if (value === undefined) {
-    ed.querySelectorAll(EDITOR_DIR_BLOCKS).forEach((child) => {
-      setDirAutoForText(child, child.textContent);
-    });
+function scheduleEditorSync() {
+  if (editorSyncPending) return;
+  editorSyncPending = true;
+  requestAnimationFrame(() => {
+    editorSyncPending = false;
+    syncEditors();
+  });
+}
+
+function attachEditorListeners(ed: Element) {
+  if (editorListenersAttached.has(ed)) return;
+  editorListenersAttached.add(ed);
+  ed.addEventListener("input", scheduleEditorSync);
+  ed.addEventListener("compositionend", scheduleEditorSync);
+}
+
+// One-shot heal: strip dir="auto" that previous builds wrote onto
+// contenteditable roots/children (this build never writes there). At most
+// one host re-render per editor, then permanent silence.
+function healStaleEditorDir(ed: Element) {
+  if (editorHealed.has(ed)) return;
+  editorHealed.add(ed);
+  if (ed.getAttribute("dir") === "auto") ed.removeAttribute("dir");
+  ed.querySelectorAll(EDITOR_DIR_BLOCKS).forEach((child) => {
+    if (child.getAttribute("dir") === "auto") child.removeAttribute("dir");
+  });
+}
+
+// Nearest non-contenteditable ancestor: hosts manage the editable root's
+// attributes (container dir="auto" was a c7bb26f loop trigger), not its
+// wrapper's.
+function scopeHostFor(ed: Element): Element | null {
+  let p = ed.parentElement;
+  while (p && (p as HTMLElement).isContentEditable) p = p.parentElement;
+  return p;
+}
+
+function writeEditorBidiCss(css: string) {
+  const styleEl = document.getElementById(EDITOR_BIDI_STYLE_ID);
+  if (!css) {
+    if (styleEl) styleEl.remove();
+    return;
+  }
+  if (!styleEl) {
+    const el = document.createElement("style");
+    el.id = EDITOR_BIDI_STYLE_ID;
+    el.textContent = css;
+    document.head.appendChild(el);
+  } else if (styleEl.textContent !== css) {
+    styleEl.textContent = css;
   }
 }
 
-function scheduleEditorDirPatch(ed: Element) {
-  requestAnimationFrame(() => patchEditorDir(ed));
-  setTimeout(() => patchEditorDir(ed), 80);
-  setTimeout(() => patchEditorDir(ed), 250);
-}
-
-function ensureEditorDirObserver(ed: Element) {
-  if (editorDirObservers.has(ed)) return;
-
-  const onInput = () => scheduleEditorDirPatch(ed);
-  ed.addEventListener("beforeinput", onInput);
-  ed.addEventListener("input", onInput);
-  ed.addEventListener("keyup", onInput);
-  ed.addEventListener("compositionend", onInput);
-
-  const observer = new MutationObserver(() => scheduleEditorDirPatch(ed));
-  observer.observe(ed, {
-    childList: true, subtree: true, characterData: true,
-    attributes: true, attributeFilter: ["dir"],
-  });
-  editorDirObservers.set(ed, observer);
-}
-
-function patchEditors() {
+function syncEditors() {
+  if (!isPlatformEnabled() || !getSettings().bidiEnabled) return;
+  const scopes: EditorScopeBlocks[] = [];
+  const seen = new Set<Element>();
   SEL.editor.forEach((sel) => {
     document.querySelectorAll(sel).forEach((ed) => {
-      patchEditorDir(ed);
-      ensureEditorDirObserver(ed);
+      if (seen.has(ed)) return;
+      seen.add(ed);
+      attachEditorListeners(ed);
+      const value = (ed as HTMLTextAreaElement).value;
+      if (value !== undefined) {
+        // textarea/input: not framework-reconciled and no childList churn —
+        // a direct dir="auto" write cannot feed back.
+        setDirAutoForText(ed, value);
+        return;
+      }
+      healStaleEditorDir(ed);
+      const host = scopeHostFor(ed);
+      if (!host) return;
+      let id = editorScopeIds.get(ed);
+      if (!id) {
+        id = "e" + nextScopeId++;
+        editorScopeIds.set(ed, id);
+      }
+      // Re-ensure each sync — the host wrapper can be recreated by the app.
+      if (host.getAttribute(SCOPE_ATTR) !== id) host.setAttribute(SCOPE_ATTR, id);
+      // Every descendant block (not just direct children): nested composer
+      // structures like ul > li keep per-block direction, matching the old
+      // per-descendant dir="auto" behavior.
+      const rtlPaths: number[][] = [];
+      ed.querySelectorAll(EDITOR_DIR_BLOCKS).forEach((block) => {
+        if (blockDir(block.textContent) !== "rtl") return;
+        const path: number[] = [];
+        let cur: Element | null = block;
+        while (cur && cur !== ed) {
+          const parent: Element | null = cur.parentElement;
+          if (!parent) return; // detached mid-scan
+          path.unshift(Array.prototype.indexOf.call(parent.children, cur) + 1);
+          cur = parent;
+        }
+        if (cur === ed) rtlPaths.push(path);
+      });
+      if (rtlPaths.length) scopes.push({ id, rtlPaths });
     });
   });
+  writeEditorBidiCss(buildEditorBidiCss(scopes));
 }
 
 export function cleanupEditorDir() {
@@ -265,4 +344,7 @@ export function cleanupEditorDir() {
       });
     });
   });
+  document.querySelectorAll(`[${SCOPE_ATTR}]`).forEach((el) => el.removeAttribute(SCOPE_ATTR));
+  const styleEl = document.getElementById(EDITOR_BIDI_STYLE_ID);
+  if (styleEl) styleEl.remove();
 }
