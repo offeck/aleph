@@ -150,7 +150,7 @@ Hides upgrade banners, promos, and UI clutter via `data-aleph-hidden` attribute 
 3. If fixing a known bug: update its `status` to `"fixed"`
 4. Write the updated file
 
-**Valid check IDs**: `rtl-direction`, `math-ltr-isolation`, `no-console-errors`, `latex-rendered`, `theme-applied`, `focus-hidden`, `streaming-attrs`, `selectors-match`, `composer-bidi-performance`
+**Valid check IDs**: `rtl-direction`, `math-ltr-isolation`, `no-console-errors`, `latex-rendered`, `theme-applied`, `focus-hidden`, `streaming-attrs`, `selectors-match`, `composer-bidi-performance`, `platform-contract`
 
 **Valid categories**: `bidi-text`, `bidi-math`, `latex-rendering`, `theme`, `streaming`, `focus-mode`, `selector-breakage`, `general`
 
@@ -190,6 +190,8 @@ Check implementations (JS snippets) live in `tests/checks.md`. Valid check IDs:
 **`selectors-match`** — `[data-aleph-platform]` always required; `[data-aleph-rtl]` only when the conversation contains RTL-script text; `[data-aleph-theme]` only when a theme is set.
 
 **`composer-bidi-performance`** — async, ~12s, requires a visible tab: types Hebrew into the composer (after a warmup that absorbs the platform's first-input lazy-init burst) and FAILs on the composer feedback-loop signature (*sustained* composer-subtree churn across both halves of a no-input silence window, repeated/long silence longtasks, longtask churn while typing) or on broken composer RTL behavior (Hebrew block not `direction: rtl`).
+
+**`platform-contract`** — reads the `data-aleph-contract` / `data-aleph-contract-missing` attributes the tracker's drift self-check publishes (`src/tracker/contract.ts` + `src/shared/contract.ts`). FAILs naming any required detection anchor (the account container, plus Gemini's tier badge when the stored plan is paid) that no longer resolves; SKIPs when the tracker hasn't evaluated yet or no anchor resolves at all (off-app / logged-out page). Surfaces a third-party DOM rework (like Gemini's tier-badge move) immediately instead of detection silently returning nothing.
 
 ## Common Tasks
 

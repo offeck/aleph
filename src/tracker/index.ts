@@ -3,6 +3,7 @@ import { startTimeTracking } from "./time";
 import { markExistingMessages, setGraceUntil, startEditorCapture, startMessageObserver, startNavRemark } from "./messages";
 import { startResponseTiming } from "./timing";
 import { sendSubscriptionDetection } from "./plans";
+import { checkPlatformContract } from "./contract";
 import { TRACKER_ADAPTERS, type TrackerPlatformAdapter } from "./platformAdapters";
 
 function detectSubscription(adapter: TrackerPlatformAdapter) {
@@ -42,4 +43,10 @@ if (adapter) {
   }, 3000);
 
   if (adapter.plan) setInterval(() => detectSubscription(adapter), 60000);
+
+  // Contract drift self-check — a few early passes catch late-rendering anchors,
+  // then a steady interval. Decoupled from the 60s plan cadence so a late render
+  // can't leave a stale "missing" verdict for up to a minute.
+  [2000, 5000, 10000].forEach((d) => setTimeout(() => { void checkPlatformContract(adapter.platform); }, d));
+  setInterval(() => { void checkPlatformContract(adapter.platform); }, 20000);
 }

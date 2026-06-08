@@ -3,6 +3,36 @@
   "lastBackfill": "2026-05-07",
   "sessions": [
     {
+      "id": "claude-contract-001",
+      "platform": "claude",
+      "url": "https://claude.ai/new",
+      "description": "Platform-contract canary: Claude's stable detection anchors (composer, account menu) still resolve. Guards against silent third-party DOM reworks.",
+      "category": "selector-breakage",
+      "checks": ["platform-contract", "no-console-errors"],
+      "addedAt": "2026-06-08",
+      "status": "active"
+    },
+    {
+      "id": "chatgpt-contract-001",
+      "platform": "chatgpt",
+      "url": "https://chatgpt.com/",
+      "description": "Platform-contract canary: ChatGPT's stable detection anchors (composer, profile button) still resolve. Guards against silent third-party DOM reworks.",
+      "category": "selector-breakage",
+      "checks": ["platform-contract", "no-console-errors"],
+      "addedAt": "2026-06-08",
+      "status": "active"
+    },
+    {
+      "id": "gemini-contract-001",
+      "platform": "gemini",
+      "url": "https://gemini.google.com/app",
+      "description": "Platform-contract canary: Gemini's stable detection anchors (composer, account container) still resolve after the 2026-06 DOM rework that broke plan detection.",
+      "category": "selector-breakage",
+      "checks": ["platform-contract", "no-console-errors"],
+      "addedAt": "2026-06-08",
+      "status": "active"
+    },
+    {
       "id": "claude-bidi-math-001",
       "platform": "claude",
       "url": "https://claude.ai/chat/ccc0d6dd-3925-4ee0-be07-681aa69413e8",

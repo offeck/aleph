@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetProviderUsageRefreshStateForTests,
+  chatgptPlanTypeRaw,
   extractClaudeOrgId,
   inferGeminiPlanFromQuotas,
   normalizeClaudePlanFromOrg,
@@ -204,6 +205,21 @@ describe("inferGeminiPlanFromQuotas", () => {
     // accounts also report a daily credit pool and feature rows.
     expect(inferGeminiPlanFromQuotas([{ id: 4, name: "Pro 3.1", limit: 100, remaining: 90, resetsAt: null }])).toBe(null);
     expect(inferGeminiPlanFromQuotas([])).toBe(null);
+  });
+});
+
+describe("chatgptPlanTypeRaw (API-shape canary)", () => {
+  it("returns the raw planType only when present and non-empty", () => {
+    expect(chatgptPlanTypeRaw({ account: { planType: "prolite" } })).toBe("prolite");
+    expect(chatgptPlanTypeRaw({ account: { planType: "plus" } })).toBe("plus");
+  });
+
+  it("returns null when there is nothing to flag as drift", () => {
+    expect(chatgptPlanTypeRaw({ account: { planType: "" } })).toBe(null);
+    expect(chatgptPlanTypeRaw({ account: {} })).toBe(null);
+    expect(chatgptPlanTypeRaw({})).toBe(null);
+    expect(chatgptPlanTypeRaw(null)).toBe(null);
+    expect(chatgptPlanTypeRaw("guest")).toBe(null);
   });
 });
 

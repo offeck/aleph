@@ -220,3 +220,17 @@ Async check, takes ~12s, **requires a visible tab** (hidden tabs throttle timers
   return issues.length ? 'FAIL: ' + issues.join('; ') : 'PASS: Required selectors match';
 })()
 ```
+
+## `platform-contract`
+
+```javascript
+(() => {
+  // Reads the verdict the tracker's self-check published on <html> (see
+  // src/tracker/contract.ts + src/shared/contract.ts) — no selector mirroring.
+  const el = document.documentElement;
+  const missing = el.getAttribute('data-aleph-contract-missing');
+  if (missing) return 'FAIL: platform-contract drift — stable detection anchors missing: ' + missing;
+  if (el.getAttribute('data-aleph-contract') === 'ok') return 'PASS: all stable detection anchors present';
+  return 'SKIP: contract not evaluated yet (tracker boot pending or platform disabled)';
+})()
+```

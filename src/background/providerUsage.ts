@@ -81,6 +81,27 @@ async function fetchText(url: string, options: RequestInit = {}): Promise<string
   return response.text();
 }
 
+// ── Provider API-shape canary ─────────────────────────────
+// Surfaces silent provider drift: a 200 response whose expected field is missing
+// or unrecognized (e.g. ChatGPT's "prolite" planType, which slipped through
+// undetected). Stores only a bounded scalar sample — never full RPC/account
+// payloads — under a local-only key (no sync prefix).
+export function chatgptPlanTypeRaw(session: unknown): string | null {
+  const account = session && typeof session === "object" ? (session as RawRecord).account : null;
+  const planType = account && typeof account === "object" ? (account as RawRecord).planType : null;
+  return typeof planType === "string" && planType ? planType : null;
+}
+
+async function recordProviderDrift(platform: string, kind: string, sample: unknown) {
+  try {
+    const all = await readLocal<RawRecord>("insights_contract_drift", {});
+    const text = typeof sample === "string" ? sample : String(sample);
+    all[platform] = { kind, sample: text.slice(0, 64), at: Date.now() };
+    await writeLocal("insights_contract_drift", all);
+    console.warn("[Aleph] provider shape drift: " + platform + " " + kind + " sample=" + all[platform].sample);
+  } catch (e) {}
+}
+
 function normalizeChatgptLimit(lp: RawRecord) {
   return {
     feature: lp.feature_name || lp.feature || lp.name,
@@ -134,6 +155,10 @@ async function fetchChatgptSession(): Promise<ChatgptSession | null> {
         token: typeof rawToken === "string" ? rawToken : null,
         plan: normalizeChatgptPlanFromSession(session),
       };
+      if (!result.plan) {
+        const planType = chatgptPlanTypeRaw(session);
+        if (planType) void recordProviderDrift("chatgpt", "plan-unrecognized", planType);
+      }
       if (result.token) return result;
       if (!fallback) fallback = result;
     } catch (e) {}
@@ -349,7 +374,12 @@ async function fetchGeminiProviderUsage(): Promise<ProviderFetchResult> {
     method: "POST",
     body,
   }));
-  if (!Array.isArray(quotas) || !Array.isArray(quotas[0])) return { usage: null, reason: "no-data" };
+  if (!Array.isArray(quotas) || !Array.isArray(quotas[0])) {
+    // A non-null but wrong-shaped payload is real drift; a null parse is treated
+    // as transient (no warn) to avoid noise on empty/expired sessions.
+    if (quotas != null) void recordProviderDrift("gemini", "quota-shape", JSON.stringify(quotas));
+    return { usage: null, reason: "no-data" };
+  }
 
   const { credits, features } = parseGeminiQuotas(quotas);
   const plan = inferGeminiPlanFromQuotas(features);
