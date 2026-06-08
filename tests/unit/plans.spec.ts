@@ -10,6 +10,8 @@ describe("normalizeChatgptPlan", () => {
     [null, ["price:20000"], "pro20x"],
     [null, ["price:10000"], "pro5x"],
     ["pro", [], "pro5x"],
+    ["prolite", [], "pro5x"],
+    [null, ["planType:prolite"], "pro5x"],
     ["ChatGPT Plus", [], "plus"],
     ["the price is $200/mo", [], "pro20x"],
     ["free", [], "free"],

@@ -137,6 +137,10 @@ export function normalizeChatgptPlan(raw: string | null | undefined, context: { 
   if (pricePlan) return pricePlan;
   if (/\$[\s ]*200\b|\b200\s*usd\b|\b20x\b|\bpro[_ -]?20x?\b|\b(?:price|cost|billing[_ -]?amount|amount[_ -]due|monthly[_ -]price|subscription)[a-z0-9_:= -]{0,80}200\b/.test(text)) return "pro20x";
   if (/\$[\s ]*100\b|\b100\s*usd\b|\b5x\b|\bpro[_ -]?5x?\b|\b(?:price|cost|billing[_ -]?amount|amount[_ -]due|monthly[_ -]price|subscription)[a-z0-9_:= -]{0,80}100\b/.test(text)) return "pro5x";
+  // "prolite" is a real ChatGPT planType ($100 tier) that the \bpro\b check
+  // below misses — "pro" has no trailing word boundary inside "prolite". Match
+  // the pro-lite/pro_lite spellings too.
+  if (/\bpro[\s_-]?lite\b/.test(text)) return "pro5x";
   if (/\bpro\b/.test(text)) return "pro5x";
   if (/\bplus\b/.test(text)) return "plus";
   if (/\bfree\b|\bgo\b/.test(text)) return "free";
