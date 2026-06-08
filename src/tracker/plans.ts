@@ -6,7 +6,7 @@ import type { Platform } from "../shared/platform";
 
 export type ClaudePlan = "free" | "pro" | "max5x" | "max20x";
 export type ChatgptPlan = "free" | "plus" | "pro5x" | "pro20x";
-export type GeminiPlan = "free" | "ai_pro" | "ai_ultra";
+export type GeminiPlan = "free" | "ai_plus" | "ai_pro" | "ai_ultra";
 
 export interface PlanDetection {
   plan: string;
@@ -223,48 +223,34 @@ export function detectChatgptSubscription(): PlanDetection {
   return { plan: "free", model };
 }
 
-export function detectGeminiSubscription(): PlanDetection {
-  let plan: GeminiPlan = "free";
-  let model: string | null = null;
+// Gemini's account tier badge (`.mavatar-tier-label`) renders the plan's last
+// word — "Pro", "Ultra", "Plus" (or legacy "Advanced"). Pure, so it is
+// unit-tested. Returns null for an absent/unrecognized label so the caller can
+// avoid clobbering a known plan with a guess.
+export function geminiPlanFromTierLabel(label: string | null | undefined): GeminiPlan | null {
+  const t = (label || "").trim();
+  if (!t) return null;
+  if (/ultra/i.test(t)) return "ai_ultra";
+  if (/plus/i.test(t)) return "ai_plus";
+  if (/pro|advanced/i.test(t)) return "ai_pro";
+  if (/^free$/i.test(t)) return "free";
+  return null;
+}
 
-  // Primary: the mode switch button in the input area shows the active model
-  const switchBtn = document.querySelector(".input-area-switch");
-  if (switchBtn) {
-    model = switchBtn.textContent?.trim() || null;
-  }
-
-  // Fallback: old testid (may still exist on some Gemini versions)
-  if (!model) {
-    const modeBtn = document.querySelector('[data-testid="bard-mode-menu-button"]');
-    if (modeBtn) model = modeBtn.textContent?.trim() || null;
-  }
-
-  // Model name → plan (handles Hebrew UI: "מעמיק"=Deep Research, "Pro" stays English)
-  if (model) {
-    if (/ultra|advanced/i.test(model)) plan = "ai_ultra";
-    else if (/\bpro\b/i.test(model) || model === "מעמיק") plan = "ai_pro";
-  }
-
-  // Tier from mode picker: Pro/Deep modes only available to paid users
-  if (plan === "free") {
-    const modeItems = document.querySelectorAll('[role="menuitem"]');
-    for (const item of modeItems) {
-      const t = item.textContent || "";
-      if (/\bpro\b/i.test(t) || t.includes("מעמיק")) {
-        plan = "ai_pro";
-        break;
-      }
-    }
-  }
-
-  // Final fallback: no upgrade button means paid user
-  if (plan === "free") {
-    const hasUpgrade = document.querySelector(
-      "[class*='upgrade' i], [class*='premium' i], [aria-label*='upgrade' i]"
-    );
-    if (!hasUpgrade && model) plan = "ai_pro";
-  }
-  return { plan, model };
+export function detectGeminiSubscription(): PlanDetection | null {
+  // The account tier badge is the only authoritative signal. Free is asserted
+  // ONLY by an explicit "Free" label — never by the absence of a badge or the
+  // presence of an upgrade CTA (paid users get upsold too). Returning null on an
+  // unknown/missing badge leaves any previously-stored plan untouched
+  // (sendSubscriptionDetection drops null), so a transient DOM miss cannot
+  // downgrade a paying user to $0.
+  const label = document.querySelector(".mavatar-tier-label")?.textContent?.trim() || "";
+  const model =
+    document.querySelector('[data-test-id="bard-mode-menu-button"]')?.textContent?.trim() ||
+    document.querySelector("bard-mode-switcher")?.textContent?.trim() ||
+    null;
+  const plan = geminiPlanFromTierLabel(label);
+  return plan ? { plan, model } : null;
 }
 
 export function sendSubscriptionDetection(platform: Platform, result: PlanDetection | null) {
