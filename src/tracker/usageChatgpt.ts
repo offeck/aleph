@@ -1,93 +1,8 @@
-import { dateDaysAgo, localDateString } from "../shared/dates";
-import { send } from "./send";
-import { getChatgptAccessToken, refreshChatgptToken } from "./plans";
-
-// ── ChatGPT real usage polling ───────────────────────────
-// Raw provider JSON is inherently untyped — `any` is confined to this fetch
-// boundary; everything downstream narrows through the typed normalizers.
-function fetchJson(url: string, options: RequestInit = {}): Promise<any> {
-  return fetch(url, options)
-    .then((r) => r.ok ? r.json() : Promise.reject(new Error(String(r.status))))
-    .catch((e) => ({ __alephError: e?.message || String(e) }));
-}
-
-function normalizeChatgptLimit(lp: any) {
-  return {
-    feature: lp.feature_name || lp.feature || lp.name,
-    remaining: lp.remaining,
-    limit: lp.limit ?? lp.max ?? lp.total,
-    used: lp.used ?? lp.consumed,
-    resetsAt: lp.reset_after ?? lp.resets_at,
-  };
-}
-
-function normalizeChatgptModelLimit(ml: any) {
-  return {
-    model: ml.model_slug || ml.model || ml.slug,
-    remaining: ml.remaining,
-    limit: ml.limit ?? ml.max ?? ml.total,
-    used: ml.used ?? ml.consumed,
-    resetsAt: ml.reset_after ?? ml.resets_at,
-  };
-}
-
-function fetchChatgptChatUsage(token: string | null) {
-  if (!token) return Promise.resolve({ limits: [], modelLimits: [], error: "missing access token" });
-  const headers = { "Content-Type": "application/json", Authorization: "Bearer " + token };
-  return fetchJson("/backend-api/conversation/init", {
-    method: "POST", credentials: "same-origin", headers, body: "{}",
-  }).then((data) => {
-    if (data?.__alephError) return { limits: [], modelLimits: [], error: data.__alephError };
-    const limits = Array.isArray(data?.limits_progress) ? data.limits_progress.map(normalizeChatgptLimit) : [];
-    const modelLimits = Array.isArray(data?.model_limits) ? data.model_limits.map(normalizeChatgptModelLimit) : [];
-    return { limits, modelLimits };
-  });
-}
-
-interface CodexUsagePayload {
-  errors?: Record<string, string>;
-  [endpoint: string]: unknown;
-}
-
-let cachedCodexUsage: CodexUsagePayload | null = null;
-let lastCodexUsagePoll = 0;
-const CODEX_USAGE_POLL_MS = 5 * 60 * 1000;
-
-function fetchCodexUsage(token: string | null): Promise<CodexUsagePayload> {
-  const now = Date.now();
-  if (cachedCodexUsage && (now - lastCodexUsagePoll) < CODEX_USAGE_POLL_MS) {
-    return Promise.resolve(cachedCodexUsage);
-  }
-
-  const start = dateDaysAgo(29);
-  const end = localDateString();
-  const headers: HeadersInit = token ? { Authorization: "Bearer " + token } : {};
-  const opts: RequestInit = { credentials: "same-origin", headers };
-  const endpoints = {
-    balance: "/backend-api/wham/usage",
-    dailyTokenUsage: "/backend-api/wham/usage/daily-token-usage-breakdown?start_date=" + start + "&end_date=" + end + "&group_by=day",
-    dailyWorkspaceUsage: "/backend-api/wham/analytics/daily-workspace-usage-counts?start_date=" + start + "&end_date=" + end + "&group_by=day&workspace_user=true",
-    creditUsageEvents: "/backend-api/wham/usage/credit-usage-events",
-  };
-
-  return Promise.all(Object.entries(endpoints).map(([key, url]) => (
-    fetchJson(url, opts).then((data) => [key, data] as [string, any])
-  ))).then((entries) => {
-    const errors: Record<string, string> = {};
-    const codex: CodexUsagePayload = { errors };
-    for (const [key, data] of entries) {
-      if (data?.__alephError) errors[key] = data.__alephError;
-      else codex[key] = data;
-    }
-    if (Object.keys(errors).length === 0) delete codex.errors;
-    if (Object.keys(codex).some((key) => key !== "errors")) {
-      cachedCodexUsage = codex;
-      lastCodexUsagePoll = now;
-    }
-    return codex;
-  });
-}
-
+// ── ChatGPT Codex usage parsing ──────────────────────────
+// Pure normalizers for the Codex/balance payload the background provider-usage
+// fetcher passes in — src/background/providerUsage.ts owns the network fetch +
+// auth. Raw provider JSON is untyped, so `any` is confined to these boundaries;
+// everything downstream narrows through the typed helpers.
 function findFirstValue(obj: unknown, names: string[]): unknown {
   if (!obj || typeof obj !== "object") return null;
   const record = obj as Record<string, unknown>;
@@ -348,40 +263,4 @@ export function normalizeCodexBalance(balance: unknown): CodexBalanceSnapshot | 
     credits,
   };
   return limits.length > 0 || snapshot.credits ? snapshot : null;
-}
-
-export function pollChatgptUsage() {
-  const doFetch = (token: string | null) => {
-    const chatPromise = token ? fetchChatgptChatUsage(token) : Promise.resolve(null);
-    Promise.all([chatPromise, fetchCodexUsage(token)])
-      .then(([chat, codex]) => {
-        const hasCodexData = codex && Object.keys(codex).some((key) => key !== "errors");
-        if (!chat && !hasCodexData) return;
-        const codexWithAnalytics: CodexUsagePayload & { analytics?: CodexBalanceSnapshot } = Object.assign({}, codex);
-        const analytics = normalizeCodexBalance(codex.balance);
-        if (analytics) codexWithAnalytics.analytics = analytics;
-        const usage: Record<string, unknown> = {
-          source: "provider",
-          codex: codexWithAnalytics,
-        };
-        if (chat && !chat.error) {
-          usage.chat = chat;
-          usage.limits = chat.limits || [];
-          usage.modelLimits = chat.modelLimits || [];
-        }
-        send({
-          type: "insights-usage",
-          platform: "chatgpt",
-          usage,
-        });
-      })
-      .catch(() => {});
-  };
-
-  const token = getChatgptAccessToken();
-  if (token) {
-    doFetch(token);
-  } else {
-    refreshChatgptToken().then((freshToken) => { doFetch(freshToken); });
-  }
 }

@@ -30,6 +30,11 @@ describe("estimateTokens", () => {
     // ```abcd``` = 10 chars / 2.5 = 4
     expect(estimateTokens("```abcd```")).toBe(4);
   });
+
+  it("accepts an explicit platform", () => {
+    expect(estimateTokens("aaaaaaaa", "claude")).toBe(3);
+    expect(estimateTokens("aaaaaaaa", "gemini")).toBe(2);
+  });
 });
 
 describe("token cost tables", () => {

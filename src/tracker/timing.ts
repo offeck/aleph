@@ -1,19 +1,12 @@
 import { send } from "./send";
-import { PLATFORM } from "./platform";
+import type { ResponseTimingConfig } from "./platformAdapters";
 
 // ── Response timing (TTFT + thinking duration) ──────────
-const THINKING_SEL = {
-  claude: '[aria-label="Stop response"]',
-  chatgpt: '[aria-label="Stop streaming"], [aria-label*="Stop" i]',
-  gemini: '.send-button.stop',
-};
-
 let responseTimingActive = false;
 let thinkingStartedAt = 0;
 let msgCountAtSend = 0;
 let userSentAt = 0;
-
-const ASSISTANT_SEL = '[data-message-author-role="assistant"], .font-claude-response, .response-content';
+let timingConfig: ResponseTimingConfig | null = null;
 
 // userSentAt is owned here (timing is its primary consumer); messages.ts
 // records sends via markUserSent() and reads via getUserSentAt().
@@ -27,37 +20,27 @@ export function getUserSentAt() {
 }
 
 export function beginResponseTiming() {
+  if (!timingConfig) return;
   responseTimingActive = true;
   thinkingStartedAt = 0;
-  msgCountAtSend = document.querySelectorAll(ASSISTANT_SEL).length;
+  msgCountAtSend = document.querySelectorAll(timingConfig.assistantSelector).length;
 }
 
-function detectFirstToken() {
-  const msgs = document.querySelectorAll(ASSISTANT_SEL);
+function detectFirstToken(config: ResponseTimingConfig) {
+  const msgs = document.querySelectorAll(config.assistantSelector);
   if (msgs.length <= msgCountAtSend) return false;
   const last = msgs[msgs.length - 1];
-  if (!last) return false;
-
-  if (PLATFORM === "chatgpt") {
-    const markdowns = last.querySelectorAll('.markdown');
-    const lastMd = markdowns.length ? markdowns[markdowns.length - 1] : null;
-    const p = lastMd ? lastMd.querySelector('p') : null;
-    return p ? p.textContent.trim().length > 20 : false;
-  }
-
-  const p = last.querySelector('p');
-  const threshold = PLATFORM === "gemini" ? 10 : 5;
-  return p ? p.textContent.trim().length > threshold : false;
+  return last ? config.hasFirstToken(last) : false;
 }
 
-export function startResponseTiming() {
+export function startResponseTiming(config: ResponseTimingConfig) {
+  timingConfig = config;
   setInterval(() => {
-    if (!userSentAt || !responseTimingActive) return;
+    if (!userSentAt || !responseTimingActive || !timingConfig) return;
     const elapsed = Date.now() - userSentAt;
-    const sel = PLATFORM ? THINKING_SEL[PLATFORM] : undefined;
 
     if (!thinkingStartedAt) {
-      if (sel && document.querySelector(sel)) {
+      if (document.querySelector(timingConfig.thinkingSelector)) {
         thinkingStartedAt = Date.now();
         document.documentElement.setAttribute("data-aleph-thinking", "true");
         console.log("[Aleph] thinking started (stop button appeared)");
@@ -65,10 +48,10 @@ export function startResponseTiming() {
     }
 
     if (thinkingStartedAt) {
-      if (detectFirstToken()) {
+      if (detectFirstToken(timingConfig)) {
         send({
           type: "insights-response-timing",
-          platform: PLATFORM,
+          platform: timingConfig.platform,
           sendToThinking: thinkingStartedAt - userSentAt,
           thinkingToFirstToken: Date.now() - thinkingStartedAt,
           totalTTFT: Date.now() - userSentAt,

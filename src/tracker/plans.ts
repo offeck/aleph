@@ -1,14 +1,14 @@
 import { PRICING } from "../shared/pricing";
 import { send } from "./send";
-import { PLATFORM } from "./platform";
+import type { Platform } from "../shared/platform";
 
 // ── Subscription & model detection ───────────────────────
 
 export type ClaudePlan = "free" | "pro" | "max5x" | "max20x";
 export type ChatgptPlan = "free" | "plus" | "pro5x" | "pro20x";
-export type GeminiPlan = "free" | "ai_pro" | "ai_ultra";
+export type GeminiPlan = "free" | "ai_plus" | "ai_pro" | "ai_ultra";
 
-interface PlanDetection {
+export interface PlanDetection {
   plan: string;
   model: string | null;
 }
@@ -45,7 +45,7 @@ export function detectClaudeViaApi() {
   } catch (e) {}
 }
 
-function detectClaude(): PlanDetection {
+export function detectClaudeSubscription(): PlanDetection {
   const modelBtn = document.querySelector('[data-testid="model-selector-dropdown"]');
   const ariaLabel = modelBtn?.getAttribute("aria-label") || "";
   const model = ariaLabel.replace(/^Model:\s*/i, "").trim() || null;
@@ -84,7 +84,7 @@ function setChatgptApiPlan(plan: ChatgptPlan | null) {
   }
 }
 
-function collectChatgptPlanSignals(value: unknown, depth = 0, includeChildren = false): string[] {
+export function collectChatgptPlanSignals(value: unknown, depth = 0, includeChildren = false): string[] {
   if (!value || depth > 3) return [];
   if (typeof value !== "object") return [String(value)];
   const signals: string[] = [];
@@ -137,6 +137,10 @@ export function normalizeChatgptPlan(raw: string | null | undefined, context: { 
   if (pricePlan) return pricePlan;
   if (/\$[\s ]*200\b|\b200\s*usd\b|\b20x\b|\bpro[_ -]?20x?\b|\b(?:price|cost|billing[_ -]?amount|amount[_ -]due|monthly[_ -]price|subscription)[a-z0-9_:= -]{0,80}200\b/.test(text)) return "pro20x";
   if (/\$[\s ]*100\b|\b100\s*usd\b|\b5x\b|\bpro[_ -]?5x?\b|\b(?:price|cost|billing[_ -]?amount|amount[_ -]due|monthly[_ -]price|subscription)[a-z0-9_:= -]{0,80}100\b/.test(text)) return "pro5x";
+  // "prolite" is a real ChatGPT planType ($100 tier) that the \bpro\b check
+  // below misses — "pro" has no trailing word boundary inside "prolite". Match
+  // the pro-lite/pro_lite spellings too.
+  if (/\bpro[\s_-]?lite\b/.test(text)) return "pro5x";
   if (/\bpro\b/.test(text)) return "pro5x";
   if (/\bplus\b/.test(text)) return "plus";
   if (/\bfree\b|\bgo\b/.test(text)) return "free";
@@ -159,10 +163,6 @@ function detectChatgptDomPlan() {
 // then /backend-api/conversation/init with that token returns real limits.
 // Without the token, the API returns guest data even for Plus users.
 let chatgptAccessToken: string | null = null;
-
-export function getChatgptAccessToken(): string | null {
-  return chatgptAccessToken;
-}
 
 export function refreshChatgptToken() {
   return fetch("/api/auth/session", { credentials: "same-origin" })
@@ -197,7 +197,7 @@ export function detectChatgptViaApi() {
   });
 }
 
-function detectChatgpt(): PlanDetection {
+export function detectChatgptSubscription(): PlanDetection {
   let model: string | null = null;
 
   try {
@@ -223,63 +223,44 @@ function detectChatgpt(): PlanDetection {
   return { plan: "free", model };
 }
 
-function detectGemini(): PlanDetection {
-  let plan: GeminiPlan = "free";
-  let model: string | null = null;
-
-  // Primary: the mode switch button in the input area shows the active model
-  const switchBtn = document.querySelector(".input-area-switch");
-  if (switchBtn) {
-    model = switchBtn.textContent?.trim() || null;
-  }
-
-  // Fallback: old testid (may still exist on some Gemini versions)
-  if (!model) {
-    const modeBtn = document.querySelector('[data-testid="bard-mode-menu-button"]');
-    if (modeBtn) model = modeBtn.textContent?.trim() || null;
-  }
-
-  // Model name → plan (handles Hebrew UI: "מעמיק"=Deep Research, "Pro" stays English)
-  if (model) {
-    if (/ultra|advanced/i.test(model)) plan = "ai_ultra";
-    else if (/\bpro\b/i.test(model) || model === "מעמיק") plan = "ai_pro";
-  }
-
-  // Tier from mode picker: Pro/Deep modes only available to paid users
-  if (plan === "free") {
-    const modeItems = document.querySelectorAll('[role="menuitem"]');
-    for (const item of modeItems) {
-      const t = item.textContent || "";
-      if (/\bpro\b/i.test(t) || t.includes("מעמיק")) {
-        plan = "ai_pro";
-        break;
-      }
-    }
-  }
-
-  // Final fallback: no upgrade button means paid user
-  if (plan === "free") {
-    const hasUpgrade = document.querySelector(
-      "[class*='upgrade' i], [class*='premium' i], [aria-label*='upgrade' i]"
-    );
-    if (!hasUpgrade && model) plan = "ai_pro";
-  }
-  return { plan, model };
+// Gemini's account tier badge (`.mavatar-tier-label`) renders the plan's last
+// word — "Pro", "Ultra", "Plus" (or legacy "Advanced"). Pure, so it is
+// unit-tested. Returns null for an absent/unrecognized label so the caller can
+// avoid clobbering a known plan with a guess.
+export function geminiPlanFromTierLabel(label: string | null | undefined): GeminiPlan | null {
+  const t = (label || "").trim();
+  if (!t) return null;
+  if (/ultra/i.test(t)) return "ai_ultra";
+  if (/plus/i.test(t)) return "ai_plus";
+  if (/pro|advanced/i.test(t)) return "ai_pro";
+  if (/^free$/i.test(t)) return "free";
+  return null;
 }
 
-export function detectSubscription() {
+export function detectGeminiSubscription(): PlanDetection | null {
+  // The account tier badge is the only authoritative signal. Free is asserted
+  // ONLY by an explicit "Free" label — never by the absence of a badge or the
+  // presence of an upgrade CTA (paid users get upsold too). Returning null on an
+  // unknown/missing badge leaves any previously-stored plan untouched
+  // (sendSubscriptionDetection drops null), so a transient DOM miss cannot
+  // downgrade a paying user to $0.
+  const label = document.querySelector(".mavatar-tier-label")?.textContent?.trim() || "";
+  const model =
+    document.querySelector('[data-test-id="bard-mode-menu-button"]')?.textContent?.trim() ||
+    document.querySelector("bard-mode-switcher")?.textContent?.trim() ||
+    null;
+  const plan = geminiPlanFromTierLabel(label);
+  return plan ? { plan, model } : null;
+}
+
+export function sendSubscriptionDetection(platform: Platform, result: PlanDetection | null) {
   try {
-    if (!PLATFORM) return;
-    let result: PlanDetection | null = null;
-    if (PLATFORM === "claude") result = detectClaude();
-    else if (PLATFORM === "chatgpt") result = detectChatgpt();
-    else if (PLATFORM === "gemini") result = detectGemini();
     if (!result) return;
 
-    const pricing = PRICING[PLATFORM][result.plan];
+    const pricing = PRICING[platform][result.plan];
     send({
       type: "insights-subscription",
-      platform: PLATFORM,
+      platform,
       plan: result.plan,
       model: result.model,
       price: pricing ? pricing.price : 0,

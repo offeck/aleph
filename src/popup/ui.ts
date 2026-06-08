@@ -153,11 +153,40 @@ export function bindEvents() {
       input.value = "";
     }
   });
+
+  // Cloud sync (front-view sign-in) — reuses the aleph-sync-* messages.
+  const signInBtn = document.getElementById("syncSignInBtn") as HTMLButtonElement | null;
+  const setSignInLabel = (text: string) => {
+    const label = signInBtn?.querySelector(".sync-label");
+    if (label) label.textContent = text;
+  };
+  signInBtn?.addEventListener("click", () => {
+    signInBtn.disabled = true;
+    setSignInLabel("Signing in…");
+    chrome.runtime.sendMessage({ type: "aleph-sync-signin" }, (resp) => {
+      signInBtn.disabled = false;
+      setSignInLabel("Sign in with Google");
+      if (resp?.success) { loadSyncIndicator(); return; }
+      setSignInLabel("Sign-in failed — retry");
+      setTimeout(() => setSignInLabel("Sign in with Google"), 2500);
+    });
+  });
+}
+
+// Cloud sync (front-view sign-in). Auth state is raw JSON from the background —
+// boundary `any`. Signed out → the "Sign in with Google" bar; signed in → just
+// the header cloud glyph (sign-out lives on the settings page).
+function renderSyncState(state: any) {
+  const syncBar = document.getElementById("syncBar");
+  const cloud = document.getElementById("syncIndicator");
+  const isSignedIn = Boolean(state?.signedIn);
+  if (syncBar) syncBar.style.display = isSignedIn ? "none" : "";
+  if (cloud) {
+    cloud.style.display = isSignedIn ? "" : "none";
+    cloud.title = isSignedIn && state.email ? "Cloud sync · " + state.email : "Cloud sync active";
+  }
 }
 
 export function loadSyncIndicator() {
-  chrome.runtime.sendMessage({ type: "aleph-sync-status" }, (state) => {
-    const el = document.getElementById("syncIndicator");
-    if (el && state?.signedIn) el.style.display = "";
-  });
+  chrome.runtime.sendMessage({ type: "aleph-sync-status" }, renderSyncState);
 }

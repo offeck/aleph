@@ -181,7 +181,7 @@ const REMARKS: Record<string, RemarkEntry> = {
     ],
   },
   messageBurst: {
-    condition: (d) => d.todayMessages >= 30,
+    condition: (d) => d.todayMessages >= 25,
     pool: [
       "{msgCount} messages today. That's a whole group chat, but just you and AI.",
       "You've sent {msgCount} messages today. Your thumbs deserve a medal.",

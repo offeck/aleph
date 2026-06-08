@@ -22,7 +22,10 @@ export const PRICING: Record<Platform, Record<string, PlanPricing>> = {
   },
   gemini: {
     free: { price: 0, label: "Free" },
+    ai_plus: { price: 4.99, label: "AI Plus" },
     ai_pro: { price: 19.99, label: "AI Pro" },
-    ai_ultra: { price: 249.99, label: "AI Ultra" },
+    // Ultra spans two tiers ($99.99 entry, $199.99 top); the "Ultra" badge can't
+    // distinguish them, so use the conservative entry price (user-adjustable).
+    ai_ultra: { price: 99.99, label: "AI Ultra" },
   },
 };

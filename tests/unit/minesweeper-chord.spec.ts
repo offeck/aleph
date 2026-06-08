@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chordTargets, neighborIds, type NeighborState } from "../../src/mini-game/minesweeper";
+import { chordTargets, minesweeperCellCursor, neighborIds, type NeighborState } from "../../src/mini-game/minesweeper";
 
 // Game grid is 6×6 (width 6, 36 cells).
 const W = 6;
@@ -66,5 +66,20 @@ describe("chordTargets", () => {
   it("returns nothing when everything around is already revealed or flagged", () => {
     const neighbors = [state(1, true), state(2, false, true), state(3, false, true)];
     expect(chordTargets(neighbors, 1)).toEqual([]);
+  });
+});
+
+describe("minesweeperCellCursor", () => {
+  it("marks unrevealed cells as clickable", () => {
+    expect(minesweeperCellCursor(false, 0, false)).toBe("pointer");
+  });
+
+  it("keeps revealed number cells clickable for chording", () => {
+    expect(minesweeperCellCursor(true, 2, false)).toBe("pointer");
+  });
+
+  it("does not mark revealed blank cells or ended games as clickable", () => {
+    expect(minesweeperCellCursor(true, 0, false)).toBe("default");
+    expect(minesweeperCellCursor(false, 0, true)).toBe("default");
   });
 });

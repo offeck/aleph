@@ -2,38 +2,44 @@ import { PLATFORM } from "./platform";
 import { startTimeTracking } from "./time";
 import { markExistingMessages, setGraceUntil, startEditorCapture, startMessageObserver, startNavRemark } from "./messages";
 import { startResponseTiming } from "./timing";
-import { detectClaudeViaApi, detectChatgptViaApi, detectSubscription } from "./plans";
-import { pollModelCapabilities } from "./modelCaps";
-import { pollClaudeUsage } from "./usageClaude";
-import { pollChatgptUsage } from "./usageChatgpt";
-import { pollGeminiUsage } from "./usageGemini";
+import { sendSubscriptionDetection } from "./plans";
+import { TRACKER_ADAPTERS, type TrackerPlatformAdapter } from "./platformAdapters";
+
+function detectSubscription(adapter: TrackerPlatformAdapter) {
+  if (!adapter.plan) return;
+  // Detection scrapes third-party DOM on a 60s interval; one wrong-shape
+  // change must not throw repeatedly. Blanket try matches the pre-refactor
+  // detectSubscription() (detect + send under one swallow).
+  try {
+    sendSubscriptionDetection(adapter.platform, adapter.plan.detect());
+  } catch (e) {}
+}
+
+function pollModelCapabilities(adapter: TrackerPlatformAdapter) {
+  adapter.modelCaps?.poll?.();
+}
 
 // ── Boot ─────────────────────────────────────────────────
 // Modules only define; everything observable starts here, gated on a
 // supported platform (manifest matches keep this always-true in practice).
-if (PLATFORM) {
-  startTimeTracking();
-  startEditorCapture();
-  startResponseTiming();
-  startNavRemark();
+const adapter = PLATFORM ? TRACKER_ADAPTERS[PLATFORM] : null;
 
-  if (PLATFORM === "claude") detectClaudeViaApi();
-  if (PLATFORM === "chatgpt") detectChatgptViaApi();
+if (adapter) {
+  startTimeTracking(adapter.platform);
+  if (adapter.timing) startResponseTiming(adapter.timing);
+  startEditorCapture(adapter);
+  startNavRemark(adapter);
+
+  adapter.plan?.bootstrap?.();
 
   setTimeout(() => {
-    detectSubscription();
-    markExistingMessages();
+    detectSubscription(adapter);
+    markExistingMessages(adapter);
     setGraceUntil(Date.now() + 5000);
-    startMessageObserver();
-    setTimeout(markExistingMessages, 5000);
-    pollModelCapabilities();
-    if (PLATFORM === "claude") pollClaudeUsage();
-    if (PLATFORM === "chatgpt") pollChatgptUsage();
-    if (PLATFORM === "gemini") pollGeminiUsage();
+    startMessageObserver(adapter);
+    setTimeout(() => markExistingMessages(adapter), 5000);
+    pollModelCapabilities(adapter);
   }, 3000);
 
-  setInterval(detectSubscription, 60000);
-  if (PLATFORM === "claude") setInterval(pollClaudeUsage, 60000);
-  if (PLATFORM === "chatgpt") setInterval(pollChatgptUsage, 60000);
-  if (PLATFORM === "gemini") setInterval(pollGeminiUsage, 60000);
+  if (adapter.plan) setInterval(() => detectSubscription(adapter), 60000);
 }

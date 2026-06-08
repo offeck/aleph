@@ -15,6 +15,19 @@ describe("extension asset paths", () => {
     expect(manifest.content_scripts[0].css).toEqual(["dist/content.css"]);
   });
 
+  it("allows background provider usage refreshes without an open chat tab", () => {
+    const manifest = JSON.parse(readText("manifest.json"));
+
+    expect(manifest.permissions).toContain("cookies");
+    expect(manifest.permissions).toContain("alarms");
+    expect(manifest.host_permissions).toEqual(expect.arrayContaining([
+      "https://claude.ai/*",
+      "https://chatgpt.com/*",
+      "https://chat.openai.com/*",
+      "https://gemini.google.com/*",
+    ]));
+  });
+
   it("keeps source page HTML references relative to generated dist siblings", () => {
     for (const page of PAGE_NAMES) {
       const html = readText(`src/${page}/${page}.html`);

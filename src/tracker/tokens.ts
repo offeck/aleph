@@ -1,5 +1,6 @@
 import { countRTLScriptLetters } from "../shared/rtl";
 import { PLATFORM } from "./platform";
+import type { Platform } from "../shared/platform";
 
 // Chars-per-token ratios tuned per platform tokenizer and content type.
 // Claude uses a custom BPE tokenizer, ChatGPT uses tiktoken (o200k_base),
@@ -11,9 +12,9 @@ export const TOKEN_RATIOS = {
   gemini:  { latin: 4.2, rtl: 2.2, code: 3.0, whitespace: 5.0 },
 };
 
-export function estimateTokens(text: string | null | undefined): number {
+export function estimateTokens(text: string | null | undefined, platform: Platform | null = PLATFORM): number {
   if (!text) return 0;
-  const ratios = (PLATFORM && TOKEN_RATIOS[PLATFORM]) || TOKEN_RATIOS.chatgpt;
+  const ratios = (platform && TOKEN_RATIOS[platform]) || TOKEN_RATIOS.chatgpt;
 
   let tokens = 0;
 
@@ -92,12 +93,12 @@ export interface MessageEstimate {
   totalTokens: number;
 }
 
-export function estimateMessage(el: Element): MessageEstimate {
+export function estimateMessage(el: Element, platform: Platform | null = PLATFORM): MessageEstimate {
   const text = el.textContent || "";
   const images = Array.from(el.querySelectorAll<HTMLImageElement>("img")).filter(isContentImage);
   const fileCount = countFileAttachments(el);
-  const textTokens = estimateTokens(text);
-  const imageTokens = images.length * ((PLATFORM && IMG_TOKEN_COST[PLATFORM]) || 1600);
+  const textTokens = estimateTokens(text, platform);
+  const imageTokens = images.length * ((platform && IMG_TOKEN_COST[platform]) || 1600);
   const fileTokens = 0;
   return {
     text,

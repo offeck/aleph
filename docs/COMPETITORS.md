@@ -778,12 +778,12 @@ function hasHebrew(el) {
 
 | Extension | Selector Storage | Update Path |
 |---|---|---|
-| **Aleph** | Hardcoded in content.js (13 categories per platform) | Requires extension update |
+| **Aleph** | Centralized in `src/shared/selectors.ts` with typed per-platform selector sets | Requires extension update |
 | **Now2ai** | Bundled JSON + remote refresh (6h interval) | Auto-update via remote server |
 | **AI Chat RTL Support** | Defined in background.js config objects | Requires extension update |
 | **Smart RTL Fixer** | Inline ternary chain + generic fallback | Requires extension update, but degrades gracefully |
 
-**Analysis**: Now2ai's remote config is the most resilient to platform DOM changes. Aleph's hardcoded selectors are comprehensive but fragile. Smart RTL Fixer's generic fallback (`p,li,h1,...`) is a useful degradation pattern.
+**Analysis**: Now2ai's remote config is the most resilient to platform DOM changes. Aleph's centralized selector sets are comprehensive and type-checked, but still require an extension update when platforms change. Smart RTL Fixer's generic fallback (`p,li,h1,...`) is a useful degradation pattern.
 
 ---
 

@@ -8,7 +8,7 @@ import type {
   StoredRemark,
 } from "../shared/messages";
 import {
-  addNonNegative,
+  applyMessageUsage,
   ensurePlatformDay,
   normalizeSends,
   numberOrZero,
@@ -16,20 +16,33 @@ import {
   updateUsageDay,
   writeLocal,
 } from "./usage";
-import { updateUsageMetricChanges } from "./metrics";
 import { generateRemark } from "./remarks";
 import { cleanupOldUsage } from "./cleanup";
+import { LIMITS_REFRESH_ALARM, LIMITS_REFRESH_PERIOD_MINUTES, refreshProviderUsage } from "./providerUsage";
 
 // MV3 requires every chrome.* listener to be registered in the service
 // worker's first synchronous turn — index.ts calls this from its module body.
 export function registerBackgroundListeners() {
+  // Idempotent (same name replaces). Created from install/startup only — NOT on
+  // every worker boot, which would perpetually reset the period and starve it.
+  const ensureLimitsAlarm = () => chrome.alarms.create(LIMITS_REFRESH_ALARM, { periodInMinutes: LIMITS_REFRESH_PERIOD_MINUTES });
   chrome.runtime.onInstalled?.addListener(() => {
     cleanupOldUsage();
+    ensureLimitsAlarm();
     alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
   });
   chrome.runtime.onStartup?.addListener(() => {
     cleanupOldUsage();
+    ensureLimitsAlarm();
     alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
+  });
+
+  // Periodic limits refresh — works with no tab/popup open. refreshProviderUsage
+  // re-derives auth (cookies/token) and refreshes limits together, keeping both
+  // fresh while the CLIs (Claude Code, Codex) drain the shared account limits.
+  // The listener must register in the worker's first synchronous turn (MV3).
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === LIMITS_REFRESH_ALARM) refreshProviderUsage("alarm").catch(() => {});
   });
 
   // ── Settings sync to Firestore ───────────────────────────
@@ -107,6 +120,11 @@ export function registerBackgroundListeners() {
       return true;
     }
 
+    if (msg.type === "insights-refresh-usage") {
+      refreshProviderUsage("popup").then(sendResponse);
+      return true;
+    }
+
     if (!sender.tab) return;
     const tabId = sender.tab.id;
 
@@ -144,27 +162,10 @@ export function registerBackgroundListeners() {
     // Insights: message counts and local token estimates
     if (msg.type === "insights-message") {
       (async () => {
-        const p = msg.platform;
         const role = msg.role;
         if (role !== "user" && role !== "assistant") return;
-        await updateUsageDay(async (usage) => {
-          const day = ensurePlatformDay(usage, p);
-          const roleSuffix = role === "user" ? "In" : "Out";
-          const totalDelta = msg.isUpdate ? numberOrZero(msg.tokenDelta) : numberOrZero(msg.estimatedTokens);
-          const textDelta = msg.isUpdate ? numberOrZero(msg.textTokenDelta) : numberOrZero(msg.estimatedTextTokens ?? msg.textTokens);
-          const imageDelta = msg.isUpdate ? numberOrZero(msg.imageTokenDelta) : numberOrZero(msg.estimatedImageTokens ?? msg.imageTokens);
-          const fileDelta = msg.isUpdate ? numberOrZero(msg.fileTokenDelta) : numberOrZero(msg.estimatedFileTokens ?? msg.fileTokens);
-          const imageCountDelta = msg.isUpdate ? numberOrZero(msg.imageCountDelta) : numberOrZero(msg.imageCount);
-          const fileCountDelta = msg.isUpdate ? numberOrZero(msg.fileCountDelta) : numberOrZero(msg.fileCount);
-
-          if (!msg.isUpdate) day.messageCount++;
-          addNonNegative(day, "tokens" + roleSuffix, totalDelta);
-          addNonNegative(day, "textTokens" + roleSuffix, textDelta);
-          addNonNegative(day, "imageTokens" + roleSuffix, imageDelta);
-          addNonNegative(day, "fileTokens" + roleSuffix, fileDelta);
-          addNonNegative(day, "imageCount" + roleSuffix, imageCountDelta);
-          addNonNegative(day, "fileCount" + roleSuffix, fileCountDelta);
-          day.estimateSource = msg.estimateSource || "local";
+        await updateUsageDay((usage) => {
+          applyMessageUsage(ensurePlatformDay(usage, msg.platform), msg, role);
         });
       })();
     }
@@ -213,30 +214,6 @@ export function registerBackgroundListeners() {
           manualOverride: false,
         };
         await writeLocal("insights_subscriptions", subs);
-      })();
-    }
-
-    // Insights: provider-backed usage snapshots
-    if (msg.type === "insights-usage") {
-      (async () => {
-        const key = "insights_platform_usage_" + msg.platform;
-        // Provider usage snapshots are raw provider JSON — boundary `any`.
-        const previous = await readLocal<Record<string, any> | null>(key, null);
-        const nextUsage: Record<string, any> = {
-          ...msg.usage,
-          source: msg.usage?.source || "provider",
-          fetchedAt: Date.now(),
-        };
-        if (msg.platform === "chatgpt") {
-          if (!nextUsage.chat && previous?.chat) nextUsage.chat = previous.chat;
-          if (!nextUsage.limits && previous?.limits) nextUsage.limits = previous.limits;
-          if (!nextUsage.modelLimits && previous?.modelLimits) nextUsage.modelLimits = previous.modelLimits;
-          if (!nextUsage.codex?.analytics && previous?.codex?.analytics) {
-            nextUsage.codex = Object.assign({}, nextUsage.codex || {}, { analytics: previous.codex.analytics });
-          }
-        }
-        Object.assign(nextUsage, updateUsageMetricChanges(msg.platform, previous, nextUsage));
-        await writeLocal(key, nextUsage);
       })();
     }
 

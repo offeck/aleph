@@ -1,5 +1,6 @@
 import { todayKey } from "../shared/dates";
 import { alephSync } from "./sync";
+import type { InsightsMessagePayload } from "../shared/messages";
 
 // ── Usage day storage ────────────────────────────────────
 export interface Sends {
@@ -19,7 +20,7 @@ export interface Timing {
 
 export interface PlatformDay {
   totalSeconds: number;
-  messageCount: number;
+  messageCount: number; // user-authored sends only
   hours: Record<string, number>;
   tokensIn: number;
   tokensOut: number;
@@ -102,6 +103,33 @@ export function numberOrZero(value: unknown): number {
 
 export function addNonNegative(target: Record<string, unknown>, key: string, delta: unknown) {
   target[key] = Math.max(0, numberOrZero(target[key]) + numberOrZero(delta));
+}
+
+// Applies one insights-message to a platform-day. messageCount counts
+// user-authored sends only — assistant renders and mid-stream updates never
+// increment it. Token/image/file counters update for both roles, routed to the
+// In/Out suffix by role. Pure mutator (no storage) so it is unit-testable.
+export function applyMessageUsage(
+  day: PlatformDay,
+  msg: InsightsMessagePayload,
+  role: "user" | "assistant",
+) {
+  const roleSuffix = role === "user" ? "In" : "Out";
+  const totalDelta = msg.isUpdate ? numberOrZero(msg.tokenDelta) : numberOrZero(msg.estimatedTokens);
+  const textDelta = msg.isUpdate ? numberOrZero(msg.textTokenDelta) : numberOrZero(msg.estimatedTextTokens ?? msg.textTokens);
+  const imageDelta = msg.isUpdate ? numberOrZero(msg.imageTokenDelta) : numberOrZero(msg.estimatedImageTokens ?? msg.imageTokens);
+  const fileDelta = msg.isUpdate ? numberOrZero(msg.fileTokenDelta) : numberOrZero(msg.estimatedFileTokens ?? msg.fileTokens);
+  const imageCountDelta = msg.isUpdate ? numberOrZero(msg.imageCountDelta) : numberOrZero(msg.imageCount);
+  const fileCountDelta = msg.isUpdate ? numberOrZero(msg.fileCountDelta) : numberOrZero(msg.fileCount);
+
+  if (!msg.isUpdate && role === "user") day.messageCount++;
+  addNonNegative(day, "tokens" + roleSuffix, totalDelta);
+  addNonNegative(day, "textTokens" + roleSuffix, textDelta);
+  addNonNegative(day, "imageTokens" + roleSuffix, imageDelta);
+  addNonNegative(day, "fileTokens" + roleSuffix, fileDelta);
+  addNonNegative(day, "imageCount" + roleSuffix, imageCountDelta);
+  addNonNegative(day, "fileCount" + roleSuffix, fileCountDelta);
+  day.estimateSource = msg.estimateSource || "local";
 }
 
 // Serializes all daily-usage read-modify-write cycles so concurrent platform
