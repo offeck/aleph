@@ -8,7 +8,7 @@ import type {
   StoredRemark,
 } from "../shared/messages";
 import {
-  addNonNegative,
+  applyMessageUsage,
   ensurePlatformDay,
   normalizeSends,
   numberOrZero,
@@ -162,27 +162,10 @@ export function registerBackgroundListeners() {
     // Insights: message counts and local token estimates
     if (msg.type === "insights-message") {
       (async () => {
-        const p = msg.platform;
         const role = msg.role;
         if (role !== "user" && role !== "assistant") return;
-        await updateUsageDay(async (usage) => {
-          const day = ensurePlatformDay(usage, p);
-          const roleSuffix = role === "user" ? "In" : "Out";
-          const totalDelta = msg.isUpdate ? numberOrZero(msg.tokenDelta) : numberOrZero(msg.estimatedTokens);
-          const textDelta = msg.isUpdate ? numberOrZero(msg.textTokenDelta) : numberOrZero(msg.estimatedTextTokens ?? msg.textTokens);
-          const imageDelta = msg.isUpdate ? numberOrZero(msg.imageTokenDelta) : numberOrZero(msg.estimatedImageTokens ?? msg.imageTokens);
-          const fileDelta = msg.isUpdate ? numberOrZero(msg.fileTokenDelta) : numberOrZero(msg.estimatedFileTokens ?? msg.fileTokens);
-          const imageCountDelta = msg.isUpdate ? numberOrZero(msg.imageCountDelta) : numberOrZero(msg.imageCount);
-          const fileCountDelta = msg.isUpdate ? numberOrZero(msg.fileCountDelta) : numberOrZero(msg.fileCount);
-
-          if (!msg.isUpdate) day.messageCount++;
-          addNonNegative(day, "tokens" + roleSuffix, totalDelta);
-          addNonNegative(day, "textTokens" + roleSuffix, textDelta);
-          addNonNegative(day, "imageTokens" + roleSuffix, imageDelta);
-          addNonNegative(day, "fileTokens" + roleSuffix, fileDelta);
-          addNonNegative(day, "imageCount" + roleSuffix, imageCountDelta);
-          addNonNegative(day, "fileCount" + roleSuffix, fileCountDelta);
-          day.estimateSource = msg.estimateSource || "local";
+        await updateUsageDay((usage) => {
+          applyMessageUsage(ensurePlatformDay(usage, msg.platform), msg, role);
         });
       })();
     }
