@@ -24,15 +24,17 @@ Aleph is a Chrome extension that fixes Hebrew and Arabic-script RTL text renderi
 
 Features:
 - Hebrew, Arabic, Persian, and Urdu BiDi text fixing with automatic RTL detection
-- 10 beautiful themes (Nord, Dracula, Catppuccin, Rose Pine, and more) with per-platform overrides
+- 14 beautiful themes (Nord, Dracula, Catppuccin, Rose Pine, and more) with per-platform overrides
 - Focus mode that hides upgrade banners, promo chips, and UI clutter
 - Smooth streaming animations (fade-in, typewriter, slide-up, glow)
 - Custom typography with Google Fonts support for both text and code
 - Adjustable chat width and message spacing
+- Local usage insights with provider quota/plan snapshots
+- Optional Google sign-in for cross-device settings and usage sync
 - Keyboard shortcut (Alt+Shift+A) to toggle on/off
 - Export/import settings as JSON
 
-Works on claude.ai, chatgpt.com, and gemini.google.com. No data collection, no analytics, no external requests except optional Google Fonts loading.
+Works on claude.ai, chatgpt.com, and gemini.google.com. No conversation content is collected, no analytics are sent to Aleph, and cloud sync is optional.
 
 **Screenshot:** Take a 1280x800 screenshot of the extension in action:
 1. Open claude.ai with a Hebrew or Arabic-script conversation
@@ -48,13 +50,13 @@ Works on claude.ai, chatgpt.com, and gemini.google.com. No data collection, no a
 Fixes Hebrew and Arabic-script RTL text direction and provides visual customization (themes, typography, focus mode) on AI chat platforms.
 
 **Host permission justification:**
-The extension requires host permissions for claude.ai, chatgpt.com, chat.openai.com, and gemini.google.com to inject content scripts that detect Hebrew and Arabic-script text and apply BiDi fixes, custom themes, and UI modifications directly on these pages. No data is read or transmitted from these sites.
+The extension requires host permissions for claude.ai, chatgpt.com, chat.openai.com, and gemini.google.com to inject content scripts that detect Hebrew and Arabic-script text and apply BiDi fixes, custom themes, usage tracking, and UI modifications directly on these pages. The background service worker also uses these same provider domains to refresh the user's own plan and quota metadata for the popup insights.
 
 **Remote code justification:**
-The extension optionally loads Google Fonts (fonts.googleapis.com) when the user selects a custom font in settings. This is the only remote resource loaded, and it only occurs on explicit user action. No other remote code is executed.
+No remotely hosted JavaScript or executable code is loaded. Firebase, KaTeX, and all extension scripts are bundled locally. Optional Google Fonts stylesheets may be requested only when the user selects a custom font in settings.
 
-**Are you using remote code?** Yes
+**Are you using remote code?** No
 
 **Data usage compliance:** Check the certification checkbox.
 
-**Data disclosure:** The extension does NOT collect or transmit any user data. Select "No" for all data types.
+**Data disclosure:** Disclose website content limited to on-page text needed for local BiDi/usage processing, user activity limited to local usage insights, authentication information limited to optional Google sign-in email, and user settings for optional sync. Conversation content is not stored or synced.

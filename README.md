@@ -23,8 +23,9 @@ On top of that, each platform uses different fonts, sizes, and spacing — makin
 - **Paragraph spacing** — Control density of response text
 - **Code block font & size** — Pick your preferred monospace font
 - **Chat width** — Widen the narrow default conversation column
+- **Usage insights** — Track local time, sends, token estimates, plan spend, and provider quota snapshots
 
-All settings sync across devices via `chrome.storage.sync`.
+Settings sync through Chrome storage by default. Optional Google sign-in backs up settings and usage insights to your own Firebase-backed cloud account so they can follow you across devices.
 
 ## Installation
 
@@ -38,11 +39,11 @@ The א icon will appear in your extensions bar. Click it to open settings.
 
 ## Supported platforms
 
-| Platform | URL | BiDi fix | Style overrides |
-|----------|-----|----------|-----------------|
-| Claude | `claude.ai` | ✓ | ✓ |
-| ChatGPT | `chatgpt.com` | ✓ | ✓ |
-| Gemini | `gemini.google.com` | ✓ | ✓ |
+| Platform | URL | BiDi fix | Style overrides | Usage insights |
+|----------|-----|----------|-----------------|----------------|
+| Claude | `claude.ai` | ✓ | ✓ | ✓ |
+| ChatGPT | `chatgpt.com` | ✓ | ✓ | ✓ |
+| Gemini | `gemini.google.com` | ✓ | ✓ | ✓ |
 
 ## How it works
 
@@ -56,16 +57,22 @@ The extension injects a content script on each supported platform. It:
 
 Math containers (`.katex`, `mjx-container`) and code blocks are explicitly isolated to stay LTR regardless of surrounding text direction.
 
+The background service worker also refreshes provider-backed usage limits and plan metadata from Claude, ChatGPT, and Gemini using the extension's host permissions. Those snapshots power the popup's quota meters and spend card without requiring an open provider tab.
+
 ## Project structure
 
 ```
 aleph/
 ├── manifest.json     # Chrome MV3 manifest — targets all 3 platforms
-├── content.js        # Main content script (platform detection, BiDi engine, style injector)
-├── content.css       # Static CSS rules (RTL, math isolation, code isolation)
-├── popup.html        # Settings popup markup
-├── popup.js          # Popup logic (reads/writes chrome.storage.sync)
-├── popup.css         # Popup styling
+├── src/
+│   ├── content/      # BiDi engine, style injector, focus/streaming/theme logic
+│   ├── tracker/      # Usage tracking content script and platform adapters
+│   ├── background/   # MV3 service worker, sync, usage, provider refresh
+│   ├── popup/        # Popup insights/settings surface
+│   ├── settings/     # Full settings page
+│   └── shared/       # Shared types, selectors, themes, defaults, pricing
+├── dist/             # Generated bundles from npm run build
+├── tests/unit/       # Vitest unit coverage
 └── icons/
     ├── icon16.png
     ├── icon48.png
@@ -90,7 +97,7 @@ Setting a value to 0 (or empty for dropdowns) means "don't override — use the 
 
 ## Contributing
 
-PRs welcome. The most common maintenance need is updating platform selectors when Claude/ChatGPT/Gemini change their DOM structure. If you notice the extension stopped working on a platform, check the `SELECTORS` object in `content.js`.
+PRs welcome. The most common maintenance need is updating platform selectors when Claude/ChatGPT/Gemini change their DOM structure. If you notice the extension stopped working on a platform, check `src/shared/selectors.ts` and the relevant tracker adapter in `src/tracker/platformAdapters/`.
 
 ## License
 

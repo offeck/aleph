@@ -35,8 +35,8 @@ function hasRTL(el) {
 Before implementing, I need to clarify:
 
 1. **What's broken?** Is Hebrew text:
-   - Not detected as RTL? (BiDi detection — hasRTL() in content.js)
-   - Detected but displayed wrong? (CSS direction — content.css)
+   - Not detected as RTL? (BiDi detection — hasRTL() in src/content/bidi.ts)
+   - Detected but displayed wrong? (CSS direction — src/content/content.css)
    - Missing in LaTeX/math blocks? (patchLatex() exclusion)
    - Rendered in wrong font? (font loading)
 
@@ -84,7 +84,7 @@ function patchAll() {
 ### Good — What Should Happen
 
 ```javascript
-// Just add the selector to the existing structure (content.js, SELECTORS.gemini)
+// Just add the selector to the existing structure (src/shared/selectors.ts, SELECTORS.gemini)
 gemini: {
   // ...existing selectors...
   focusHide: {
@@ -222,7 +222,7 @@ const THEMES = {
 };
 ```
 
-One object, 10 properties, matching every other theme exactly. Then add the swatch in `popup.html` and `THEME_NAMES` in `popup.js`.
+One object, 10 properties, matching every other theme exactly. Then add the swatch in `src/popup/popup.html` and the label in `THEME_NAMES` in `src/shared/themes.ts`.
 
 ---
 
