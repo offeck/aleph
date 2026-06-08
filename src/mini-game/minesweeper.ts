@@ -40,6 +40,12 @@ export function chordTargets(neighbors: NeighborState[], count: number): number[
   return neighbors.filter((n) => !n.flagged && !n.checked).map((n) => n.id);
 }
 
+export function minesweeperCellCursor(checked: boolean, count: number, gameOver: boolean): "pointer" | "default" {
+  if (gameOver) return "default";
+  if (!checked) return "pointer";
+  return count > 0 ? "pointer" : "default";
+}
+
 // ── Minesweeper ──────────────────────────────────────────────────────
 export function startMinesweeper(container: HTMLElement, callbacks: GameCallbacks) {
   const width = 6;
@@ -113,6 +119,7 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
           s.textContent = "💣";
           s.style.background = "#4a1a1a";
         }
+        updateCellCursor(s);
       });
       setTimeout(callbacks.onGameOver, 800);
       return;
@@ -120,7 +127,7 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
     const total = parseInt(sq.getAttribute("data-count") || "0");
     sq.setAttribute("data-checked", "true");
     sq.style.background = "#22224a";
-    sq.style.cursor = "default";
+    updateCellCursor(sq);
     if (total > 0) {
       sq.textContent = String(total);
       sq.style.color = COLORS[total] || "#ccc";
@@ -176,9 +183,16 @@ export function startMinesweeper(container: HTMLElement, callbacks: GameCallback
     // dead-end with nothing left to do but ESC.
     if (matches === bombAmount || revealed === squares.length - bombAmount) {
       isGameOver = true;
+      squares.forEach(updateCellCursor);
       console.log("[Aleph MiniGame] minesweeper: you won!");
       setTimeout(callbacks.onGameOver, 600);
     }
+  }
+
+  function updateCellCursor(sq: HTMLDivElement) {
+    const checked = !!sq.getAttribute("data-checked");
+    const count = parseInt(sq.getAttribute("data-count") || "0");
+    sq.style.cursor = minesweeperCellCursor(checked, count, isGameOver);
   }
 
   return function cleanup() {
