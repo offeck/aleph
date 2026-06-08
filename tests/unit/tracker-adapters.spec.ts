@@ -35,6 +35,12 @@ describe("tracker platform adapters", () => {
     }
   });
 
+  it("does not run provider usage polling from content-script adapters", () => {
+    for (const platform of PLATFORMS) {
+      expect("usage" in TRACKER_ADAPTERS[platform]).toBe(false);
+    }
+  });
+
   it("classifies messages using adapter markers", () => {
     expect(classifyMessage(
       fakeElement({ matches: [".font-claude-response"] }),

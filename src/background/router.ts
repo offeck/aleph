@@ -16,20 +16,33 @@ import {
   updateUsageDay,
   writeLocal,
 } from "./usage";
-import { updateUsageMetricChanges } from "./metrics";
 import { generateRemark } from "./remarks";
 import { cleanupOldUsage } from "./cleanup";
+import { LIMITS_REFRESH_ALARM, LIMITS_REFRESH_PERIOD_MINUTES, refreshProviderUsage } from "./providerUsage";
 
 // MV3 requires every chrome.* listener to be registered in the service
 // worker's first synchronous turn — index.ts calls this from its module body.
 export function registerBackgroundListeners() {
+  // Idempotent (same name replaces). Created from install/startup only — NOT on
+  // every worker boot, which would perpetually reset the period and starve it.
+  const ensureLimitsAlarm = () => chrome.alarms.create(LIMITS_REFRESH_ALARM, { periodInMinutes: LIMITS_REFRESH_PERIOD_MINUTES });
   chrome.runtime.onInstalled?.addListener(() => {
     cleanupOldUsage();
+    ensureLimitsAlarm();
     alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
   });
   chrome.runtime.onStartup?.addListener(() => {
     cleanupOldUsage();
+    ensureLimitsAlarm();
     alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
+  });
+
+  // Periodic limits refresh — works with no tab/popup open. refreshProviderUsage
+  // re-derives auth (cookies/token) and refreshes limits together, keeping both
+  // fresh while the CLIs (Claude Code, Codex) drain the shared account limits.
+  // The listener must register in the worker's first synchronous turn (MV3).
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === LIMITS_REFRESH_ALARM) refreshProviderUsage("alarm").catch(() => {});
   });
 
   // ── Settings sync to Firestore ───────────────────────────
@@ -104,6 +117,11 @@ export function registerBackgroundListeners() {
         const summary: InsightsSummary = { subs, today, remark, weekData, prevWeekData, platformUsage, modelCaps };
         sendResponse(summary);
       })();
+      return true;
+    }
+
+    if (msg.type === "insights-refresh-usage") {
+      refreshProviderUsage("popup").then(sendResponse);
       return true;
     }
 
@@ -213,30 +231,6 @@ export function registerBackgroundListeners() {
           manualOverride: false,
         };
         await writeLocal("insights_subscriptions", subs);
-      })();
-    }
-
-    // Insights: provider-backed usage snapshots
-    if (msg.type === "insights-usage") {
-      (async () => {
-        const key = "insights_platform_usage_" + msg.platform;
-        // Provider usage snapshots are raw provider JSON — boundary `any`.
-        const previous = await readLocal<Record<string, any> | null>(key, null);
-        const nextUsage: Record<string, any> = {
-          ...msg.usage,
-          source: msg.usage?.source || "provider",
-          fetchedAt: Date.now(),
-        };
-        if (msg.platform === "chatgpt") {
-          if (!nextUsage.chat && previous?.chat) nextUsage.chat = previous.chat;
-          if (!nextUsage.limits && previous?.limits) nextUsage.limits = previous.limits;
-          if (!nextUsage.modelLimits && previous?.modelLimits) nextUsage.modelLimits = previous.modelLimits;
-          if (!nextUsage.codex?.analytics && previous?.codex?.analytics) {
-            nextUsage.codex = Object.assign({}, nextUsage.codex || {}, { analytics: previous.codex.analytics });
-          }
-        }
-        Object.assign(nextUsage, updateUsageMetricChanges(msg.platform, previous, nextUsage));
-        await writeLocal(key, nextUsage);
       })();
     }
 

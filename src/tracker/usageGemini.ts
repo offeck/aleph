@@ -1,43 +1,7 @@
-import { send } from "./send";
-
-// ── Gemini real usage polling ───────────────────────────
-// Fetches qpEbW RPC which returns the quota table.
-// WIZ_global_data lives in page context (MAIN world), but content scripts
-// run in ISOLATED world — so we extract the values from <script> tags in the DOM.
-function getGeminiSessionData() {
-  const scripts = document.querySelectorAll("script");
-  let sid = "", at = "", bl = "";
-  bl = getGeminiBuildLabel();
-  for (const s of scripts) {
-    const text = s.textContent || "";
-    if (!text.includes("WIZ_global_data")) continue;
-    const sidMatch = text.match(/FdrFJe["']?\s*[:=]\s*["']([^"']+)["']/);
-    const atMatch = text.match(/SNlM0e["']?\s*[:=]\s*["']([^"']+)["']/);
-    const blMatch = text.match(/boq_assistant-bard-web-server_[^"'\\\s&]+/);
-    if (sidMatch) sid = sidMatch[1];
-    if (atMatch) at = atMatch[1];
-    if (!bl && blMatch) bl = blMatch[0];
-    break;
-  }
-  return { sid, at, bl };
-}
-
-function getGeminiBuildLabel() {
-  const re = /boq_assistant-bard-web-server_[^"'\\\s&]+/;
-  try {
-    const entries = performance.getEntriesByType("resource") || [];
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const name = entries[i].name || "";
-      const m = name.match(re);
-      if (m) return decodeURIComponent(m[0]);
-    }
-  } catch (e) {}
-  for (const s of document.querySelectorAll<HTMLScriptElement>("script[src]")) {
-    const m = (s.src || "").match(re);
-    if (m) return decodeURIComponent(m[0]);
-  }
-  return "";
-}
+// Gemini quota parsing. This module owns the pure parse of the qpEbW RPC's
+// decoded payload, used by the background provider-usage fetcher
+// (src/background/providerUsage.ts) — which owns the session-token extraction
+// and network call now that limits refresh in the background.
 
 // qpEbW row schema (verified 2026-06 by replaying the app's own calls):
 // [featureDescriptor, poolType, ?, [resetSec, resetNanos], limit, remaining]
@@ -96,46 +60,4 @@ export function parseGeminiQuotas(quotas: any): { credits: GeminiCredits | null;
   }
   features.sort((a, b) => b.limit - a.limit);
   return { credits, features };
-}
-
-export function pollGeminiUsage() {
-  const { sid, at, bl } = getGeminiSessionData();
-  if (!sid) return;
-  const body = new URLSearchParams();
-  body.append("f.req", JSON.stringify([[["qpEbW", "[]", null, "generic"]]]));
-  body.append("at", at);
-  let url = "/_/BardChatUi/data/batchexecute?rpcids=qpEbW&source-path=" + encodeURIComponent(location.pathname || "/app");
-  if (bl) url += "&bl=" + encodeURIComponent(bl);
-  url += "&f.sid=" + encodeURIComponent(sid) + "&hl=" + encodeURIComponent(document.documentElement.lang || "en") + "&_reqid=" + Math.floor(Math.random() * 9999999) + "&rt=c";
-  fetch(url, {
-    method: "POST", credentials: "same-origin", body,
-  })
-    .then((r) => r.text())
-    .then((raw) => {
-      const lines = raw.split("\n").filter((l) => l.trim());
-      let parsed = null;
-      for (const line of lines) {
-        try { const j = JSON.parse(line); if (Array.isArray(j)) { parsed = j; break; } } catch (e) {}
-      }
-      if (!parsed) return;
-      const dataStr = parsed[0]?.[2];
-      if (!dataStr) return;
-      let quotas;
-      try { quotas = JSON.parse(dataStr); } catch (e) { return; }
-      if (!Array.isArray(quotas) || !Array.isArray(quotas[0])) return;
-
-      const { credits, features } = parseGeminiQuotas(quotas);
-      send({
-        type: "insights-usage", platform: "gemini",
-        usage: {
-          source: "provider",
-          credits,
-          features,
-          mainChat: features[0] || null,
-          activeModel: document.querySelector(".input-area-switch")?.textContent?.trim() || null,
-          buildLabel: bl || null,
-        },
-      });
-    })
-    .catch(() => {});
 }

@@ -6,7 +6,6 @@ import {
 } from "./common";
 import { detectChatgptSubscription, detectChatgptViaApi } from "../plans";
 import { getChatgptCurrentModel, pollChatgptModelCapabilities } from "../modelCaps";
-import { pollChatgptUsage } from "../usageChatgpt";
 import type { TrackerPlatformAdapter } from "./types";
 
 function hasChatgptFirstToken(el: Element) {
@@ -36,9 +35,6 @@ export const chatgptAdapter: TrackerPlatformAdapter = {
   plan: {
     bootstrap: detectChatgptViaApi,
     detect: detectChatgptSubscription,
-  },
-  usage: {
-    poll: pollChatgptUsage,
   },
   modelCaps: {
     getCurrentModel: getChatgptCurrentModel,

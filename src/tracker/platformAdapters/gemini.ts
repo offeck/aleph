@@ -6,7 +6,6 @@ import {
   hasParagraphTextLongerThan,
 } from "./common";
 import { detectGeminiSubscription } from "../plans";
-import { pollGeminiUsage } from "../usageGemini";
 import type { TrackerPlatformAdapter } from "./types";
 
 export const geminiAdapter: TrackerPlatformAdapter = {
@@ -28,8 +27,5 @@ export const geminiAdapter: TrackerPlatformAdapter = {
   },
   plan: {
     detect: detectGeminiSubscription,
-  },
-  usage: {
-    poll: pollGeminiUsage,
   },
 };

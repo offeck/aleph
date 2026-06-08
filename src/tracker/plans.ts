@@ -84,7 +84,7 @@ function setChatgptApiPlan(plan: ChatgptPlan | null) {
   }
 }
 
-function collectChatgptPlanSignals(value: unknown, depth = 0, includeChildren = false): string[] {
+export function collectChatgptPlanSignals(value: unknown, depth = 0, includeChildren = false): string[] {
   if (!value || depth > 3) return [];
   if (typeof value !== "object") return [String(value)];
   const signals: string[] = [];
@@ -159,10 +159,6 @@ function detectChatgptDomPlan() {
 // then /backend-api/conversation/init with that token returns real limits.
 // Without the token, the API returns guest data even for Plus users.
 let chatgptAccessToken: string | null = null;
-
-export function getChatgptAccessToken(): string | null {
-  return chatgptAccessToken;
-}
 
 export function refreshChatgptToken() {
   return fetch("/api/auth/session", { credentials: "same-origin" })

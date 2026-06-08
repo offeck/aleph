@@ -7,7 +7,6 @@ import {
 } from "./common";
 import { detectClaudeSubscription, detectClaudeViaApi } from "../plans";
 import { pollClaudeModelCapabilities } from "../modelCaps";
-import { pollClaudeUsage } from "../usageClaude";
 import type { TrackerPlatformAdapter } from "./types";
 
 export const claudeAdapter: TrackerPlatformAdapter = {
@@ -30,9 +29,6 @@ export const claudeAdapter: TrackerPlatformAdapter = {
   plan: {
     bootstrap: detectClaudeViaApi,
     detect: detectClaudeSubscription,
-  },
-  usage: {
-    poll: pollClaudeUsage,
   },
   modelCaps: {
     poll: pollClaudeModelCapabilities,

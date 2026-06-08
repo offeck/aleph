@@ -3,7 +3,13 @@
   "name": "Aleph — AI Chat Styler",
   "version": "2.7.7",
   "description": "Hebrew & Arabic-script RTL/BiDi fixes, themes, focus mode & styling across Claude, ChatGPT & Gemini",
-  "permissions": ["storage", "activeTab", "identity"],
+  "permissions": ["storage", "activeTab", "identity", "cookies", "alarms"],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*"
+  ],
   "oauth2": {
     "client_id": "440163597784-t0bfi7ahtqba6dmlj0iis96d5jklc56e.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/userinfo.email"]

@@ -12,7 +12,6 @@ export type {
   PlanTrackingConfig,
   ResponseTimingConfig,
   TrackerPlatformAdapter,
-  UsageTrackingConfig,
 } from "./types";
 
 export const TRACKER_ADAPTERS = {

@@ -15,10 +15,6 @@ function detectSubscription(adapter: TrackerPlatformAdapter) {
   } catch (e) {}
 }
 
-function pollUsage(adapter: TrackerPlatformAdapter) {
-  adapter.usage?.poll();
-}
-
 function pollModelCapabilities(adapter: TrackerPlatformAdapter) {
   adapter.modelCaps?.poll?.();
 }
@@ -43,9 +39,7 @@ if (adapter) {
     startMessageObserver(adapter);
     setTimeout(() => markExistingMessages(adapter), 5000);
     pollModelCapabilities(adapter);
-    pollUsage(adapter);
   }, 3000);
 
   if (adapter.plan) setInterval(() => detectSubscription(adapter), 60000);
-  if (adapter.usage) setInterval(() => pollUsage(adapter), 60000);
 }

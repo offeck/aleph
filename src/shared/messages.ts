@@ -36,16 +36,22 @@ export type ContentToBackgroundMessage =
   | { type: "insights-response-timing"; platform: string; sendToThinking?: number; thinkingToFirstToken?: number; totalTTFT?: number; timestamp?: number }
   | InsightsMessagePayload
   | { type: "insights-subscription"; platform: string; plan?: string; price?: number; label?: string; model?: string | null }
-  | { type: "insights-model-caps"; platform: string; caps?: Record<string, unknown> }
-  // Provider usage snapshots are raw provider JSON — boundary `any` values.
-  | { type: "insights-usage"; platform: string; usage?: Record<string, any> };
+  | { type: "insights-model-caps"; platform: string; caps?: Record<string, unknown> };
 
 export type PageToBackgroundMessage =
   | { type: "insights-get-summary" }
+  | { type: "insights-refresh-usage" }
   | { type: "aleph-sync-status" }
   | { type: "aleph-sync-signin" }
   | { type: "aleph-sync-signout" }
   | { type: "aleph-sync-now" };
+
+export type UsageRefreshReason = "throttled" | "missing-auth" | "no-data" | "error";
+
+export interface UsageRefreshResponse {
+  refreshed: boolean;
+  platforms?: Record<string, { refreshed: boolean; reason?: UsageRefreshReason }>;
+}
 
 export type BackgroundToContentMessage = { type: "toggle" };
 

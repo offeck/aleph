@@ -25,10 +25,6 @@ export interface PlanTrackingConfig {
   detect: () => PlanDetection | null;
 }
 
-export interface UsageTrackingConfig {
-  poll: () => void;
-}
-
 export interface ModelCapsTrackingConfig {
   getCurrentModel?: () => string | null;
   poll?: () => void;
@@ -39,6 +35,5 @@ export interface TrackerPlatformAdapter {
   messages: MessageTrackingConfig;
   timing?: ResponseTimingConfig;
   plan?: PlanTrackingConfig;
-  usage?: UsageTrackingConfig;
   modelCaps?: ModelCapsTrackingConfig;
 }
