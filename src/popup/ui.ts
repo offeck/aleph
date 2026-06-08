@@ -183,7 +183,9 @@ function renderSyncState(state: any) {
   if (syncBar) syncBar.style.display = isSignedIn ? "none" : "";
   if (cloud) {
     cloud.style.display = isSignedIn ? "" : "none";
-    cloud.title = isSignedIn && state.email ? "Cloud sync · " + state.email : "Cloud sync active";
+    // Custom CSS tooltip (data-tooltip) — the native `title` tooltip is
+    // unreliable in the popup. Rendered by .sync-indicator[data-tooltip] in popup.css.
+    cloud.dataset.tooltip = isSignedIn && state.email ? "Cloud sync · " + state.email : "Cloud sync active";
   }
 }
 

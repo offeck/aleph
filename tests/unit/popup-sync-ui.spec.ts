@@ -11,6 +11,7 @@ class FakeElement {
   value = "";
   textContent = "";
   title = "";
+  dataset: Record<string, string> = {};
   style: Record<string, string> = {};
 
   private readonly listeners = new Map<string, ElementListener[]>();
@@ -121,7 +122,7 @@ describe("popup sync UI", () => {
 
     expect(elements.syncBar.style.display).toBe("none");
     expect(elements.syncIndicator.style.display).toBe("");
-    expect(elements.syncIndicator.title).toBe("Cloud sync · user@example.com");
+    expect(elements.syncIndicator.dataset.tooltip).toBe("Cloud sync · user@example.com");
   });
 
   it("signs in and refreshes sync status on success", () => {
