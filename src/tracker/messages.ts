@@ -1,41 +1,33 @@
-import { USER_MESSAGE_MARKERS } from "../shared/messageMarkers";
 import { countRTLScriptLetters } from "../shared/rtl";
 import { send, type TrackerMessage } from "./send";
-import { PLATFORM } from "./platform";
 import { estimateMessage, type MessageEstimate } from "./tokens";
-import { getCurrentModel } from "./modelCaps";
 import { beginResponseTiming, getUserSentAt, markUserSent } from "./timing";
-
-// ── Message selectors (tracker-specific subset; content selectors live in shared/selectors.ts) ──
-const MSG_WRAPPER = {
-  claude:  ["[data-testid='user-message']", ".font-claude-response"],
-  chatgpt: ["[data-testid^='conversation-turn']"],
-  gemini:  ["model-response", ".conversation-turn", ".query-content"],
-};
-const ASSISTANT_MARKER = {
-  claude:  [".font-claude-response"],
-  chatgpt: ["[data-message-author-role='assistant']"],
-  gemini:  [".response-content", ".model-response-text", "message-content"],
-};
-const USER_MARKER = USER_MESSAGE_MARKERS;
+import type { MessageRole, MessageTrackingConfig, TrackerPlatformAdapter } from "./platformAdapters";
 
 // ── Message counting + token estimation ──────────────────
 const countedMessages = new WeakSet();
 let graceUntil = 0;
+let lastEditorText = "";
 
 export function setGraceUntil(ts: number) {
   graceUntil = ts;
 }
 
-const EDITOR_SEL = "[contenteditable], textarea, #prompt-textarea, .ProseMirror, .ql-editor, rich-textarea";
-let lastEditorText = "";
+function selectorUnion(selectors: string[]) {
+  return selectors.join(", ");
+}
 
-function captureAndSignal(source: string) {
-  let text = "";
-  for (const sel of [".ProseMirror", "#prompt-textarea", ".ql-editor"]) {
+function getEditorText(config: MessageTrackingConfig) {
+  for (const sel of config.editorTextSelectors) {
     const ed = document.querySelector(sel);
-    if (ed) { text = (ed.textContent || "").trim(); break; }
+    if (ed) return (ed.textContent || "").trim();
   }
+  return "";
+}
+
+function captureAndSignal(adapter: TrackerPlatformAdapter, source: string) {
+  const config = adapter.messages;
+  let text = getEditorText(config);
   if (!text && lastEditorText) text = lastEditorText;
   if (!text) {
     markUserSent();
@@ -57,39 +49,41 @@ function captureAndSignal(source: string) {
 
   send({
     type: "insights-send-analytics",
-    platform: PLATFORM, lang, length: text.length, words, timestamp: sentAt,
+    platform: adapter.platform, lang, length: text.length, words, timestamp: sentAt,
   });
 
   console.log("[Aleph] send detected (" + source + ") lang=" + lang + " len=" + text.length);
 }
 
-export function startEditorCapture() {
+export function startEditorCapture(adapter: TrackerPlatformAdapter) {
+  const config = adapter.messages;
+  const editorClosestSelector = selectorUnion(config.editorClosestSelectors);
   window.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      if ((e.target as Element | null)?.closest?.(EDITOR_SEL)) {
-        captureAndSignal("Enter");
+      if ((e.target as Element | null)?.closest?.(editorClosestSelector)) {
+        captureAndSignal(adapter, "Enter");
       }
     }
   }, true);
   window.addEventListener("click", (e) => {
     const btn = (e.target as Element | null)?.closest?.("button");
     if (!btn) return;
-    const form = btn.closest("form, fieldset, [class*='composer'], [class*='input-container'], [class*='chat-input']");
-    if (form && form.querySelector(EDITOR_SEL)) {
-      captureAndSignal("button");
+    const form = btn.closest(config.sendButtonContainerSelector);
+    if (form && form.querySelector(editorClosestSelector)) {
+      captureAndSignal(adapter, "button");
     }
   }, true);
 
   // Fallback: detect editor emptying (message was sent)
   let lastEditorLen = 0;
   setInterval(() => {
-    for (const sel of [".ProseMirror", "#prompt-textarea", ".ql-editor"]) {
+    for (const sel of config.editorTextSelectors) {
       const ed = document.querySelector(sel);
       if (!ed) continue;
       const text = (ed.textContent || "").trim();
       const len = text.length;
       if (lastEditorLen > 0 && len === 0) {
-        captureAndSignal("editor empty");
+        captureAndSignal(adapter, "editor empty");
       }
       lastEditorLen = len;
       if (len > 0) lastEditorText = text;
@@ -98,12 +92,11 @@ export function startEditorCapture() {
   }, 500);
 }
 
-function classifyMessage(el: Element): "assistant" | "user" | null {
-  if (!PLATFORM) return null;
-  for (const s of ASSISTANT_MARKER[PLATFORM]) {
+export function classifyMessage(el: Element, config: MessageTrackingConfig): MessageRole | null {
+  for (const s of config.assistantMarkers) {
     if (el.matches?.(s) || el.querySelector?.(s)) return "assistant";
   }
-  for (const s of USER_MARKER[PLATFORM]) {
+  for (const s of config.userMarkers) {
     if (el.matches?.(s) || el.querySelector?.(s)) return "user";
   }
   return null;
@@ -111,8 +104,8 @@ function classifyMessage(el: Element): "assistant" | "user" | null {
 
 const messageEstimates = new WeakMap<Element, MessageEstimate>();
 
-function sendMessageEstimate(el: Element, role: string, isUpdate: boolean) {
-  const next = estimateMessage(el);
+function sendMessageEstimate(adapter: TrackerPlatformAdapter, el: Element, role: string, isUpdate: boolean) {
+  const next = estimateMessage(el, adapter.platform);
   const prev = messageEstimates.get(el) || {
     totalTokens: 0, textTokens: 0, imageTokens: 0, fileTokens: 0, imageCount: 0, fileCount: 0,
   };
@@ -132,7 +125,7 @@ function sendMessageEstimate(el: Element, role: string, isUpdate: boolean) {
 
   const payload: TrackerMessage = {
     type: "insights-message",
-    platform: PLATFORM,
+    platform: adapter.platform,
     role,
     estimatedTokens: next.totalTokens,
     estimatedTextTokens: next.textTokens,
@@ -141,7 +134,7 @@ function sendMessageEstimate(el: Element, role: string, isUpdate: boolean) {
     imageCount: next.imageCount,
     fileCount: next.fileCount,
     estimateSource: "local",
-    model: getCurrentModel(),
+    model: adapter.modelCaps?.getCurrentModel?.() ?? null,
     timestamp: Date.now(),
   };
 
@@ -169,7 +162,7 @@ function imgSettleState(el: Element): number {
   return imgs.length * 1000 + complete;
 }
 
-function scheduleSettledRecount(el: Element, role: string) {
+function scheduleSettledRecount(adapter: TrackerPlatformAdapter, el: Element, role: string) {
   if (role !== "assistant") return;
   let lastText = el.textContent || "";
   let lastImgs = imgSettleState(el);
@@ -182,7 +175,7 @@ function scheduleSettledRecount(el: Element, role: string) {
     const currentText = el.textContent || "";
     const currentImgs = imgSettleState(el);
     if (checks === 0 || currentText !== lastText || currentImgs !== lastImgs) {
-      sendMessageEstimate(el, role, true);
+      sendMessageEstimate(adapter, el, role, true);
     }
     lastImgs = currentImgs;
     if (currentText === lastText) stableChecks++;
@@ -196,28 +189,25 @@ function scheduleSettledRecount(el: Element, role: string) {
   setTimeout(check, 1500);
 }
 
-function processNewMessage(el: Element) {
+function processNewMessage(adapter: TrackerPlatformAdapter, el: Element) {
   if (countedMessages.has(el)) return;
   countedMessages.add(el);
-  const role = classifyMessage(el);
+  const role = classifyMessage(el, adapter.messages);
   if (!role) return;
-  sendMessageEstimate(el, role, false);
-  scheduleSettledRecount(el, role);
+  sendMessageEstimate(adapter, el, role, false);
+  scheduleSettledRecount(adapter, el, role);
 }
 
-export function markExistingMessages() {
-  if (!PLATFORM) return;
+export function markExistingMessages(adapter: TrackerPlatformAdapter) {
   let count = 0;
-  for (const sel of MSG_WRAPPER[PLATFORM]) {
+  for (const sel of adapter.messages.messageWrappers) {
     document.querySelectorAll(sel).forEach((el) => { countedMessages.add(el); count++; });
   }
   if (count > 0) console.log("[Aleph] marked", count, "existing msgs");
 }
 
 // Observe document.body (not a container that SPAs might replace)
-export function startMessageObserver() {
-  const platform = PLATFORM;
-  if (!platform) return;
+export function startMessageObserver(adapter: TrackerPlatformAdapter) {
   new MutationObserver((mutations) => {
     const newMsgs: Element[] = [];
     for (const m of mutations) {
@@ -225,7 +215,7 @@ export function startMessageObserver() {
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) continue;
         const added = node as Element;
-        for (const sel of MSG_WRAPPER[platform]) {
+        for (const sel of adapter.messages.messageWrappers) {
           if (added.matches?.(sel)) { newMsgs.push(added); continue; }
           added.querySelectorAll?.(sel).forEach((el) => newMsgs.push(el));
         }
@@ -238,7 +228,7 @@ export function startMessageObserver() {
       console.log("[Aleph] skipped", newMsgs.length, "msgs (bulk=" + (newMsgs.length > 2) + " grace=" + inGrace + ")");
       newMsgs.forEach((el) => countedMessages.add(el));
     } else {
-      newMsgs.forEach(processNewMessage);
+      newMsgs.forEach((el) => processNewMessage(adapter, el));
     }
   }).observe(document.body, { childList: true, subtree: true });
 }
@@ -246,7 +236,7 @@ export function startMessageObserver() {
 // Re-mark existing messages on SPA navigation (URL change within same tab).
 // Event-driven via the Navigation API (Baseline since early 2026); the 2s
 // URL poll remains only as the fallback where the API is unavailable.
-export function startNavRemark() {
+export function startNavRemark(adapter: TrackerPlatformAdapter) {
   let lastUrl = location.href;
   const onNav = () => {
     if (location.href === lastUrl) return;
@@ -255,11 +245,11 @@ export function startNavRemark() {
       console.log("[Aleph] nav after send — skip marking");
     } else {
       graceUntil = Date.now() + 2000;
-      markExistingMessages();
-      setTimeout(markExistingMessages, 500);
-      setTimeout(markExistingMessages, 1000);
-      setTimeout(markExistingMessages, 2000);
-      setTimeout(markExistingMessages, 3000);
+      markExistingMessages(adapter);
+      setTimeout(() => markExistingMessages(adapter), 500);
+      setTimeout(() => markExistingMessages(adapter), 1000);
+      setTimeout(() => markExistingMessages(adapter), 2000);
+      setTimeout(() => markExistingMessages(adapter), 3000);
     }
   };
   // Narrowing cast: the Navigation API isn't in our TS lib set.

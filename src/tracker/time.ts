@@ -1,10 +1,11 @@
 import { send } from "./send";
-import { PLATFORM } from "./platform";
+import type { Platform } from "../shared/platform";
 
 // ── Time tracking ────────────────────────────────────────
 let isActive = false;
 let lastTickTime: number | null = null;
 let pendingSeconds = 0;
+let activePlatform: Platform | null = null;
 const FLUSH_INTERVAL = 30000;
 
 function activate() {
@@ -33,15 +34,17 @@ function flush() {
   if (pendingSeconds < 1) return;
   const seconds = Math.round(pendingSeconds);
   pendingSeconds = 0;
+  if (!activePlatform) return;
   send({
     type: "insights-time",
-    platform: PLATFORM,
+    platform: activePlatform,
     seconds,
     hour: new Date().getHours(),
   });
 }
 
-export function startTimeTracking() {
+export function startTimeTracking(platform: Platform) {
+  activePlatform = platform;
   isActive = document.visibilityState === "visible" && document.hasFocus();
   lastTickTime = isActive ? Date.now() : null;
 

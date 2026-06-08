@@ -1,6 +1,6 @@
 import { PRICING } from "../shared/pricing";
 import { send } from "./send";
-import { PLATFORM } from "./platform";
+import type { Platform } from "../shared/platform";
 
 // ── Subscription & model detection ───────────────────────
 
@@ -8,7 +8,7 @@ export type ClaudePlan = "free" | "pro" | "max5x" | "max20x";
 export type ChatgptPlan = "free" | "plus" | "pro5x" | "pro20x";
 export type GeminiPlan = "free" | "ai_pro" | "ai_ultra";
 
-interface PlanDetection {
+export interface PlanDetection {
   plan: string;
   model: string | null;
 }
@@ -45,7 +45,7 @@ export function detectClaudeViaApi() {
   } catch (e) {}
 }
 
-function detectClaude(): PlanDetection {
+export function detectClaudeSubscription(): PlanDetection {
   const modelBtn = document.querySelector('[data-testid="model-selector-dropdown"]');
   const ariaLabel = modelBtn?.getAttribute("aria-label") || "";
   const model = ariaLabel.replace(/^Model:\s*/i, "").trim() || null;
@@ -197,7 +197,7 @@ export function detectChatgptViaApi() {
   });
 }
 
-function detectChatgpt(): PlanDetection {
+export function detectChatgptSubscription(): PlanDetection {
   let model: string | null = null;
 
   try {
@@ -223,7 +223,7 @@ function detectChatgpt(): PlanDetection {
   return { plan: "free", model };
 }
 
-function detectGemini(): PlanDetection {
+export function detectGeminiSubscription(): PlanDetection {
   let plan: GeminiPlan = "free";
   let model: string | null = null;
 
@@ -267,19 +267,14 @@ function detectGemini(): PlanDetection {
   return { plan, model };
 }
 
-export function detectSubscription() {
+export function sendSubscriptionDetection(platform: Platform, result: PlanDetection | null) {
   try {
-    if (!PLATFORM) return;
-    let result: PlanDetection | null = null;
-    if (PLATFORM === "claude") result = detectClaude();
-    else if (PLATFORM === "chatgpt") result = detectChatgpt();
-    else if (PLATFORM === "gemini") result = detectGemini();
     if (!result) return;
 
-    const pricing = PRICING[PLATFORM][result.plan];
+    const pricing = PRICING[platform][result.plan];
     send({
       type: "insights-subscription",
-      platform: PLATFORM,
+      platform,
       plan: result.plan,
       model: result.model,
       price: pricing ? pricing.price : 0,
