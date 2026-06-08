@@ -32,6 +32,24 @@ h1 { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: 0.5px; }
 }
 .icon-btn:hover { color: #7c83ff; }
 .sync-indicator { color: #4ade80; font-size: 16px; opacity: 0.7; cursor: default; margin-left: 4px; }
+/* ── Cloud sync bar (signed-out sign-in CTA) ──────────────────────── */
+.sync-bar { padding: 8px 16px 0; }
+.sync-signin {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 8px;
+  background: #2a2a4a;
+  border: 1px solid #3a3a5a;
+  border-radius: 8px;
+  color: #e2e2e2;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.sync-signin:hover { border-color: #7c83ff; background: #30304f; }
+.sync-signin:disabled { opacity: 0.6; cursor: default; }
+.sync-signin .g-logo { flex-shrink: 0; display: block; }
 
 /* ── Sections ─────────────────────────────────────────────────────── */
 section { padding: 10px 16px 4px; }

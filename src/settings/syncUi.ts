@@ -40,4 +40,11 @@ export function bindSyncEvents() {
   document.getElementById("syncSignOutBtn")?.addEventListener("click", () => {
     chrome.runtime.sendMessage({ type: "aleph-sync-signout" }, () => loadSyncStatus());
   });
+
+  // Reflect sync state live: the background writes aleph_sync_auth (including
+  // lastSyncAt) after each sync, so re-render when it changes — otherwise the
+  // page keeps showing the pre-sync value (e.g. "Last sync: never") until reopened.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.aleph_sync_auth) loadSyncStatus();
+  });
 }
