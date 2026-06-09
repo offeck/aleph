@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULTS } from "../../src/shared/defaults";
+import { DEFAULTS, filterToDefaults } from "../../src/shared/defaults";
 import { THEME_NAMES, THEMES } from "../../src/shared/themes";
 
 const DEFAULT_KEYS = [
@@ -46,6 +46,12 @@ describe("shared defaults", () => {
   it("keeps the canonical settings key list explicit", () => {
     expect(Object.keys(DEFAULTS)).toEqual(DEFAULT_KEYS);
     expect(DEFAULTS.miniGame).toBe(false);
+  });
+
+  it("filterToDefaults keeps known keys (even falsy) and drops unknown ones", () => {
+    expect(filterToDefaults({ theme: "nord", fontSize: 0, injected: "x", __proto__junk: 1 }))
+      .toEqual({ theme: "nord", fontSize: 0 });
+    expect(filterToDefaults({})).toEqual({});
   });
 });
 

@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// Aleph cloud sync — schema v2 (see docs/SYNC.md).
+// Deny-by-default: only the paths the extension writes are matched; anything
+// else (unknown collections, other users' subtrees, the root user doc) has no
+// rule and is denied. Per-field settings validation is deliberately the
+// client's job (filterToDefaults): still-deployed old clients write flat
+// settings docs and merge-style usage docs during the upgrade window, so the
+// rules validate ownership, document IDs, and rollup identity — not field
+// lists. Never validate updatedAt here: it is a serverTimestamp sentinel.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      // Legacy combined usage days — old clients during the upgrade window
+      // plus the one-time migration seal. Frozen baseline afterwards; deletes
+      // are the 400-day retention sweep.
+      match /usage/{date} {
+        allow read: if isOwner();
+        allow create, update: if isOwner() && date.matches('^\\d{4}-\\d{2}-\\d{2}$');
+        allow delete: if isOwner();
+      }
+
+      // Device-scoped daily rollups: {deviceId}_{YYYY-MM-DD}. The doc must
+      // self-identify consistently with its ID so cache rebuilds can trust
+      // the deviceId/date fields.
+      match /usageRollups/{rollupId} {
+        allow read: if isOwner();
+        allow create, update: if isOwner()
+          && request.resource.data.deviceId is string
+          && request.resource.data.deviceId.size() >= 8
+          && request.resource.data.date is string
+          && request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+          && rollupId == request.resource.data.deviceId + '_' + request.resource.data.date;
+        allow delete: if isOwner();
+      }
+
+      // settings (legacy flat doc), settings2 (v2 per-key-stamped doc),
+      // subscriptions (per-platform plan detections).
+      match /meta/{doc} {
+        allow read, write: if isOwner() && doc in ['settings', 'settings2', 'subscriptions'];
+      }
+    }
+  }
+}

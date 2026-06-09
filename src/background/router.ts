@@ -9,9 +9,10 @@ import type {
 } from "../shared/messages";
 import {
   applyMessageUsage,
+  applySendAnalytics,
   ensurePlatformDay,
-  normalizeSends,
   numberOrZero,
+  readCombinedUsageDays,
   readLocal,
   updateUsageDay,
   writeLocal,
@@ -26,31 +27,35 @@ export function registerBackgroundListeners() {
   // Idempotent (same name replaces). Created from install/startup only — NOT on
   // every worker boot, which would perpetually reset the period and starve it.
   const ensureLimitsAlarm = () => chrome.alarms.create(LIMITS_REFRESH_ALARM, { periodInMinutes: LIMITS_REFRESH_PERIOD_MINUTES });
+  const bootSync = () => alephSync.restoreAuth().then(() => alephSync.ensureMigrated()).then(() => alephSync.flushDirty()).catch(() => {});
   chrome.runtime.onInstalled?.addListener(() => {
     cleanupOldUsage();
     ensureLimitsAlarm();
-    alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
+    bootSync();
   });
   chrome.runtime.onStartup?.addListener(() => {
     cleanupOldUsage();
     ensureLimitsAlarm();
-    alephSync.restoreAuth().then(() => alephSync.processRetryQueue()).catch(() => {});
+    bootSync();
   });
 
   // Periodic limits refresh — works with no tab/popup open. refreshProviderUsage
   // re-derives auth (cookies/token) and refreshes limits together, keeping both
   // fresh while the CLIs (Claude Code, Codex) drain the shared account limits.
   // The listener must register in the worker's first synchronous turn (MV3).
+  // The same tick flushes deferred cloud pushes (an MV3 worker death loses the
+  // trailing throttle timer) and refreshes the remote usage cache.
   chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === LIMITS_REFRESH_ALARM) refreshProviderUsage("alarm").catch(() => {});
+    if (alarm.name === LIMITS_REFRESH_ALARM) {
+      refreshProviderUsage("alarm").catch(() => {});
+      alephSync.flushDirty().then(() => alephSync.lightweightPull()).catch(() => {});
+    }
   });
 
   // ── Settings sync to Firestore ───────────────────────────
-  chrome.storage.onChanged.addListener((_changes, area) => {
+  chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync") return;
-    chrome.storage.sync.get(null, (all) => {
-      try { alephSync.maybePush("aleph_settings", all); } catch (e) {}
-    });
+    try { alephSync.onSettingsChanged(changes); } catch (e) {}
   });
 
   // ── Message handlers ─────────────────────────────────────
@@ -80,29 +85,30 @@ export function registerBackgroundListeners() {
     // Insights summary — allowed from any extension context (popup, dashboard)
     if (msg.type === "insights-get-summary") {
       (async () => {
+        // Refresh the remote-device cache in the background (5-min throttled);
+        // this response serves the current cache, the next open is fresher.
+        alephSync.lightweightPull().catch(() => {});
+
         const subs = await readLocal<Record<string, any>>("insights_subscriptions", {});
         const key = todayKey();
-        const today = await readLocal<Record<string, any>>(key, {});
         const remark = await readLocal<StoredRemark | null>("insights_last_remark", null);
 
-        const weekData: Record<string, any> = {};
         const now = new Date();
-        for (let i = 0; i < 7; i++) {
+        const weekKeys: string[] = [];
+        const prevWeekKeys: string[] = [];
+        for (let i = 0; i < 14; i++) {
           const d = new Date(now);
           d.setDate(d.getDate() - i);
-          const wk = usageKeyForDate(d);
-          const data = await readLocal<Record<string, any> | null>(wk, null);
-          weekData[wk] = data;
+          (i < 7 ? weekKeys : prevWeekKeys).push(usageKeyForDate(d));
         }
 
+        // Local docs ADD the synced remote cache — multi-device totals.
+        const combined = await readCombinedUsageDays([...weekKeys, ...prevWeekKeys]);
+        const today = combined[key] || {};
+        const weekData: Record<string, any> = {};
+        for (const wk of weekKeys) weekData[wk] = combined[wk];
         const prevWeekData: Record<string, any> = {};
-        for (let i = 7; i < 14; i++) {
-          const d = new Date(now);
-          d.setDate(d.getDate() - i);
-          const wk = usageKeyForDate(d);
-          const data = await readLocal<Record<string, any> | null>(wk, null);
-          prevWeekData[wk] = data;
-        }
+        for (const wk of prevWeekKeys) prevWeekData[wk] = combined[wk];
 
         const platformUsage: Record<string, any> = {};
         for (const p of ["claude", "chatgpt", "gemini"]) {
@@ -174,12 +180,7 @@ export function registerBackgroundListeners() {
       (async () => {
         const p = msg.platform;
         await updateUsageDay(async (usage) => {
-          const day = ensurePlatformDay(usage, p);
-          day.sends = normalizeSends(day.sends);
-          day.sends.total++;
-          if (msg.lang === "rtl" || msg.lang === "hebrew") day.sends.rtl++;
-          day.sends.totalWords += numberOrZero(msg.words);
-          day.sends.totalChars += numberOrZero(msg.length);
+          applySendAnalytics(ensurePlatformDay(usage, p), msg);
         });
       })();
     }

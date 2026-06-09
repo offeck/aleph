@@ -1,5 +1,6 @@
 import { todayKey } from "../shared/dates";
 import { alephSync } from "./sync";
+import { REMOTE_USAGE_KEY, sumUsageDays } from "./syncSchema";
 import type { InsightsMessagePayload } from "../shared/messages";
 
 // ── Usage day storage ────────────────────────────────────
@@ -8,6 +9,7 @@ export interface Sends {
   rtl: number;
   totalWords: number;
   totalChars: number;
+  byHour?: Record<string, number>;
 }
 
 export interface Timing {
@@ -66,12 +68,14 @@ export function emptyPlatformDay(): PlatformDay {
 
 export function normalizeSends(sends: Partial<Sends> & { hebrew?: number } | undefined): Sends {
   const s = sends || {};
-  return {
+  const normalized: Sends = {
     total: s.total || 0,
     rtl: s.rtl ?? s.hebrew ?? 0,
     totalWords: s.totalWords || 0,
     totalChars: s.totalChars || 0,
   };
+  if (s.byHour && typeof s.byHour === "object") normalized.byHour = s.byHour;
+  return normalized;
 }
 
 export async function readLocal<T>(key: string, fallback: T): Promise<T> {
@@ -82,7 +86,8 @@ export async function readLocal<T>(key: string, fallback: T): Promise<T> {
 export async function writeLocal(key: string, value: unknown) {
   await chrome.storage.local.set({ [key]: value });
   if (key.startsWith("usage_") || key === "insights_subscriptions") {
-    try { alephSync.maybePush(key, value); } catch (e) {}
+    // Key only — the push path reads the current local value at fire time.
+    try { alephSync.maybePush(key); } catch (e) {}
   }
 }
 
@@ -132,18 +137,62 @@ export function applyMessageUsage(
   day.estimateSource = msg.estimateSource || "local";
 }
 
+// Applies one insights-send-analytics to a platform-day. Pure mutator (no
+// storage) so it is unit-testable — mirrors applyMessageUsage. byHour buckets
+// send counts by local hour for peak-hour analysis.
+export function applySendAnalytics(
+  day: PlatformDay,
+  msg: { lang?: string; words?: number; length?: number; timestamp?: number },
+) {
+  const sends = normalizeSends(day.sends);
+  sends.total++;
+  if (msg.lang === "rtl" || msg.lang === "hebrew") sends.rtl++;
+  sends.totalWords += numberOrZero(msg.words);
+  sends.totalChars += numberOrZero(msg.length);
+  const ts = numberOrZero(msg.timestamp) || Date.now();
+  const hour = String(new Date(ts).getHours());
+  const byHour = sends.byHour || {};
+  byHour[hour] = (byHour[hour] || 0) + 1;
+  sends.byHour = byHour;
+  day.sends = sends;
+}
+
 // Serializes all daily-usage read-modify-write cycles so concurrent platform
 // tabs cannot lose increments.
 let usageUpdateQueue: Promise<unknown> = Promise.resolve();
 
+// Runs fn behind every pending usage update (and blocks later ones) — sync's
+// migration uses this so a tracker message can never interleave with its
+// read-and-reset of the usage docs.
+export function enqueueUsageWork<T>(fn: () => Promise<T>): Promise<T> {
+  const run = usageUpdateQueue.catch(() => {}).then(fn);
+  usageUpdateQueue = run.catch(() => {});
+  return run;
+}
+
 export function updateUsageDay(updater: (usage: UsageDay) => void | Promise<void>): Promise<{ key: string; usage: UsageDay }> {
-  const run = usageUpdateQueue.catch(() => {}).then(async () => {
+  return enqueueUsageWork(async () => {
     const key = todayKey();
     const usage = await readLocal<UsageDay>(key, {});
     await updater(usage);
     await writeLocal(key, usage);
     return { key, usage };
   });
-  usageUpdateQueue = run.catch(() => {});
-  return run;
+}
+
+// Effective usage for display: this device's local doc ADD the synced
+// remote-device cache (other devices + the legacy cloud baseline). The single
+// chokepoint for every usage read that feeds UI or remarks.
+export async function readCombinedUsageDays(keys: string[]): Promise<Record<string, Record<string, any> | null>> {
+  const stored = await chrome.storage.local.get([...keys, REMOTE_USAGE_KEY]);
+  // Remote cache is raw storage JSON — boundary `any`.
+  const cache: Record<string, any> = stored[REMOTE_USAGE_KEY] || {};
+  const out: Record<string, Record<string, any> | null> = {};
+  for (const key of keys) {
+    const date = key.replace("usage_", "");
+    const local = stored[key];
+    const remote = cache[date];
+    out[key] = local == null && remote == null ? null : sumUsageDays(local, remote);
+  }
+  return out;
 }

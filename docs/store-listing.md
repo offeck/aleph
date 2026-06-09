@@ -59,4 +59,4 @@ No remotely hosted JavaScript or executable code is loaded. Firebase, KaTeX, and
 
 **Data usage compliance:** Check the certification checkbox.
 
-**Data disclosure:** Disclose website content limited to on-page text needed for local BiDi/usage processing, user activity limited to local usage insights, authentication information limited to optional Google sign-in email, and user settings for optional sync. Conversation content is not stored or synced.
+**Data disclosure:** Disclose website content limited to on-page text needed for local BiDi/usage processing, user activity limited to usage insights (stored locally; daily summaries sync to the user's private Firebase account only with optional sign-in, retained 400 days), authentication information limited to optional Google sign-in email, and user settings for optional sync. Conversation content is not stored or synced.

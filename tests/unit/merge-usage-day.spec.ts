@@ -42,6 +42,14 @@ describe("_mergeUsageDay", () => {
     expect(empty.gemini.sends).toBeUndefined();
   });
 
+  it("merges sends.byHour per-slot with max", () => {
+    const merged = _mergeUsageDay(
+      { gemini: { sends: { total: 4, byHour: { "9": 4 } } } },
+      { gemini: { sends: { total: 6, byHour: { "9": 2, "13": 4 } } } },
+    );
+    expect(merged.gemini.sends.byHour).toEqual({ "9": 4, "13": 4 });
+  });
+
   it("merges timing counters, preserves approximate, drops empty timing", () => {
     const merged = _mergeUsageDay(
       { claude: { timing: { count: 2, totalTTFT: 1000, approximate: true } } },
@@ -51,6 +59,18 @@ describe("_mergeUsageDay", () => {
 
     const none = _mergeUsageDay({ claude: {} }, { claude: {} });
     expect(none.claude.timing).toBeUndefined();
+  });
+
+  it("never emits explicit-undefined fields (Firestore set() rejects them)", () => {
+    // A claude-only day forces empty chatgpt/gemini maps in the merge output —
+    // the case that silently killed every migration seal batch.
+    const merged = _mergeUsageDay({ claude: { totalSeconds: 5 } }, {});
+    for (const platform of ["claude", "chatgpt", "gemini"]) {
+      for (const [field, value] of Object.entries(merged[platform])) {
+        expect(value, platform + "." + field).not.toBeUndefined();
+      }
+    }
+    expect("estimateSource" in merged.chatgpt).toBe(false);
   });
 
   it("prefers local estimateSource, then remote", () => {

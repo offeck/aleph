@@ -20,7 +20,13 @@ importScripts(
 if (ALEPH_FIREBASE_CONFIG.apiKey !== "PLACEHOLDER") {
   firebase.initializeApp(ALEPH_FIREBASE_CONFIG);
   alephSync.init(firebase);
-  alephSync.restoreAuth();
+  // Boot chain: restore auth → run the schema-v2 migration/adoption → push
+  // anything a dead worker left dirty. Each step is single-flight, so the
+  // router's install/startup hooks calling the same chain is harmless.
+  alephSync.restoreAuth()
+    .then(() => alephSync.ensureMigrated())
+    .then(() => alephSync.flushDirty())
+    .catch(() => {});
 }
 
 // MV3: all chrome.* listeners must be registered in the worker's first

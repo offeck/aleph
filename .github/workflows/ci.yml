@@ -28,3 +28,33 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Firestore security rules tests (needs Java for the emulator). The rules
+  # artifact ships via `npm run deploy:rules` (which re-runs this gate), not
+  # via the Chrome Web Store zip — so publish.yml stays emulator-free.
+  rules-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Firestore emulator
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+
+      - name: Firestore rules tests
+        run: npm run test:rules

@@ -26,3 +26,13 @@ export const DEFAULTS = {
 };
 
 export type Settings = typeof DEFAULTS;
+
+// Keeps only keys defined in DEFAULTS — the shared guard for settings that
+// cross a trust boundary (file import, cloud sync).
+export function filterToDefaults(data: Record<string, unknown>): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const key of Object.keys(DEFAULTS)) {
+    if (key in data) filtered[key] = data[key];
+  }
+  return filtered;
+}

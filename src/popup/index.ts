@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let redrawTimer: ReturnType<typeof setTimeout> | null = null;
   chrome.storage?.onChanged?.addListener((changes, area) => {
     if (area !== "local") return;
-    const relevant = (k: string) => k.startsWith("insights_platform_usage_") || k === "insights_subscriptions";
+    const relevant = (k: string) => k.startsWith("insights_platform_usage_") || k === "insights_subscriptions" || k === "aleph_remote_usage";
     if (!Object.keys(changes).some(relevant)) return;
     if (redrawTimer) return;
     redrawTimer = setTimeout(() => { redrawTimer = null; loadInsights(); }, 50);

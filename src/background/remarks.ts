@@ -1,5 +1,5 @@
 import { todayKey, usageKeyForDate } from "../shared/dates";
-import { readLocal, writeLocal } from "./usage";
+import { readCombinedUsageDays, readLocal, writeLocal } from "./usage";
 
 // ── Remark engine ────────────────────────────────────────
 interface RemarkContext {
@@ -232,7 +232,16 @@ export async function generateRemark(platform: string | null): Promise<string | 
   const now = new Date();
   const key = todayKey();
   // Stored snapshots are raw JSON — boundary `any`, traversed defensively.
-  const usage = await readLocal<Record<string, any>>(key, {});
+  // Usage reads go through the combined chokepoint so remarks see the same
+  // multi-device totals as the dashboard.
+  const weekKeys = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    weekKeys.push(usageKeyForDate(d));
+  }
+  const weekData = await readCombinedUsageDays(weekKeys);
+  const usage = weekData[key] || {};
   const subs = await readLocal<Record<string, any>>("insights_subscriptions", {});
   const usedRemarks = await readLocal<string[]>("insights_used_remarks", []);
 
@@ -255,13 +264,6 @@ export async function generateRemark(platform: string | null): Promise<string | 
     todayTokens += (usage[p]?.tokensIn || 0) + (usage[p]?.tokensOut || 0);
   }
 
-  const weekKeys = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    weekKeys.push(usageKeyForDate(d));
-  }
-  const weekData = await chrome.storage.local.get(weekKeys);
   let weekSeconds = 0;
   let hasAnyPrior = false;
   for (const wk of weekKeys) {

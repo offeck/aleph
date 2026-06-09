@@ -15,5 +15,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["src", "tests/unit", "vitest.config.ts"]
+  "include": ["src", "tests/unit", "tests/rules", "vitest.config.ts"]
 }

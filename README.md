@@ -25,7 +25,7 @@ On top of that, each platform uses different fonts, sizes, and spacing — makin
 - **Chat width** — Widen the narrow default conversation column
 - **Usage insights** — Track local time, sends, token estimates, plan spend, and provider quota snapshots
 
-Settings sync through Chrome storage by default. Optional Google sign-in backs up settings and usage insights to your own Firebase-backed cloud account so they can follow you across devices.
+Settings sync through Chrome storage by default. Optional Google sign-in backs up settings and usage insights to your own Firebase-backed cloud account so they can follow you across devices — each device syncs its own daily summaries so multi-device totals add up, and cloud data expires after 400 days (see `docs/SYNC.md`). Conversation text is never read or synced.
 
 ## Installation
 
@@ -72,7 +72,9 @@ aleph/
 │   ├── settings/     # Full settings page
 │   └── shared/       # Shared types, selectors, themes, defaults, pricing
 ├── dist/             # Generated bundles from npm run build
+├── firestore.rules   # Versioned Firestore security rules (npm run deploy:rules)
 ├── tests/unit/       # Vitest unit coverage
+├── tests/rules/      # Firestore rules tests (npm run test:rules, needs Java)
 └── icons/
     ├── icon16.png
     ├── icon48.png

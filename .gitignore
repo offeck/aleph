@@ -5,3 +5,5 @@ node_modules/
 .claude/settings.local.json
 dist/
 Trace-*.json.gz
+firestore-debug.log
+.firebase/

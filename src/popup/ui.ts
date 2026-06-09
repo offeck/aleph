@@ -1,4 +1,4 @@
-import { DEFAULTS } from "../shared/defaults";
+import { DEFAULTS, filterToDefaults } from "../shared/defaults";
 import { detectPlatform, platformThemeKey, type Platform } from "../shared/platform";
 import { PLATFORM_LABELS } from "../shared/platformMeta";
 
@@ -92,11 +92,7 @@ function importSettings(file: File) {
     try {
       // Imported settings are user-supplied JSON — filtered against DEFAULTS.
       const data = JSON.parse(String(reader.result));
-      const filtered: Record<string, unknown> = {};
-      for (const key of Object.keys(DEFAULTS)) {
-        if (key in data) filtered[key] = data[key];
-      }
-      chrome.storage.sync.set(filtered, () => loadUI());
+      chrome.storage.sync.set(filterToDefaults(data), () => loadUI());
     } catch (err) {
       console.error("[Aleph] Import failed:", err);
     }

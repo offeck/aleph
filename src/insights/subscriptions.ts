@@ -1,4 +1,3 @@
-import { usageKeyForDate } from "../shared/dates";
 import { formatTokens } from "../shared/format";
 import { PLATFORMS, platformSettingSuffix, type Platform } from "../shared/platform";
 import { PRICING } from "../shared/pricing";
@@ -65,10 +64,10 @@ export function bindOverrides(subs: Record<string, any>) {
           manualOverride: true,
         };
         chrome.storage.local.set({ insights_subscriptions: allSubs }, () => {
-          // Refresh subscriptions display
-          const todayKey = usageKeyForDate();
-          chrome.storage.local.get({ [todayKey]: {}, insights_subscriptions: {} }, (r) => {
-            loadSubscriptions(r.insights_subscriptions, r[todayKey]);
+          // Refresh through the summary chokepoint so the token columns show
+          // the same combined (multi-device) usage as the rest of the page.
+          chrome.runtime.sendMessage({ type: "insights-get-summary" }, (summary) => {
+            if (summary) loadSubscriptions(summary.subs, summary.today);
           });
         });
       });
