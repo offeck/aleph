@@ -1,3 +1,33 @@
+/* Slim themed scrollbars for the extension pages — Chrome's default gray
+   bar clashes with the dark UI. Webkit pseudos only: with the standard
+   scrollbar-width/color properties also set, Chrome ≥121 would ignore these,
+   so the standard properties are deliberately omitted. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3d63;
+  border-radius: 5px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #565b94;
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .logo {
   font-size: 32px;
   font-weight: 700;
