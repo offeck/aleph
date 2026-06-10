@@ -12,6 +12,7 @@
       <p class="subtitle">AI Chat Styler</p>
     </div>
     <p class="remark-header" id="remark"></p>
+    <span id="antigravityIndicator" class="ag-indicator" style="display:none" title="Antigravity connected">&#x26A1;</span>
     <span id="syncIndicator" class="sync-indicator" style="display:none">&#x2601;</span>
     <button id="settingsBtn" class="icon-btn" title="Settings">&#x2699;</button>
   </header>
@@ -50,6 +51,11 @@
       <div class="time-bar" id="todayTimeBar"></div>
       <div class="platform-breakdown" id="platformBreakdown"></div>
       <div class="usage-meters" id="usageMeters" style="display:none"></div>
+      <div id="antigravityConnectRow" class="ag-connect-row" style="display:none">
+        <button id="antigravityConnectBtn" class="ag-connect-btn" type="button" title="Show Antigravity CLI per-model quota (experimental)">&#x26A1; Connect Antigravity</button>
+        <button id="antigravityDismissBtn" class="ag-dismiss-btn" type="button" title="Hide — still available in Settings" aria-label="Hide">&times;</button>
+      </div>
+      <p id="antigravityDismissedHint" class="ag-dismissed-hint" style="display:none">Antigravity sign-in is still available in Settings.</p>
     </div>
 
     <div class="insight-card" id="weekCard">

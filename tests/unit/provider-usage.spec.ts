@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetProviderUsageRefreshStateForTests,
   chatgptPlanTypeRaw,
+  clearAntigravityUsage,
+  detectAntigravityModelDrift,
   extractClaudeOrgId,
   inferGeminiPlanFromQuotas,
   normalizeClaudePlanFromOrg,
@@ -10,6 +12,11 @@ import {
   refreshProviderUsage,
   shouldRefreshUsage,
 } from "../../src/background/providerUsage";
+import { ANTIGRAVITY_AUTH_KEY, _resetAntigravityAuthForTests } from "../../src/background/antigravityAuth";
+
+// A fresh stored Antigravity access token — getAntigravityAccessToken returns it
+// directly (no token-endpoint round-trip) while expiresAt is in the future.
+const ANTIGRAVITY_AUTH_FRESH = { refreshToken: "ag-refresh", accessToken: "ag-access", expiresAt: 9_999_999_999_999, email: "ag@example.com", connectedAt: 0 };
 
 type Stored = Record<string, unknown>;
 
@@ -30,18 +37,29 @@ function installChromeStorage(storage: Stored) {
     return out;
   });
   const set = vi.fn(async (update: Stored) => { Object.assign(storage, update); });
+  const remove = vi.fn(async (keys: string | string[]) => {
+    for (const k of Array.isArray(keys) ? keys : [keys]) delete storage[k];
+  });
+  // chrome.storage.sync stub for any settings reads in the refresh path.
+  const syncGet = vi.fn(async (defaults: Record<string, unknown>) => {
+    const out: Stored = {};
+    for (const [key, fallback] of Object.entries(defaults)) out[key] = key in storage ? storage[key] : fallback;
+    return out;
+  });
+  const runtime = { lastError: undefined };
   vi.stubGlobal("chrome", {
-    storage: { local: { get, set } },
+    storage: { local: { get, set, remove }, sync: { get: syncGet } },
     cookies: {
       get: vi.fn((_details: chrome.cookies.CookieDetails, cb: (cookie: Partial<chrome.cookies.Cookie>) => void) => {
         cb({ value: "org-claude" });
       }),
     },
+    runtime,
   });
   return { get, set };
 }
 
-function installProviderFetch() {
+function installProviderFetch(overrides: { antigravityModels?: unknown; onAntigravityFetch?: () => void } = {}) {
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url === "https://chatgpt.com/api/auth/session") {
@@ -95,6 +113,30 @@ function installProviderFetch() {
       const quotas = [[[null, 2, 0, [1780679819, 0], 100, 90]]];
       return Promise.resolve(makeJsonResponse(JSON.stringify([["wrb.fr", "qpEbW", JSON.stringify(quotas)]])));
     }
+    if (url === "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist") {
+      overrides.onAntigravityFetch?.();
+      expect(init?.method).toBe("POST");
+      expect((init?.headers as Record<string, string>)?.Authorization).toBe("Bearer ag-access");
+      expect(String(init?.body)).toContain("ANTIGRAVITY");
+      return Promise.resolve(makeJsonResponse({
+        planInfo: { monthlyPromptCredits: 500, planType: "premium" },
+        availablePromptCredits: 450,
+        cloudaicompanionProject: { id: "ag-project" },
+      }));
+    }
+    if (url === "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels") {
+      expect(init?.method).toBe("POST");
+      expect((init?.headers as Record<string, string>)?.Authorization).toBe("Bearer ag-access");
+      expect(String(init?.body)).toContain("ag-project");
+      return Promise.resolve(makeJsonResponse(overrides.antigravityModels ?? {
+        models: {
+          "claude-sonnet-4-5": {
+            displayName: "Claude Sonnet 4.5",
+            quotaInfo: { remainingFraction: 0.4, resetTime: "2026-06-08T13:00:00.000Z" },
+          },
+        },
+      }));
+    }
     throw new Error("unexpected fetch " + url);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -139,6 +181,90 @@ describe("prepareProviderUsageSnapshot", () => {
     expect(next.codex.dailyWorkspaceUsage).toBe(previous.codex.dailyWorkspaceUsage);
     expect(next.codex.balance).toEqual({ credits: 7 });
     expect(next.fetchedAt).toBe(1_000_000);
+  });
+
+  it("preserves previous Gemini web and Antigravity fields across partial refreshes", () => {
+    vi.setSystemTime(2_000_000);
+    const previous = {
+      source: "provider",
+      credits: { limit: 100, remaining: 90, used: 10 },
+      features: [{ id: 4, remaining: 90 }],
+      mainChat: { limit: 100, remaining: 90 },
+      activeModel: "gemini-3-pro",
+      buildLabel: "boq_assistant-bard-web-server_20260608.01_p0",
+      antigravity: {
+        credits: { limit: 500, remaining: 450, used: 50 },
+        models: [{ id: "claude-sonnet-4-5", remaining: 40 }],
+      },
+    };
+
+    const next = prepareProviderUsageSnapshot("gemini", previous, {
+      source: "provider",
+      antigravity: {
+        credits: { limit: 500, remaining: 400, used: 100 },
+      },
+    });
+
+    expect(next.credits).toBe(previous.credits);
+    expect(next.features).toBe(previous.features);
+    expect(next.mainChat).toBe(previous.mainChat);
+    expect(next.activeModel).toBe("gemini-3-pro");
+    expect(next.buildLabel).toBe("boq_assistant-bard-web-server_20260608.01_p0");
+    expect(next.antigravity).toMatchObject({
+      credits: { limit: 500, remaining: 400, used: 100 },
+      models: [{ id: "claude-sonnet-4-5", remaining: 40 }],
+    });
+    expect(next.metricValues).toMatchObject({
+      "gemini:credits": 90,
+      "gemini:feature:4": 90,
+      "gemini:antigravity.credits": 400,
+      "gemini:antigravity.model:claude-sonnet-4-5": 40,
+    });
+  });
+});
+
+describe("clearAntigravityUsage", () => {
+  it("removes the antigravity block from the stored Gemini snapshot, keeping the rest", async () => {
+    const storage: Stored = {
+      insights_platform_usage_gemini: { source: "provider", credits: { limit: 100, remaining: 90 }, antigravity: { models: [{ id: "x" }] } },
+    };
+    installChromeStorage(storage);
+
+    await clearAntigravityUsage();
+
+    const snap = storage.insights_platform_usage_gemini as Stored;
+    expect(snap.antigravity).toBeUndefined();
+    expect(snap.credits).toMatchObject({ limit: 100, remaining: 90 });
+  });
+
+  it("is a no-op when there is no antigravity block or no snapshot", async () => {
+    const storage: Stored = { insights_platform_usage_gemini: { source: "provider", credits: { limit: 100 } } };
+    installChromeStorage(storage);
+    await clearAntigravityUsage();
+    expect((storage.insights_platform_usage_gemini as Stored).credits).toMatchObject({ limit: 100 });
+
+    const empty: Stored = {};
+    installChromeStorage(empty);
+    await expect(clearAntigravityUsage()).resolves.toBeUndefined();
+  });
+});
+
+describe("detectAntigravityModelDrift", () => {
+  it("flags drift when the response carries models but none survive normalization", () => {
+    expect(detectAntigravityModelDrift({ models: { a: {}, b: {}, c: {} } }, 0))
+      .toEqual({ kind: "models-shape", sample: "raw=3 kept=0" });
+  });
+
+  it("stays silent when models normalize successfully", () => {
+    expect(detectAntigravityModelDrift({ models: { a: {}, b: {} } }, 2)).toBeNull();
+    expect(detectAntigravityModelDrift({ models: { a: {} } }, 1)).toBeNull();
+  });
+
+  it("stays silent when the response has no models (account simply not provisioned)", () => {
+    expect(detectAntigravityModelDrift({ models: {} }, 0)).toBeNull();
+    expect(detectAntigravityModelDrift({}, 0)).toBeNull();
+    expect(detectAntigravityModelDrift(null, 0)).toBeNull();
+    expect(detectAntigravityModelDrift(undefined, 0)).toBeNull();
   });
 });
 
@@ -228,6 +354,7 @@ describe("refreshProviderUsage", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000_000);
     _resetProviderUsageRefreshStateForTests(() => 123456);
+    _resetAntigravityAuthForTests();
   });
 
   afterEach(() => {
@@ -235,8 +362,8 @@ describe("refreshProviderUsage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("fetches ChatGPT, Claude, and Gemini provider limits from the background and persists snapshots", async () => {
-    const storage: Stored = {};
+  it("fetches ChatGPT, Claude, and Gemini provider limits with nested Antigravity data", async () => {
+    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH };
     installChromeStorage(storage);
     const fetchMock = installProviderFetch();
 
@@ -268,7 +395,14 @@ describe("refreshProviderUsage", () => {
       source: "provider",
       credits: { limit: 100, remaining: 90, used: 10 },
       buildLabel: "boq_assistant-bard-web-server_20260608.01_p0",
+      antigravity: {
+        credits: { limit: 500, remaining: 450, used: 50 },
+        planType: "premium",
+        project: "ag-project",
+        models: [{ id: "claude-sonnet-4-5", remaining: 40, used: 60 }],
+      },
     });
+    expect(storage.insights_platform_usage_antigravity).toBeUndefined();
     expect(storage.insights_subscriptions).toMatchObject({
       chatgpt: {
         plan: "plus",
@@ -292,6 +426,118 @@ describe("refreshProviderUsage", () => {
     expect((storage.insights_subscriptions as Stored).gemini).toBeUndefined();
   });
 
+  it("leaves Antigravity inert (no Cloud Code fetch) when not connected", async () => {
+    const storage: Stored = {}; // no stored antigravity auth → off by default
+    installChromeStorage(storage);
+    const fetchMock = installProviderFetch();
+
+    await refreshProviderUsage();
+
+    const gemini = storage.insights_platform_usage_gemini as Stored;
+    expect(gemini.credits).toMatchObject({ limit: 100, remaining: 90 });
+    expect(gemini.antigravity).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalledWith("https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", expect.anything());
+  });
+
+  it("clears stale Antigravity meters when the account is gone (revoked/disconnected)", async () => {
+    // A prior refresh stored Antigravity meters, but the account is no longer
+    // connected (refresh token revoked → auth auto-cleared, or disconnected).
+    // prepareProviderUsageSnapshot preserves `antigravity` across a missing
+    // refresh, so without an explicit clear the stale meters would survive.
+    const storage: Stored = {
+      insights_platform_usage_gemini: {
+        source: "provider",
+        fetchedAt: 0,
+        credits: { limit: 100, remaining: 50, used: 50 },
+        antigravity: { source: "provider", credits: { limit: 500, remaining: 450, used: 50 }, models: [], planType: "premium", project: "ag" },
+      },
+      // no ANTIGRAVITY_AUTH_KEY → getAntigravityAccessToken returns null, not connected
+    };
+    installChromeStorage(storage);
+    installProviderFetch();
+
+    await refreshProviderUsage();
+
+    const gemini = storage.insights_platform_usage_gemini as Stored;
+    expect(gemini.antigravity).toBeUndefined();                          // stale meters dropped
+    expect(gemini.credits).toMatchObject({ limit: 100, remaining: 90 }); // fresh Gemini web data kept
+  });
+
+  it("clears stale Antigravity meters even when the Gemini snapshot is fresh enough to throttle", async () => {
+    const storage: Stored = {
+      insights_platform_usage_gemini: {
+        source: "provider",
+        fetchedAt: 970_000,
+        credits: { limit: 100, remaining: 50, used: 50 },
+        antigravity: { source: "provider", credits: { limit: 500, remaining: 450, used: 50 }, models: [], planType: "premium", project: "ag" },
+      },
+      // no ANTIGRAVITY_AUTH_KEY -> inert/not connected
+    };
+    installChromeStorage(storage);
+    const fetchMock = installProviderFetch();
+
+    const result = await refreshProviderUsage();
+
+    const gemini = storage.insights_platform_usage_gemini as Stored;
+    expect(result.platforms?.gemini).toEqual({ refreshed: true });
+    expect(gemini.antigravity).toBeUndefined();
+    expect(gemini.credits).toMatchObject({ limit: 100, remaining: 50 });
+    expect(fetchMock).not.toHaveBeenCalledWith("https://gemini.google.com/app", expect.any(Object));
+    expect(fetchMock).not.toHaveBeenCalledWith("https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", expect.any(Object));
+  });
+
+  it("discards in-flight Antigravity usage when the account disconnects mid-refresh", async () => {
+    // The refresh obtained a token and its Cloud Code request is in flight when the
+    // account is disconnected (auth removed). The response still carries usage, but
+    // the write-time connection re-check must reject it so a just-completed
+    // disconnect isn't clobbered by the older request.
+    const storage: Stored = {
+      [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH,
+      insights_platform_usage_gemini: {
+        source: "provider",
+        fetchedAt: 0,
+        credits: { limit: 100, remaining: 50, used: 50 },
+        antigravity: { source: "provider", credits: { limit: 500, remaining: 450, used: 50 }, models: [], planType: "premium", project: "ag" },
+      },
+    };
+    installChromeStorage(storage);
+    // The disconnect lands while the Cloud Code request is in flight.
+    installProviderFetch({ onAntigravityFetch: () => { delete storage[ANTIGRAVITY_AUTH_KEY]; } });
+
+    await refreshProviderUsage();
+
+    const gemini = storage.insights_platform_usage_gemini as Stored;
+    expect(gemini.antigravity).toBeUndefined();                          // in-flight usage rejected, stale cleared
+    expect(gemini.credits).toMatchObject({ limit: 100, remaining: 90 }); // fresh Gemini web data still saved
+  });
+
+  it("canary: records antigravity drift when fetchAvailableModels returns an unrecognized model shape", async () => {
+    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH };
+    installChromeStorage(storage);
+    // A healthy 200 that carries model entries, but the quota shape changed
+    // (quotaInfo → quotaShifted) so the normalizer keeps none — the silent failure.
+    installProviderFetch({
+      antigravityModels: { models: { "claude-sonnet-4-5": { displayName: "Claude Sonnet 4.5", quotaShifted: { remaining: 0.4 } } } },
+    });
+
+    await refreshProviderUsage();
+
+    expect(storage.insights_contract_drift).toMatchObject({ antigravity: { kind: "models-shape", sample: "raw=1 kept=0" } });
+    // Credits still parse from loadCodeAssist, but the model list is empty.
+    const gemini = storage.insights_platform_usage_gemini as Stored;
+    expect((gemini.antigravity as Stored)?.models).toEqual([]);
+  });
+
+  it("canary: does NOT record drift on a healthy antigravity response", async () => {
+    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH };
+    installChromeStorage(storage);
+    installProviderFetch();
+
+    await refreshProviderUsage();
+
+    expect(storage.insights_contract_drift).toBeUndefined();
+  });
+
   it("throttles repeated popup refreshes after a successful provider fetch", async () => {
     const storage: Stored = {};
     installChromeStorage(storage);
@@ -306,6 +552,37 @@ describe("refreshProviderUsage", () => {
     expect(result.platforms?.claude).toEqual({ refreshed: false, reason: "throttled" });
     expect(result.platforms?.gemini).toEqual({ refreshed: false, reason: "throttled" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("force-refreshes past the freshness throttle (used right after an Antigravity connect)", async () => {
+    const storage: Stored = {};
+    installChromeStorage(storage);
+    const fetchMock = installProviderFetch();
+
+    await refreshProviderUsage();   // first fetch → snapshot now fresh
+    fetchMock.mockClear();
+    const result = await refreshProviderUsage("popup", true);   // force bypasses the throttle
+
+    expect(result.refreshed).toBe(true);
+    expect(result.platforms?.gemini?.refreshed).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith("https://gemini.google.com/app", expect.any(Object));
+  });
+
+  it("a forced refresh does not reuse an in-flight non-forced refresh (post-connect race)", async () => {
+    const storage: Stored = {};
+    installChromeStorage(storage);
+    const fetchMock = installProviderFetch();
+
+    // The popup's opening (non-forced) refresh is still in flight when the
+    // just-connected OAuth path fires its forced refresh. The forced one must run
+    // its own fetch, not return the in-flight, token-less result.
+    const opening = refreshProviderUsage();             // non-forced, now in-flight
+    const forced = refreshProviderUsage("popup", true); // forced, arrives mid-flight
+    const [, forcedResult] = await Promise.all([opening, forced]);
+
+    expect(forcedResult.platforms?.gemini?.refreshed).toBe(true);
+    const geminiAppCalls = fetchMock.mock.calls.filter(([url]) => url === "https://gemini.google.com/app").length;
+    expect(geminiAppCalls).toBe(2); // opening fetched once; forced re-fetched instead of reusing it
   });
 
   it("does not overwrite manually overridden subscription plans", async () => {

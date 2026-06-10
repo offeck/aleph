@@ -9,6 +9,11 @@ import {
   type GeminiPlan,
   type PlanDetection,
 } from "../tracker/plans";
+import { getAntigravityAccessToken, getAntigravityAuthStatus } from "./antigravityAuth";
+import {
+  extractAntigravityProjectId,
+  normalizeAntigravityUsage,
+} from "../tracker/usageAntigravity";
 import { normalizeCodexBalance } from "../tracker/usageChatgpt";
 import { parseGeminiQuotas, type GeminiFeature } from "../tracker/usageGemini";
 import { updateUsageMetricChanges } from "./metrics";
@@ -36,6 +41,15 @@ const BACKGROUND_USAGE_PLATFORMS: BackgroundUsagePlatform[] = ["chatgpt", "claud
 const PLAN_FORCE_PLATFORMS: BackgroundUsagePlatform[] = ["chatgpt", "claude"];
 const CHATGPT_ORIGINS = ["https://chatgpt.com", "https://chat.openai.com"];
 const GEMINI_ORIGIN = "https://gemini.google.com";
+// Antigravity's Cloud Code channel. If a Gemini-CLI-minted token is rejected
+// here, the stable Code Assist host `https://cloudcode-pa.googleapis.com` is a
+// drop-in fallback (both are host-permitted).
+const CLOUDCODE_ORIGIN = "https://daily-cloudcode-pa.googleapis.com";
+const ANTIGRAVITY_METADATA = {
+  ideType: "ANTIGRAVITY",
+  platform: "PLATFORM_UNSPECIFIED",
+  pluginType: "GEMINI",
+};
 export const LIMITS_REFRESH_ALARM = "aleph-refresh-limits";
 export const LIMITS_REFRESH_PERIOD_MINUTES = 20;
 
@@ -79,6 +93,22 @@ async function fetchText(url: string, options: RequestInit = {}): Promise<string
   });
   if (!response.ok) throw new Error(String(response.status));
   return response.text();
+}
+
+function statusFromError(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+async function fetchCloudCodeJson(endpoint: string, token: string, body: unknown): Promise<unknown> {
+  return fetchJson(CLOUDCODE_ORIGIN + endpoint, {
+    method: "POST",
+    credentials: "omit",
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
 }
 
 // ── Provider API-shape canary ─────────────────────────────
@@ -357,7 +387,7 @@ export function inferGeminiPlanFromQuotas(features: GeminiFeature[]): GeminiPlan
   return features.some((feature) => feature.id === 12) ? "ai_ultra" : null;
 }
 
-async function fetchGeminiProviderUsage(): Promise<ProviderFetchResult> {
+async function fetchGeminiWebProviderUsage(): Promise<ProviderFetchResult> {
   const html = await fetchText(GEMINI_ORIGIN + "/app");
   const { sid, at, bl } = parseGeminiSessionData(html);
   if (!sid) return { usage: null, reason: "missing-auth" };
@@ -396,6 +426,92 @@ async function fetchGeminiProviderUsage(): Promise<ProviderFetchResult> {
   };
 }
 
+// ── Antigravity drift canary ──────────────────────────────
+// fetchAvailableModels is an undocumented internal endpoint gated on a project id
+// and the antigravity/cli User-Agent (set via declarativeNetRequest). The brittle
+// failure isn't an error — it's a 200 whose model/quota shape changed, so the
+// normalizer keeps nothing and the popup silently empties. This flags exactly that:
+// raw model entries present in the response, but zero survive normalization. Pure
+// (no chrome/network), so it is unit-tested directly.
+export function detectAntigravityModelDrift(availableModels: unknown, normalizedModelCount: number): { kind: string; sample: string } | null {
+  const map = availableModels && typeof availableModels === "object" ? (availableModels as RawRecord).models : null;
+  const rawCount = map && typeof map === "object" ? Object.keys(map).length : 0;
+  if (rawCount > 0 && normalizedModelCount === 0) {
+    return { kind: "models-shape", sample: "raw=" + rawCount + " kept=0" };
+  }
+  return null;
+}
+
+async function fetchAntigravityProviderUsage(): Promise<ProviderFetchResult> {
+  // Gated purely on connection: off by default (nothing connected), inert
+  // (no network) until the user connects from the popup. Disconnect (in
+  // settings) clears the token and turns it back off.
+  const token = await getAntigravityAccessToken();
+  if (!token) return { usage: null, reason: "missing-auth" };
+
+  let loadCodeAssist: unknown;
+  try {
+    loadCodeAssist = await fetchCloudCodeJson("/v1internal:loadCodeAssist", token, { metadata: ANTIGRAVITY_METADATA });
+  } catch (e) {
+    const status = statusFromError(e);
+    if (status === "401" || status === "403") return { usage: null, reason: "missing-auth" };
+    if (status === "400" || status === "404") return { usage: null, reason: "no-data" };
+    throw e;
+  }
+
+  let availableModels: unknown = {};
+  try {
+    const project = extractAntigravityProjectId(loadCodeAssist);
+    availableModels = await fetchCloudCodeJson("/v1internal:fetchAvailableModels", token, project ? { project } : {});
+  } catch (e) {
+    const status = statusFromError(e);
+    if (status === "401" || status === "403") return { usage: null, reason: "missing-auth" };
+    // Accounts without an initialized Cloud Code project can still expose
+    // prompt-credit plan data from loadCodeAssist, so keep that partial result.
+  }
+
+  const usage = normalizeAntigravityUsage(loadCodeAssist, availableModels);
+  const drift = detectAntigravityModelDrift(availableModels, usage?.models.length || 0);
+  if (drift) void recordProviderDrift("antigravity", drift.kind, drift.sample);
+  return { usage, reason: usage ? undefined : "no-data" };
+}
+
+async function fetchGeminiProviderUsage(): Promise<ProviderFetchResult> {
+  const [geminiResult, antigravityResult] = await Promise.allSettled([
+    fetchGeminiWebProviderUsage(),
+    fetchAntigravityProviderUsage(),
+  ]);
+  const gemini = geminiResult.status === "fulfilled" ? geminiResult.value : { usage: null, reason: "error" as const };
+  const antigravity = antigravityResult.status === "fulfilled" ? antigravityResult.value : { usage: null, reason: "error" as const };
+
+  // Re-check the connection at WRITE time, after the network round-trip. A refresh
+  // that obtained a token can land after the user disconnects (or the token was
+  // revoked mid-flight); accepting its `antigravity.usage` would resurrect meters a
+  // just-completed disconnect cleared. So keep Antigravity data only while still
+  // connected — otherwise drop it (fresh OR stale) and strip any stored block
+  // (no-op if none). A transient failure keeps the auth, so its meters survive.
+  const antigravityConnected = (await getAntigravityAuthStatus()).connected;
+  const antigravityUsage = antigravityConnected ? antigravity.usage : null;
+  if (!antigravityConnected) await clearAntigravityUsage();
+
+  const usage: RawRecord = gemini.usage ? { ...gemini.usage } : { source: "provider" };
+  if (antigravityUsage) usage.antigravity = antigravityUsage;
+
+  if (gemini.usage || antigravityUsage) {
+    return {
+      usage,
+      plan: gemini.plan,
+    };
+  }
+  return {
+    usage: null,
+    plan: gemini.plan,
+    reason: gemini.reason === "missing-auth" && antigravity.reason === "missing-auth"
+      ? "missing-auth"
+      : gemini.reason || antigravity.reason || "no-data",
+  };
+}
+
 export function prepareProviderUsageSnapshot(
   platform: string,
   previous: RawRecord | null,
@@ -417,6 +533,16 @@ export function prepareProviderUsageSnapshot(
       nextUsage.codex = Object.assign({}, previous.codex, nextUsage.codex);
     }
   }
+  if (platform === "gemini") {
+    for (const key of ["credits", "features", "mainChat", "activeModel", "buildLabel"]) {
+      if (!(key in nextUsage) && key in (previous || {})) nextUsage[key] = previous?.[key];
+    }
+    if (!nextUsage.antigravity && previous?.antigravity) {
+      nextUsage.antigravity = previous.antigravity;
+    } else if (nextUsage.antigravity && previous?.antigravity) {
+      nextUsage.antigravity = Object.assign({}, previous.antigravity, nextUsage.antigravity);
+    }
+  }
   Object.assign(nextUsage, updateUsageMetricChanges(platform, previous, nextUsage));
   return nextUsage;
 }
@@ -425,6 +551,32 @@ export async function saveProviderUsageSnapshot(platform: string, usage?: RawRec
   const key = "insights_platform_usage_" + platform;
   const previous = await readLocal<RawRecord | null>(key, null);
   await writeLocal(key, prepareProviderUsageSnapshot(platform, previous, usage));
+}
+
+// Drop the Antigravity block from the stored Gemini snapshot on disconnect.
+// prepareProviderUsageSnapshot's gemini branch preserves `antigravity` whenever a
+// refresh lacks it (guarding partial provider failures), so without this the popup
+// keeps rendering stale Antigravity meters after the token is gone. Removing it
+// from the snapshot also means later merges have nothing to preserve. The write
+// fires storage.onChanged, which re-renders the popup.
+export async function clearAntigravityUsage(): Promise<void> {
+  const key = "insights_platform_usage_gemini";
+  const snap = await readLocal<RawRecord | null>(key, null);
+  if (!snap || !snap.antigravity) return;
+  const next = { ...snap };
+  delete next.antigravity;
+  await writeLocal(key, next);
+}
+
+// Clears stale Antigravity meters independent of the freshness throttle: a build
+// that went inert (secret removed) or a disconnect while the Gemini snapshot is
+// still fresh would otherwise keep showing old meters until the snapshot ages out.
+// Gemini-only; no-op when connected or nothing is stored. Returns whether it cleared.
+async function clearDisconnectedAntigravityUsage(platform: BackgroundUsagePlatform, snapshot: RawRecord | null): Promise<boolean> {
+  if (platform !== "gemini" || !snapshot?.antigravity) return false;
+  if ((await getAntigravityAuthStatus()).connected) return false;
+  await clearAntigravityUsage();
+  return true;
 }
 
 async function saveProviderPlan(platform: Platform, plan: PlanDetection | null | undefined): Promise<boolean> {
@@ -456,15 +608,23 @@ async function fetchProviderUsage(platform: BackgroundUsagePlatform): Promise<Pr
   return fetchGeminiProviderUsage();
 }
 
-async function refreshPlatformUsage(platform: BackgroundUsagePlatform, trigger: UsageRefreshTrigger): Promise<PlatformRefreshResult> {
-  if (inFlight[platform]) return inFlight[platform]!;
+async function refreshPlatformUsage(platform: BackgroundUsagePlatform, trigger: UsageRefreshTrigger, force = false): Promise<PlatformRefreshResult> {
+  // Dedup concurrent refreshes — but a forced refresh must NOT reuse a non-forced
+  // in-flight one (e.g. the popup's opening refresh that ran *before* the user
+  // connected Antigravity); reusing it would return stale, token-less data. Chain
+  // the forced run after the in-flight one so it re-fetches with the now-present token.
+  const existing = inFlight[platform];
+  if (existing && !force) return existing;
   const run = (async () => {
+    if (existing) { try { await existing; } catch (e) {} }
     // Skip the network (auth fetch included) when the stored snapshot is still
     // fresh — the content script and prior refreshes write the same fetchedAt,
-    // so an open tab or a recent refresh makes this a no-op.
+    // so an open tab or a recent refresh makes this a no-op. `force` bypasses this
+    // for deliberate user actions (e.g. just-connected Antigravity) whose new data
+    // would otherwise be suppressed by the popup's own opening refresh.
     const key = "insights_platform_usage_" + platform;
     const previous = await readLocal<RawRecord | null>(key, null);
-    if (!shouldRefreshUsage(previous, Date.now(), FRESH_TTL_MS[trigger])) {
+    if (!force && !shouldRefreshUsage(previous, Date.now(), FRESH_TTL_MS[trigger])) {
       // Usage is fresh — but the user wants tab-less PLAN detection too, so a
       // fresh usage snapshot must not permanently suppress a never-detected plan
       // (e.g. a prior cycle saved usage but the plan endpoint failed). For
@@ -474,6 +634,9 @@ async function refreshPlatformUsage(platform: BackgroundUsagePlatform, trigger: 
       // so a missing Gemini subscription is normal, not a failure to retry.
       const subs = await readLocal<RawRecord>("insights_subscriptions", {});
       if (subs[platform] || !PLAN_FORCE_PLATFORMS.includes(platform)) {
+        // Even while throttled, drop stale Antigravity meters if the account is gone
+        // (build went inert / disconnected) — the fetch-path clear is skipped here.
+        if (await clearDisconnectedAntigravityUsage(platform, previous)) return { refreshed: true };
         return { refreshed: false, reason: "throttled" as const };
       }
     }
@@ -492,13 +655,14 @@ async function refreshPlatformUsage(platform: BackgroundUsagePlatform, trigger: 
     }
   })();
   inFlight[platform] = run;
-  run.finally(() => { delete inFlight[platform]; });
+  // Guard against a chained run clearing a newer entry that has replaced it.
+  run.finally(() => { if (inFlight[platform] === run) delete inFlight[platform]; });
   return run;
 }
 
-export async function refreshProviderUsage(trigger: UsageRefreshTrigger = "popup"): Promise<UsageRefreshResponse> {
+export async function refreshProviderUsage(trigger: UsageRefreshTrigger = "popup", force = false): Promise<UsageRefreshResponse> {
   const entries = await Promise.all(BACKGROUND_USAGE_PLATFORMS.map(async (platform) => {
-    const result = await refreshPlatformUsage(platform, trigger);
+    const result = await refreshPlatformUsage(platform, trigger, force);
     return [platform, result] as const;
   }));
   const platforms = Object.fromEntries(entries);

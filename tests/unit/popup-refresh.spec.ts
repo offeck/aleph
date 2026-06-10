@@ -8,6 +8,10 @@ import {
 } from "../../src/popup/ui";
 
 vi.mock("../../src/popup/insightsView", () => ({ loadInsights: vi.fn() }));
+vi.mock("../../src/popup/antigravityConnect", () => ({
+  loadAntigravityConnect: vi.fn(),
+  bindAntigravityConnect: vi.fn(),
+}));
 vi.mock("../../src/popup/ui", () => ({
   bindEvents: vi.fn(),
   detectActivePlatform: vi.fn(),

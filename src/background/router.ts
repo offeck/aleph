@@ -19,7 +19,70 @@ import {
 } from "./usage";
 import { generateRemark } from "./remarks";
 import { cleanupOldUsage } from "./cleanup";
-import { LIMITS_REFRESH_ALARM, LIMITS_REFRESH_PERIOD_MINUTES, refreshProviderUsage } from "./providerUsage";
+import { clearAntigravityUsage, LIMITS_REFRESH_ALARM, LIMITS_REFRESH_PERIOD_MINUTES, refreshProviderUsage } from "./providerUsage";
+import {
+  ANTIGRAVITY_REDIRECT_URI,
+  captureAntigravityCode,
+  disconnectAntigravity,
+  getAntigravityAuthStatus,
+  startAntigravityConnect,
+} from "./antigravityAuth";
+
+// Pull the OAuth authorization code out of the loopback callback URL. After
+// consent, Google redirects the tab to http://localhost:51121/oauth-callback?code=…;
+// nothing listens there so the page fails to load, but the tab URL still carries
+// the code and is readable via the http://localhost/* host permission. The
+// accounts.google.com consent steps are opaque to us, which is fine.
+function antigravityCodeFromUrl(rawUrl: string | undefined): string | null {
+  if (!rawUrl) return null;
+  try {
+    const u = new URL(rawUrl);
+    if (u.origin + u.pathname !== ANTIGRAVITY_REDIRECT_URI) return null;
+    return u.searchParams.get("code");
+  } catch (e) {
+    return null;
+  }
+}
+
+// One-click connect: open the consent tab, then watch it for the authcode
+// redirect and capture the code from the URL — no manual paste. On success the
+// token write lands in insights_antigravity_auth (settings re-renders via
+// storage.onChanged) and usage refreshes so the popup meters populate.
+async function startAntigravityTabConnect(): Promise<{ started: boolean; error?: string }> {
+  let url: string;
+  try {
+    ({ url } = await startAntigravityConnect());
+  } catch (e) {
+    return { started: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  const tab = await chrome.tabs.create({ url });
+  const tabId = tab.id;
+  if (tabId == null) return { started: false, error: "Could not open the consent tab." };
+
+  const onUpdated = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo, tabInfo: chrome.tabs.Tab) => {
+    if (updatedTabId !== tabId) return;
+    const code = antigravityCodeFromUrl(changeInfo.url || tabInfo.url || undefined);
+    if (!code) return;
+    chrome.tabs.onUpdated.removeListener(onUpdated);
+    chrome.tabs.onRemoved.removeListener(onRemoved);
+    (async () => {
+      const result = await captureAntigravityCode(code);
+      try { await chrome.tabs.remove(tabId); } catch (e) {}
+      // force=true: the popup's own opening refresh just wrote a fresh (Antigravity-less)
+      // Gemini snapshot, which would otherwise throttle this one and hide the new meters.
+      if (result.success) refreshProviderUsage("popup", true).catch(() => {});
+    })();
+  };
+  // Drop the watcher if the user closes the consent tab without finishing.
+  const onRemoved = (removedTabId: number) => {
+    if (removedTabId !== tabId) return;
+    chrome.tabs.onUpdated.removeListener(onUpdated);
+    chrome.tabs.onRemoved.removeListener(onRemoved);
+  };
+  chrome.tabs.onUpdated.addListener(onUpdated);
+  chrome.tabs.onRemoved.addListener(onRemoved);
+  return { started: true };
+}
 
 // MV3 requires every chrome.* listener to be registered in the service
 // worker's first synchronous turn — index.ts calls this from its module body.
@@ -79,6 +142,24 @@ export function registerBackgroundListeners() {
     }
     if (msg.type === "aleph-sync-now") {
       alephSync.fullMergeAndSync().then(() => sendResponse({ success: true })).catch((e) => sendResponse({ success: false, error: e.message }));
+      return true;
+    }
+
+    // Antigravity (experimental, opt-in) — login from the popup, logout from
+    // settings; borrowed-client OAuth, see antigravityAuth.ts.
+    if (msg.type === "aleph-antigravity-connect") {
+      startAntigravityTabConnect().then(sendResponse);
+      return true;
+    }
+    if (msg.type === "aleph-antigravity-status") {
+      getAntigravityAuthStatus().then(sendResponse);
+      return true;
+    }
+    if (msg.type === "aleph-antigravity-disconnect") {
+      disconnectAntigravity()
+        .then(() => clearAntigravityUsage())
+        .then(() => sendResponse({ success: true }))
+        .catch(() => sendResponse({ success: false }));
       return true;
     }
 

@@ -43,14 +43,21 @@ describe("collectUsageMetricValues", () => {
       .toEqual({ "chatgpt:model:gpt-4": 1 });
   });
 
-  it("collects gemini credits and per-feature metrics", () => {
+  it("collects gemini credits, per-feature metrics, and nested antigravity metrics", () => {
     expect(collectUsageMetricValues("gemini", {
       credits: { remaining: 950 },
       features: [{ id: 4, remaining: 12 }, { id: 15, used: 3 }],
+      antigravity: {
+        credits: { remaining: 450 },
+        models: [{ id: "claude-sonnet-4-5", remaining: 40 }, { id: "gemini-3-pro", used: 20 }],
+      },
     })).toEqual({
       "gemini:credits": 950,
       "gemini:feature:4": 12,
       "gemini:feature:15": 3,
+      "gemini:antigravity.credits": 450,
+      "gemini:antigravity.model:claude-sonnet-4-5": 40,
+      "gemini:antigravity.model:gemini-3-pro": 20,
     });
   });
 

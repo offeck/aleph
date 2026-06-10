@@ -184,6 +184,36 @@ h2 {
   flex-direction: column;
   gap: 4px;
 }
+.ag-connect-row { margin-top: 10px; display: flex; align-items: center; gap: 6px; }
+.ag-connect-btn {
+  flex: 1;
+  padding: 6px 10px;
+  background: transparent;
+  color: #A142F4;
+  border: 1px solid #A142F4;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+.ag-connect-btn:hover { background: rgba(161, 66, 244, 0.12); }
+.ag-connect-btn:disabled { opacity: 0.6; cursor: wait; }
+.ag-dismiss-btn {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  padding: 0;
+  background: transparent;
+  color: #888;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  font-size: 15px; line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.ag-dismiss-btn:hover { color: #ff6b6b; border-color: #ff6b6b; }
+.ag-dismissed-hint { margin-top: 8px; font-size: 10px; color: #888; text-align: center; }
+.ag-indicator { color: #A142F4; font-size: 14px; margin-left: 4px; cursor: default; }
 .usage-meter {
   display: flex;
   align-items: center;

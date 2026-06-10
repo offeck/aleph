@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "User-Agent", "operation": "set", "value": "antigravity/cli/1.0.7 windows/amd64" }
+      ]
+    },
+    "condition": {
+      "requestDomains": ["daily-cloudcode-pa.googleapis.com", "cloudcode-pa.googleapis.com"],
+      "resourceTypes": ["xmlhttprequest", "other"]
+    }
+  }
+]

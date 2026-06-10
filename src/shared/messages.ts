@@ -44,7 +44,20 @@ export type PageToBackgroundMessage =
   | { type: "aleph-sync-status" }
   | { type: "aleph-sync-signin" }
   | { type: "aleph-sync-signout" }
-  | { type: "aleph-sync-now" };
+  | { type: "aleph-sync-now" }
+  | { type: "aleph-antigravity-connect" }
+  | { type: "aleph-antigravity-status" }
+  | { type: "aleph-antigravity-disconnect" };
+
+export interface AntigravityStatusResponse {
+  connected: boolean;
+  // Whether this build has a client secret at all. An inert build (no secret)
+  // can't connect, so the UI hides the connect CTA rather than offering one that
+  // would only throw.
+  configured: boolean;
+  email?: string | null;
+  connectedAt?: number | null;
+}
 
 export type UsageRefreshReason = "throttled" | "missing-auth" | "no-data" | "error";
 

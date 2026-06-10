@@ -1,4 +1,5 @@
 import { loadInsights } from "./insightsView";
+import { bindAntigravityConnect, loadAntigravityConnect } from "./antigravityConnect";
 import { bindEvents, detectActivePlatform, loadSyncIndicator, loadUI } from "./ui";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -11,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   detectActivePlatform();
   loadSyncIndicator();
+  loadAntigravityConnect();
+  bindAntigravityConnect();
 
   // Redraw as each platform's refreshed usage snapshot or detected plan lands
   // (background or alarm) — a refresh can update only the subscription (e.g. a

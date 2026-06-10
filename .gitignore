@@ -1,8 +1,11 @@
 .DS_Store
 *.py
+__pycache__/
+_metadata/
 node_modules/
 *.zip
 .claude/settings.local.json
+.antigravity-secret
 dist/
 Trace-*.json.gz
 firestore-debug.log

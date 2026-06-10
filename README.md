@@ -61,7 +61,7 @@ The extension injects a content script on each supported platform. It:
 
 Math containers (`.katex`, `mjx-container`) and code blocks are explicitly isolated to stay LTR regardless of surrounding text direction.
 
-The background service worker also refreshes provider-backed usage limits and plan metadata from Claude, ChatGPT, and Gemini using the extension's host permissions. Those snapshots power the popup's quota meters and spend card without requiring an open provider tab.
+The background service worker also refreshes provider-backed usage limits and plan metadata from Claude, ChatGPT, and Gemini using the extension's host permissions. Those snapshots power the popup's quota meters and spend card without requiring an open provider tab. An opt-in experimental feature additionally surfaces Google Antigravity (Cloud Code) per-model quota once you connect your Antigravity account from the popup (disconnect lives in settings).
 
 ## Project structure
 

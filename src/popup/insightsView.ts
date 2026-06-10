@@ -6,6 +6,8 @@ import {
   chatgptLimitMetricKey,
   chatgptModelMetricKey,
   GEMINI_CREDITS_KEY,
+  GEMINI_ANTIGRAVITY_CREDITS_KEY,
+  geminiAntigravityModelMetricKey,
   geminiFeatureMetricKey,
 } from "../shared/metricKeys";
 import type { InsightsSummary } from "../shared/messages";
@@ -197,9 +199,36 @@ export function loadInsights() {
       }
     }
 
+    // Antigravity CLI: Google Cloud Code quota under the signed-in Gemini account.
+    // Kept in its OWN meter group (not rawMeters.gemini) so a connected-but-fully-
+    // available account still renders its own "Antigravity 0%" row alongside
+    // "Gemini 0%", instead of collapsing into the Gemini fallback.
+    const antUsage = gemUsage?.antigravity;
+    const agMeters: Meter[] = [];
+    if ((asNumber(antUsage?.credits?.limit) ?? 0) > 0) {
+      addQuotaMeter(agMeters, "Antigravity credits", antUsage.credits, "#A142F4", {
+        requiresRecentDelta: true,
+        changedWithin24h: metricChangedRecently(gemUsage, GEMINI_ANTIGRAVITY_CREDITS_KEY),
+      });
+    }
+    const antModels = Array.isArray(antUsage?.models) ? [...antUsage.models] : [];
+    antModels.sort((a: any, b: any) => (asNumber(b?.usedPct) || 0) - (asNumber(a?.usedPct) || 0));
+    for (const m of antModels.slice(0, 4)) {
+      const id = m?.id || m?.modelId || m?.model;
+      if (id == null) continue;
+      addQuotaMeter(agMeters, `Antigravity ${cleanLabel(m?.name || m?.label || id, "Model")}`, m, "#A142F4", {
+        requiresRecentDelta: true,
+        changedWithin24h: metricChangedRecently(gemUsage, geminiAntigravityModelMetricKey(id)),
+      });
+    }
+
     // Used percentage quota rows stay visible; fully available quotas collapse
     // to one platform row. Number-only rows are gated by deltas.
-    const PLATFORM_FALLBACK: Record<Platform, { label: string; color: string }> = { claude: { label: "Claude", color: "#D97706" }, chatgpt: { label: "ChatGPT", color: "#4285F4" }, gemini: { label: "Gemini", color: "#10A37F" } };
+    const PLATFORM_FALLBACK: Record<Platform, { label: string; color: string }> = {
+      claude: { label: "Claude", color: "#D97706" },
+      chatgpt: { label: "ChatGPT", color: "#4285F4" },
+      gemini: { label: "Gemini", color: "#10A37F" },
+    };
     const shouldShowMeter = (m: Meter) => !m.requiresRecentDelta || m.changedWithin24h;
     for (const p of PLATFORMS) {
       const pm = rawMeters[p];
@@ -212,6 +241,21 @@ export function loadInsights() {
         meters.push(...visibleMeters);
       } else {
         meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true, quota: true, fullAvailable: true });
+      }
+    }
+
+    // Antigravity group: a connected account always reads as tracked — its used
+    // models when there's usage, otherwise one "Antigravity 0%" row (mirrors the
+    // per-platform fallback so a fully-available connection still shows, beside
+    // "Gemini 0%"). Nothing shows when not connected (no antigravity block).
+    if (antUsage) {
+      const activeAg = agMeters.filter((m) => m.pct != null && (m.pct ?? 0) > 0);
+      const detailAg = agMeters.filter((m) => m.pct == null && shouldShowMeter(m) && (m.alwaysShow || m.detail));
+      const visibleAg = [...activeAg, ...detailAg];
+      if (visibleAg.length > 0) {
+        meters.push(...visibleAg);
+      } else {
+        meters.push({ label: "Antigravity", pct: 0, color: "#A142F4", alwaysShow: true, quota: true, fullAvailable: true });
       }
     }
 

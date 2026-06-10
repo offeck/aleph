@@ -6,6 +6,8 @@ import {
   chatgptLimitMetricKey,
   chatgptModelMetricKey,
   GEMINI_CREDITS_KEY,
+  GEMINI_ANTIGRAVITY_CREDITS_KEY,
+  geminiAntigravityModelMetricKey,
   geminiFeatureMetricKey,
 } from "../shared/metricKeys";
 
@@ -69,6 +71,11 @@ export function collectUsageMetricValues(platform: string, usage: any): Record<s
     addUsageMetricValue(values, GEMINI_CREDITS_KEY, usage.credits?.remaining);
     for (const feature of (usage.features || [])) {
       if (feature?.id != null) addUsageMetricValue(values, geminiFeatureMetricKey(feature.id), feature?.remaining ?? feature?.used);
+    }
+    const antigravity = usage.antigravity;
+    addUsageMetricValue(values, GEMINI_ANTIGRAVITY_CREDITS_KEY, antigravity?.credits?.remaining);
+    for (const model of (antigravity?.models || [])) {
+      if (model?.id != null) addUsageMetricValue(values, geminiAntigravityModelMetricKey(model.id), model?.remaining ?? model?.used);
     }
   }
 
