@@ -71,6 +71,8 @@ Before reporting any change as complete:
 
 Chrome extension (Manifest V3, TypeScript) that provides Hebrew and Arabic-script BiDi text fixing, custom themes, focus mode, streaming smoothing, and consistent typography/layout styling across Claude, ChatGPT, and Gemini.
 
+Marketing operations (store listing, launch copy, channel/metrics trackers, SEO strategy) live in `marketing/`, operated via the `/marketing` skill — agents draft, the human posts; nothing is ever auto-published.
+
 ## Architecture
 
 TypeScript source lives in `src/`, bundled by esbuild (`node build.mjs`, or `npm run dev` for watch mode) into `dist/` — one IIFE bundle per entry plus generated CSS/HTML assets and a `__ALEPH_BUILD__` stamp exposed as `data-aleph-build` on `<html>`. `manifest.json` stays at the **repo root**; page HTML/CSS source lives beside its entry in `src/<page>/` and ships from `dist/`. The repo root remains the unpacked-extension directory (moving the manifest would change the extension ID and orphan user storage). **Never edit `dist/`** — it's gitignored build output. After editing `src/`, rebuild (or have watch running), then reload via the `aleph-reload` flow below.

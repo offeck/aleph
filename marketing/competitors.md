@@ -1,6 +1,9 @@
 # Aleph Competitive Analysis Report
 
-> **Date**: May 13, 2026
+> **Date**: May 13, 2026 — point-in-time snapshot. Aleph has since shipped the
+> cross-platform usage/insights dashboard (v2.8), so §10's "don't adopt usage
+> tracking" is superseded. Positioning source of truth: `brand.md`. Competitor
+> numbers here are refreshed by `/marketing audit` (delta table in `seo.md`).
 > **Scope**: RTL extensions, AI chat styling extensions, and hybrid competitors across Chrome Web Store
 > **Method**: Web search, Chrome Web Store analysis, open-source code review, feature comparison
 

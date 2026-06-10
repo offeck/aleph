@@ -4,64 +4,8 @@ Store link: https://chromewebstore.google.com/detail/jpicfbmjogpihahcmephbnibnjk
 Repo link: https://github.com/offeck/aleph
 Hero image for posts: `store-assets/final/01-before-after.png` (attach it everywhere images are allowed).
 
-## Where to post — researched venues (June 2026)
-
-**Hebrew Facebook groups (post the Hebrew group post + hero image):**
-- GenAI for developers Israel — facebook.com/groups/1264810614120121
-- AI ISRAEL — בינה מלאכותית כלים ושימושים — facebook.com/groups/aisrael
-- GenAI, AI, ML & Data IsraelClouds — facebook.com/groups/genaicommunityisrael
-- Full directory of HE AI Facebook + WhatsApp groups: aicoffeeclub.co.il (קבוצות פייסבוק / קבוצות וואטסאפ pages)
-
-**OpenAI Developer Community (reply with the EN comment template — these are
-ChatGPT-web complaints, exactly what Aleph fixes):**
-- "Add support for right-to-left layout (rtl)" — community.openai.com/t/275955
-- "Request to Fix KaTeX Rendering Issues for RTL Languages" — community.openai.com/t/1117054 (bullseye: math+RTL)
-- "Support RTL in ChatGPT chat box" — community.openai.com/t/1082487
-- "Please bring back the RTL and LTR Support…" — community.openai.com/t/1036310
-- "Request for RTL Support in ChatGPT 4.0 with Canvas" — community.openai.com/t/1016687
-
-**Anthropic GitHub tracker (HONESTY REQUIRED: most are about Claude
-Code/Desktop/VS Code, which Aleph does NOT fix — comment only on the 1-2
-broadest threads, clearly framed as "for the claude.ai web side meanwhile"):**
-- "RTL Support for Hebrew & Arabic in Claude Desktop / Cowork" — github.com/anthropics/claude-code/issues/38005
-- "[FEATURE] Hebrew (RTL) text display broken when mixed with English" — github.com/anthropics/claude-code/issues/50705
-
-**Reddit (no thread URLs pre-baked — search in-sub for "hebrew"/"RTL"/"arabic"
-the day you post, reply there, AND make one top-level post per sub):**
-r/ClaudeAI, r/ChatGPT, r/GoogleGemini, r/chrome_extensions, r/Egypt_Developers
-(Arabic dev community — top-level Arabic post welcome). Set saved
-searches/alerts for: "Hebrew ChatGPT", "RTL Claude", "עברית הפוך", "العربية مقلوب".
-
-**Live complaint threads to answer (tailored replies in §1e below):**
-- r/Egypt_Developers — "في حد عنده حل لمشكلة الـRTL في claude.ai؟" —
-  reddit.com/r/Egypt_Developers/comments/1sc5tu3 (explicitly asking for a fix → Arabic reply)
-- r/ClaudeAI — "Claude should fix the RTL issue" — reddit.com/r/ClaudeAI/comments/1tczlbj (EN reply)
-- r/ClaudeAI — "Arabic output is not readable (RTL)" — reddit.com/r/ClaudeAI/comments/1s7jqgb (EN reply)
-- Facebook "Claude" group post — facebook.com/groups/cladue/posts/1346428154210500
-  (read the post, answer with the matching EN/HE group reply; the group itself
-  is also a venue for the full group post later)
-- SKIP: forum.glyphsapp.com Hebrew-kerning thread — it's about font-editor
-  export bugs, not AI chats; replying there is off-topic spam.
-- NOT a venue: ai-toolbox.co's "RTL fix" article — competitor SEO content;
-  it's the model for our own ranking article instead.
-
-**Student channels (you're the in-group here):** course/degree WhatsApp groups,
-university CS Discord/Slack servers, faculty Facebook groups — use the casual
-WhatsApp version, not marketing copy.
-
-## Sequencing — do not skip the gates
-
-1. **Gate 1 — listing live.** Post nothing until the dashboard shows the new
-   screenshots + copy (after the pending CWS review clears). Traffic to the old
-   listing (one watermarked screenshot, 3.0★) converts badly and first
-   impressions don't repeat.
-2. **Gate 2 — seed honest reviews.** Before any big post, ask a handful of real
-   users (friends, classmates, group members who already use it) to rate it —
-   honestly, unincentivized (CWS bans paid/quid-pro-quo reviews). Target: ≥5
-   reviews, ≥4.5★ average, so the social proof exists when traffic lands.
-3. **Then stagger posts over ~2 weeks** (one channel every 2-3 days), reply to
-   every comment within hours, and watch installs-per-day in the CWS dashboard
-   to see which channel works. Double down there.
+Where to post + the live thread registry: `channels.md`. Posting gates + sequencing: `plan.md`.
+Writing rules (post anatomy, reply etiquette): `playbook.md` §d/§e.
 
 ---
 
@@ -313,8 +257,11 @@ the same day you post; some require a comment ratio or specific flair.)
 - **"Your Claude Code CLI and claude.ai share the same limits — here's where
   your quota actually goes"** — the meters angle, timed to the next big
   rate-limit discourse wave on r/ClaudeAI (recurs roughly monthly).
+- **"I added Snake to play while Claude thinks"** — the mini-game as a
+  standalone post (X/Reddit, 15-second clip): the most meme-able feature in
+  the extension; zero search volume but high share potential.
 - **"I tested 7 RTL extensions on the same Hebrew conversation"** — turn
-  docs/COMPETITORS.md into an honest public comparison with screenshots.
+  marketing/competitors.md into an honest public comparison with screenshots.
   Be scrupulously fair (praise Chat-Math RTL Fix's niche, RTL Responder's
   Claude polish); the multi-platform + math story wins on its own.
 - **BiDi engineering deep-dive** — "Why mixed Hebrew/English breaks in
