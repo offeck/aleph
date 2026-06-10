@@ -12,8 +12,8 @@ Edit these files. Everything else is a symlink (or a synced copy on systems with
 | Type | Source Location | Count |
 |------|----------------|-------|
 | Rules | `CLAUDE.md` | 1 |
-| Agents | `.agents/agents/*.md` | 3 |
-| Skills | `.agents/skills/*/SKILL.md` | 1 |
+| Agents | `.agents/agents/*.md` | 5 |
+| Skills | `.agents/skills/*/SKILL.md` | 2 |
 
 ---
 
@@ -29,21 +29,24 @@ Edit these files. Everything else is a symlink (or a synced copy on systems with
 
 ---
 
-## Agents (3)
+## Agents (5)
 
 | Agent | Purpose | Source |
 |-------|---------|--------|
 | **issue-investigator** | Root cause analysis of visual bugs (BiDi, LaTeX, theme, focus mode, streaming) | `.agents/agents/issue-investigator.md` |
 | **issue-planner** | Plans general, non-monkey-patch fixes; researches competing tools | `.agents/agents/issue-planner.md` |
 | **regression-tester** | Runs visual regression tests against all sessions in `tests/sessions.json` | `.agents/agents/regression-tester.md` |
+| **marketing-writer** | Drafts venue-adapted marketing copy (EN/HE/AR) in brand voice; never posts | `.agents/agents/marketing-writer.md` |
+| **seo-auditor** | Audits the CWS listing vs keyword-spam policy + keyword strategy; read-only | `.agents/agents/seo-auditor.md` |
 
 ---
 
-## Skills (1)
+## Skills (2)
 
 | Skill | Purpose | Source |
 |-------|---------|--------|
 | **fix-issue** | End-to-end bug fix workflow: reproduce, investigate, plan, implement, verify, regression-test | `.agents/skills/fix-issue/SKILL.md` |
+| **marketing** | Marketing ops console: plan / post / log / audit / scout over `marketing/*.md` | `.agents/skills/marketing/SKILL.md` |
 
 ---
 
