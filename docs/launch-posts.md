@@ -28,8 +28,22 @@ broadest threads, clearly framed as "for the claude.ai web side meanwhile"):**
 
 **Reddit (no thread URLs pre-baked — search in-sub for "hebrew"/"RTL"/"arabic"
 the day you post, reply there, AND make one top-level post per sub):**
-r/ClaudeAI, r/ChatGPT, r/GoogleGemini, r/chrome_extensions. Set saved
+r/ClaudeAI, r/ChatGPT, r/GoogleGemini, r/chrome_extensions, r/Egypt_Developers
+(Arabic dev community — top-level Arabic post welcome). Set saved
 searches/alerts for: "Hebrew ChatGPT", "RTL Claude", "עברית הפוך", "العربية مقلوب".
+
+**Live complaint threads to answer (tailored replies in §1e below):**
+- r/Egypt_Developers — "في حد عنده حل لمشكلة الـRTL في claude.ai؟" —
+  reddit.com/r/Egypt_Developers/comments/1sc5tu3 (explicitly asking for a fix → Arabic reply)
+- r/ClaudeAI — "Claude should fix the RTL issue" — reddit.com/r/ClaudeAI/comments/1tczlbj (EN reply)
+- r/ClaudeAI — "Arabic output is not readable (RTL)" — reddit.com/r/ClaudeAI/comments/1s7jqgb (EN reply)
+- Facebook "Claude" group post — facebook.com/groups/cladue/posts/1346428154210500
+  (read the post, answer with the matching EN/HE group reply; the group itself
+  is also a venue for the full group post later)
+- SKIP: forum.glyphsapp.com Hebrew-kerning thread — it's about font-editor
+  export bugs, not AI chats; replying there is off-topic spam.
+- NOT a venue: ai-toolbox.co's "RTL fix" article — competitor SEO content;
+  it's the model for our own ranking article instead.
 
 **Student channels (you're the in-group here):** course/degree WhatsApp groups,
 university CS Discord/Slack servers, faculty Facebook groups — use the casual
@@ -125,6 +139,43 @@ venue, never spammed across every thread; adjust the first line to the thread:
 For the Anthropic GitHub issues (which are mostly about Claude Code/Desktop),
 prefix instead with: "This bites on claude.ai web too. For the web side, until
 there's a native fix, I built…" — never imply it fixes the CLI/desktop apps.
+
+## 1e. Tailored replies for the found threads
+
+**r/Egypt_Developers — "في حد عنده حل لمشكلة الـRTL في claude.ai؟" (Arabic):**
+
+> نعم — واجهت نفس المشكلة بالضبط، فبنيت إضافة كروم مفتوحة المصدر تحلّها على
+> claude.ai (وكمان ChatGPT وGemini): تكتشف الاتجاه لكل فقرة من الأحرف نفسها،
+> فالعربي يتجه يمين والإنجليزي يبقى شمال بدون قلب إجباري، والمعادلات والأكواد
+> تبقى مقروءة داخل النص. تشتغل حتى أثناء بث الإجابة.
+>
+> مجانية وبدون أي جمع بيانات — المتجر: [رابط] — الكود المصدري:
+> github.com/offeck/aleph (للإفصاح: أنا المطوّر). لو جربتها وفيه حالة مكسورة،
+> ابعتلي وهصلحها.
+
+**r/ClaudeAI — "Claude should fix the RTL issue" (EN):**
+
+> Agreed — it's been broken forever, and it gets worse the more you mix
+> Hebrew/Arabic with English tokens or math (the BiDi algorithm just gives up).
+>
+> Until Anthropic fixes it natively: I built an open-source Chrome extension
+> that fixes it on claude.ai (and chatgpt.com / gemini.google.com) —
+> per-paragraph direction detection from the actual characters, KaTeX/code
+> isolated so math stays readable inside RTL text, works mid-stream. Free, MIT,
+> no data collection: [store link] — source: github.com/offeck/aleph.
+> (Disclosure: I'm the author.) Happy to fix any edge case you throw at it.
+
+**r/ClaudeAI — "Arabic output is not readable (RTL)" (EN):**
+
+> This is exactly the mixed-direction BiDi failure — Arabic plus English
+> tokens/numbers in one paragraph and the browser reorders it into soup.
+>
+> I built an open-source Chrome extension that fixes it on claude.ai, ChatGPT,
+> and Gemini: it detects direction per paragraph from the characters
+> themselves, so Arabic flows RTL while code/math/English stay readable. Free,
+> no data collection: [store link] — source: github.com/offeck/aleph.
+> (Disclosure: I'm the author.) If you hit a case it doesn't handle, I want to
+> know about it.
 
 ## 2. Reddit — r/ClaudeAI
 
