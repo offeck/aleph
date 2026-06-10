@@ -6,6 +6,10 @@ A Chrome extension that fixes Hebrew, Arabic-script, English, and math bidirecti
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
+![Hebrew text in Claude without and with Aleph](store-assets/final/01-before-after.png)
+
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/jpicfbmjogpihahcmephbnibnjkfkfia)**
+
 ## The problem
 
 AI chat platforms render RTL text poorly. When Hebrew, Arabic, Persian, or Urdu mixes with English words or math expressions, the bidirectional text algorithm breaks — words appear in the wrong order, math equations flip, and lists point the wrong way. Each platform (Claude, ChatGPT, Gemini) has different DOM structures, making a universal fix non-trivial.
