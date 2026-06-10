@@ -71,7 +71,7 @@ Before reporting any change as complete:
 
 Chrome extension (Manifest V3, TypeScript) that provides Hebrew and Arabic-script BiDi text fixing, custom themes, focus mode, streaming smoothing, and consistent typography/layout styling across Claude, ChatGPT, and Gemini.
 
-Marketing operations (store listing, launch copy, channel/metrics trackers, SEO strategy) live in `marketing/`, operated via the `/marketing` skill — agents draft; posting happens only with a fresh, explicit per-post confirmation (one yes = one post; protocol in `marketing/playbook.md` §h), and blocked platforms stay human-pasted.
+Marketing operations (store listing, launch copy, channel/metrics trackers, SEO strategy) live in `marketing/`, operated via the `/marketing` skill — agents draft; posting happens only with a fresh, explicit per-post confirmation (one yes = one post; protocol in `marketing/playbook.md` §h).
 
 ## Architecture
 

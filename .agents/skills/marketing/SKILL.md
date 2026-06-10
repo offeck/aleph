@@ -8,7 +8,8 @@ argument-hint: "[plan | post <venue> | log <k=v ...> | audit | scout [topic]]"
 
 **GLOBAL RULES — read before doing anything:**
 1. **Posting is confirmation-gated, always.** You may reply/post/comment on the user's behalf ONLY after: (a) presenting the EXACT final copy and the EXACT target (venue + URL), and (b) receiving a fresh, explicit confirmation for THAT specific post in this conversation. One confirmation = one post — never batch several posts under one approval, never reuse an earlier approval, never treat the skill invocation itself as approval. If anything about the copy or target changes after approval, re-confirm.
-2. **Respect platform capability honestly.** Some venues are automatable (GitHub via `gh`, some forums via browser tools); others are blocked for automation (Reddit, Facebook, X, WhatsApp — the browser layer refuses them) or too account-sensitive to automate (HN, Product Hunt). Check the venue's Auto-post value in `marketing/playbook.md` §b. For non-automatable venues, deliver paste-ready copy and say plainly that the human posts it — never claim you posted.
+2. **Respect platform capability honestly.** Reddit uses Chrome DevTools MCP under the same confirmation gates as forums. GitHub uses `gh`; some forums use browser tools.
+   Some other venues are blocked for automation (Facebook, X, WhatsApp — the browser layer refuses them) or too account-sensitive to automate (HN, Product Hunt). Check the venue's Auto-post value in `marketing/playbook.md` §b. For non-automatable venues, deliver paste-ready copy and say plainly that the human posts it — never claim you posted.
 3. **After any post you make: verify it is live, capture the live URL, and update `marketing/channels.md` in the same turn.** A post that isn't logged doesn't exist.
 4. File writes are limited to `marketing/*.md`. Never touch `src/`, `manifest.json`, or anything else.
 5. Copy drafting MUST go through the `marketing-writer` agent; listing audits MUST go through the `seo-auditor` agent. Do not do their work inline.
@@ -47,8 +48,8 @@ Agent({
 4. Present the copy (both variants if applicable) + the pre-post checklist + the exact target URL. Remind: attach the hero image where allowed (`store-assets/final/01-before-after.png` — image upload is usually a manual step even on automatable venues).
 5. **Determine the posting path** from playbook §b Auto-post:
    - **`gh` (GitHub issues/discussions):** on explicit confirmation of the final text, post with `gh issue comment <url> --body-file <tempfile>` (write the body to a temp file first — never inline-quote it through the shell). Verify with `gh issue view --comments | tail`, capture the comment URL.
-   - **`browser` (Discourse forums and other allowed sites):** on explicit confirmation, use the claude-in-chrome tools on the user's logged-in session: navigate to the thread, click reply, paste the text, screenshot the filled editor, **re-confirm with the user against the screenshot**, then submit. Verify the comment renders, capture its URL. If the browser layer refuses the site or the flow breaks twice, stop and fall back to manual paste — do not keep retrying.
-   - **`manual` (Reddit, Facebook, X, WhatsApp, HN, Product Hunt, LinkedIn, Discord):** deliver the copy and wait for the human to post; ask for the live URL afterwards.
+   - **`browser` (Reddit via Chrome DevTools MCP, Discourse forums, and other allowed sites):** on explicit confirmation, use the user's logged-in browser session: navigate to the thread, click reply, paste the text, screenshot the filled editor, **re-confirm with the user against the screenshot**, then submit. Verify the comment renders, capture its URL. If the flow breaks twice, stop, report exactly where it failed, and ask the user how to proceed — do not keep retrying.
+   - **`manual` (Facebook, X, WhatsApp, HN, Product Hunt, LinkedIn, Discord):** deliver the copy and wait for the human to post; ask for the live URL afterwards.
 6. **Log in the same turn**: update the row — Status=`posted`/`replied`, Posted={date}, Outcome={live URL}. Add a follow-up row (or note) dated +48h: "log installs delta + answer replies". If the user declined to post, leave Status as `todo` and note the decision.
 
 ## Mode: log <k=v ...>
@@ -88,7 +89,7 @@ Agent({
 ## Example invocations
 
 - `/marketing` — weekly planning pass
-- `/marketing post r/ClaudeAI` — draft the r/ClaudeAI top-level post (manual venue: human pastes)
+- `/marketing post r/ClaudeAI` — draft the r/ClaudeAI top-level post and, after confirmation, use the browser path
 - `/marketing post OpenAI forum KaTeX` — draft + (after confirmation) post the reply via browser
 - `/marketing post claude-code 38005` — draft + (after confirmation) comment via gh
 - `/marketing log users=12 installs=9 rating=4.5 ratings=6 note="HE FB post day"`

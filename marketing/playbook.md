@@ -38,7 +38,7 @@ THAT DAY — they change), (3) is there a recent precedent post that did well,
 | Channel type | Norms | Best time | Image | Auto-post | Notes |
 |---|---|---|---|---|---|
 | HE/AR Facebook groups | casual, first-person, ≤120 words | Sun–Thu evening IL | yes — hero | manual | browser layer blocks FB; admins delete link-first posts; pain-first |
-| Platform subreddits | technical-honest, ≤180 words, flair check | Tue–Thu morning US | yes | manual | browser layer blocks Reddit; some subs require karma/ratio |
+| Platform subreddits | technical-honest, ≤180 words, flair check | Tue–Thu morning US | yes | browser | use Chrome DevTools MCP with confirmation; some subs require karma/ratio |
 | Vendor forums (OpenAI community) | reply-only, answer the thread, ≤100 words | any | usually | browser | Discourse; test the flow once; never top-level self-promo |
 | GitHub issue threads | precise, web-side framing only, ≤80 words | any | yes | gh | `gh issue comment` — most reliable path; max 1 comment per issue, 2 issues total |
 | Show HN | technical depth, builder story | Tue–Thu 8-10am ET | n/a (link) | manual | account actions matter — always the human; runbook §f |
@@ -51,8 +51,8 @@ THAT DAY — they change), (3) is there a recent precedent post that did well,
 
 **Auto-post values** (used by `/marketing post` step 5): `gh` = Claude posts via
 the GitHub CLI after confirmation · `browser` = Claude posts via the user's
-logged-in browser session after confirmation (with a filled-editor screenshot
-re-confirm before submit) · `manual` = the human pastes; Claude only drafts.
+logged-in browser session after confirmation (Chrome DevTools MCP for Reddit;
+filled-editor screenshot re-confirm before submit) · `manual` = the human pastes; Claude only drafts.
 
 ## c. Finding leads (the scout process — `/marketing scout` automates 1–3)
 
@@ -144,7 +144,7 @@ buries). Reply to every comment.
 3. After posting: verify it's live, capture the URL, log it in `channels.md`
    in the same turn. If posting fails twice, stop and hand the copy to the
    human — never keep retrying into a possible double-post.
-4. Blocked/manual venues (§b table) are never automated, period — Claude
+4. Manual-only venues (§b table) are never automated, period — Claude
    drafts, the human pastes, the human reports back the live URL.
 5. UTM note: CWS install pages give no referrer data, so links to the store
    can't be tagged usefully. When the GitHub Pages landing exists, links in
