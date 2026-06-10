@@ -1,16 +1,18 @@
 ---
 name: marketing
-description: Marketing operations console for Aleph. Reviews trackers and proposes weekly actions (plan), drafts venue-adapted post copy via the marketing-writer agent (post), appends weekly CWS metrics (log), audits the store listing for CWS SEO/policy compliance via the seo-auditor agent (audit), and hunts new venues/complaint threads (scout). Use for any marketing, store-listing, posting, metrics, or lead-finding task.
+description: Marketing operations console for Aleph. Reviews trackers and proposes weekly actions (plan), drafts venue-adapted post copy via the marketing-writer agent and — with explicit per-post confirmation — posts/replies on automatable venues (post), appends weekly CWS metrics (log), audits the store listing for CWS SEO/policy compliance via the seo-auditor agent (audit), and hunts new venues/complaint threads (scout). Use for any marketing, store-listing, posting, metrics, or lead-finding task.
 argument-hint: "[plan | post <venue> | log <k=v ...> | audit | scout [topic]]"
 ---
 
 # Marketing Ops Workflow
 
 **GLOBAL RULES — read before doing anything:**
-1. **NEVER post, comment, rate, publish, or submit anything anywhere** — not on Reddit, forums, Facebook, GitHub, the CWS dashboard, or any other site, and not even if browser tools are connected. You produce copy and tracker updates; the human pastes. No exceptions, no "just this once".
-2. File writes are limited to `marketing/*.md`. Never touch `src/`, `manifest.json`, or anything else.
-3. Copy drafting MUST go through the `marketing-writer` agent; listing audits MUST go through the `seo-auditor` agent. Do not do their work inline.
-4. Before acting in any mode, read `marketing/plan.md` (the Gates section governs everything) and `marketing/README.md` (hard rules).
+1. **Posting is confirmation-gated, always.** You may reply/post/comment on the user's behalf ONLY after: (a) presenting the EXACT final copy and the EXACT target (venue + URL), and (b) receiving a fresh, explicit confirmation for THAT specific post in this conversation. One confirmation = one post — never batch several posts under one approval, never reuse an earlier approval, never treat the skill invocation itself as approval. If anything about the copy or target changes after approval, re-confirm.
+2. **Respect platform capability honestly.** Some venues are automatable (GitHub via `gh`, some forums via browser tools); others are blocked for automation (Reddit, Facebook, X, WhatsApp — the browser layer refuses them) or too account-sensitive to automate (HN, Product Hunt). Check the venue's Auto-post value in `marketing/playbook.md` §b. For non-automatable venues, deliver paste-ready copy and say plainly that the human posts it — never claim you posted.
+3. **After any post you make: verify it is live, capture the live URL, and update `marketing/channels.md` in the same turn.** A post that isn't logged doesn't exist.
+4. File writes are limited to `marketing/*.md`. Never touch `src/`, `manifest.json`, or anything else.
+5. Copy drafting MUST go through the `marketing-writer` agent; listing audits MUST go through the `seo-auditor` agent. Do not do their work inline.
+6. Before acting in any mode, read `marketing/plan.md` (the Gates section governs everything) and `marketing/README.md` (hard rules).
 
 ---
 
@@ -38,12 +40,16 @@ Parse the mode from `$ARGUMENTS`:
 Agent({
   subagent_type: "marketing-writer",
   description: "Draft copy for {venue}",
-  prompt: "Venue: {venue}\nVenue type: {type from channels.md}\nLanguage: {lang}\nBase variant: marketing/launch-posts.md §{copy ref}\nThread URL: {URL if the row is a live thread, else omit}\nVenue notes: {Notes column}\nExtra context: {anything the user added}\n\nProduce ready-to-paste copy per your output format."
+  prompt: "Venue: {venue}\nVenue type: {type from channels.md}\nLanguage: {lang}\nBase variant: marketing/launch-posts.md §{copy ref}\nThread URL: {URL if the row is a live thread, else omit}\nVenue notes: {Notes column}\nExtra context: {anything the user added}\n\nProduce ready-to-paste copy per your output format. For a top-level post produce two labeled variants (A/B); for a thread reply produce one."
 })
 ```
 
-4. Present the agent's copy + pre-post checklist verbatim. Remind: attach the hero image where allowed (`store-assets/final/01-before-after.png`).
-5. The human posts manually. After they confirm, update the row: Status=`posted` (or `replied`), Posted={date}, Outcome={live post URL}. Add a follow-up row (or note) dated +48h: "log installs delta + answer replies".
+4. Present the copy (both variants if applicable) + the pre-post checklist + the exact target URL. Remind: attach the hero image where allowed (`store-assets/final/01-before-after.png` — image upload is usually a manual step even on automatable venues).
+5. **Determine the posting path** from playbook §b Auto-post:
+   - **`gh` (GitHub issues/discussions):** on explicit confirmation of the final text, post with `gh issue comment <url> --body-file <tempfile>` (write the body to a temp file first — never inline-quote it through the shell). Verify with `gh issue view --comments | tail`, capture the comment URL.
+   - **`browser` (Discourse forums and other allowed sites):** on explicit confirmation, use the claude-in-chrome tools on the user's logged-in session: navigate to the thread, click reply, paste the text, screenshot the filled editor, **re-confirm with the user against the screenshot**, then submit. Verify the comment renders, capture its URL. If the browser layer refuses the site or the flow breaks twice, stop and fall back to manual paste — do not keep retrying.
+   - **`manual` (Reddit, Facebook, X, WhatsApp, HN, Product Hunt, LinkedIn, Discord):** deliver the copy and wait for the human to post; ask for the live URL afterwards.
+6. **Log in the same turn**: update the row — Status=`posted`/`replied`, Posted={date}, Outcome={live URL}. Add a follow-up row (or note) dated +48h: "log installs delta + answer replies". If the user declined to post, leave Status as `todo` and note the decision.
 
 ## Mode: log <k=v ...>
 
@@ -74,21 +80,21 @@ Agent({
 2. Load `WebSearch` (and `WebFetch`) via ToolSearch if not loaded. Run the searches (Reddit, X, vendor forums, GitHub issues).
 3. Qualify each promising hit per `playbook.md` §c.3: real current pain · thread active (<3 months old or evergreen) · Aleph actually fixes it (web pages only — REJECT Claude-Code/Desktop/IDE-only complaints) · venue allows replies/posts.
 4. Dedupe against every URL already in `marketing/channels.md`.
-5. Present qualified finds as proposed table rows (venue, type, URL, lang, recommended copy ref, notes incl. why qualified). Append ONLY user-approved rows to the right section of `channels.md`.
-6. Never reply to anything found — that's `post` mode, after approval, by the human.
+5. Present qualified finds as proposed table rows (venue, type, URL, lang, recommended copy ref, Auto-post path, notes incl. why qualified). Append ONLY user-approved rows to the right section of `channels.md`.
+6. Scout never posts — answering a found lead is `post` mode, with its own confirmation.
 
 ---
 
 ## Example invocations
 
 - `/marketing` — weekly planning pass
-- `/marketing post r/ClaudeAI` — draft the r/ClaudeAI top-level post
-- `/marketing post OpenAI forum KaTeX` — draft the reply for the KaTeX-RTL thread
+- `/marketing post r/ClaudeAI` — draft the r/ClaudeAI top-level post (manual venue: human pastes)
+- `/marketing post OpenAI forum KaTeX` — draft + (after confirmation) post the reply via browser
+- `/marketing post claude-code 38005` — draft + (after confirmation) comment via gh
 - `/marketing log users=12 installs=9 rating=4.5 ratings=6 note="HE FB post day"`
 - `/marketing audit` — monthly listing/policy audit
 - `/marketing scout` — sweep saved searches for new complaint threads
-- `/marketing scout perplexity rtl` — scout a specific topic
 
 ## Summary
 
-Always end by reporting: what changed in which `marketing/*.md` files, what the human must do manually (paste/post/dashboard), and the next due item from `plan.md`.
+Always end by reporting: what was posted where (with live URLs) vs. what awaits manual posting, what changed in which `marketing/*.md` files, and the next due item from `plan.md`.

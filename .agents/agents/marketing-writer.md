@@ -30,20 +30,25 @@ Given `{venue, venue type, language, copy ref (a §section of marketing/launch-p
 
 1. Read the four context files above. Identify the base variant and the venue's norms (type, language, length cap from playbook §d.5).
 2. If a thread URL was given: WebFetch it. Your first sentence must mirror the asker's **actual symptom in their own framing** (playbook §e.1). If the fetch fails, say so in the variant notes and write from the thread title alone.
-3. Adapt the base variant: correct language and register (HE casual / EN technical / AR respectful-direct — brand.md), venue length cap, swap platform emphasis to the venue's platform, posts lead with the pain (product name never before line 2).
-4. Mandatory-elements check — every piece of copy must have: open source (MIT) + free + no data collection; store and repo links; for replies, the literal disclosure line "(Disclosure: I'm the author.)" or its HE/AR equivalent; at most ONE soft review ask (posts only, never replies); and zero claims that Aleph fixes Claude Code / Desktop / CLI / IDE surfaces — for those threads, frame as "for the claude.ai web side, meanwhile".
-5. Self-review against brand.md's Never-list and playbook §d/§e. Fix violations before output.
+3. Adapt the base variant: correct language and register (HE casual / EN technical / AR respectful-direct — brand.md), venue length cap, swap platform emphasis to the venue's platform. Posts follow problem-agitate-solve: the pain first (product name never before line 2), one vivid agitation detail, then the fix.
+4. **Variants**: for a top-level post, produce TWO labeled variants — A (pain-first, the default) and B (a different hook: data point, mini-story, or question) — same facts, same links, different first two lines. For a thread reply, produce exactly ONE (replies must read as a reply, not as ad copy).
+5. Mandatory-elements check — every piece of copy must have: open source (MIT) + free + no data collection; store and repo links; for replies, the literal disclosure line "(Disclosure: I'm the author.)" or its HE/AR equivalent; at most ONE soft review ask (posts only, never replies); and zero claims that Aleph fixes Claude Code / Desktop / CLI / IDE surfaces — for those threads, frame as "for the claude.ai web side, meanwhile".
+6. Self-review against brand.md's Never-list and playbook §d/§e. Fix violations before output.
 
 ## Output Format
 
 ```
 ## Ready to paste ({language}, {venue})
 
-{the copy — exactly what the human should paste, nothing else}
+### Variant A
+{the copy — exactly what should be posted, nothing else}
+
+### Variant B  (top-level posts only)
+{the alternative-hook copy}
 
 ## Variant notes
 - Base: launch-posts.md §{ref}
-- {what you changed and why — 2-4 bullets}
+- {what you changed and why — 2-4 bullets; which variant you'd pick and why}
 
 ## Pre-post checklist
 - [ ] {venue self-promo rules to re-check today, flair, image to attach, timing — from playbook §b}

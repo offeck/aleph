@@ -28,7 +28,7 @@ One-person system. Touch weekly. Markdown only — no tooling that can rot.
 
 ## Hard rules
 
-- **Nothing is ever auto-posted.** Agents draft; the human pastes.
+- **Posting is confirmation-gated.** Claude may post/reply only after showing the exact final copy + target and getting a fresh, explicit yes for THAT post (one yes = one post — protocol in `playbook.md` §h). Blocked platforms (Reddit/FB/X/WhatsApp/HN/PH) are always pasted by the human.
 - **Honest always**: "Disclosure: I'm the author" in every external comment; never claim Aleph fixes Claude Code / Desktop / CLI surfaces.
 - **Reviews are organic** — never incentivized, never traded (CWS policy; also the fastest way to lose trust in small communities).
 - **One change to the store listing at a time** — otherwise metrics can't attribute anything.

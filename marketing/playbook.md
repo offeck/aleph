@@ -35,19 +35,24 @@ audience have the exact pain, (2) are self-promo posts allowed (read the rules
 THAT DAY — they change), (3) is there a recent precedent post that did well,
 (4) can you attach an image.
 
-| Channel type | Norms | Best time | Image | Notes |
-|---|---|---|---|---|
-| HE/AR Facebook groups | casual, first-person, ≤120 words | Sun–Thu evening IL | yes — hero | admins delete link-first posts; pain-first |
-| Platform subreddits | technical-honest, ≤180 words, flair check | Tue–Thu morning US | yes | some require comment karma / ratio |
-| Vendor forums (OpenAI community) | reply-only, answer the thread, ≤100 words | any | usually | never top-level self-promo |
-| GitHub issue threads | precise, web-side framing only, ≤80 words | any | yes | max 1 comment per issue, 2 issues total |
-| Show HN | technical depth, builder story | Tue–Thu 8-10am ET | n/a (link) | runbook §f |
-| Product Hunt | polished assets, maker story | Tue–Thu 12:01am PT | gallery | runbook §f |
-| dev.to / blog | long-form evergreen, code snippets | any | yes | feeds HN/newsletters; SEO compounding |
-| X/Twitter | thread, image in tweet 1, ≤4 tweets | weekday morning | yes | HE version separately |
-| WhatsApp/Degree groups | friend voice, zero marketing tone | any | optional | §1c only — never the formal copy |
-| Discord servers | ask-the-mods first; many ban promo | any | varies | a deleted post burns the server forever |
-| Media pitches (Geektime etc.) | 3-sentence email: angle, proof, link | Sun–Mon | press kit | angle: local dev, open source, real pain |
+| Channel type | Norms | Best time | Image | Auto-post | Notes |
+|---|---|---|---|---|---|
+| HE/AR Facebook groups | casual, first-person, ≤120 words | Sun–Thu evening IL | yes — hero | manual | browser layer blocks FB; admins delete link-first posts; pain-first |
+| Platform subreddits | technical-honest, ≤180 words, flair check | Tue–Thu morning US | yes | manual | browser layer blocks Reddit; some subs require karma/ratio |
+| Vendor forums (OpenAI community) | reply-only, answer the thread, ≤100 words | any | usually | browser | Discourse; test the flow once; never top-level self-promo |
+| GitHub issue threads | precise, web-side framing only, ≤80 words | any | yes | gh | `gh issue comment` — most reliable path; max 1 comment per issue, 2 issues total |
+| Show HN | technical depth, builder story | Tue–Thu 8-10am ET | n/a (link) | manual | account actions matter — always the human; runbook §f |
+| Product Hunt | polished assets, maker story | Tue–Thu 12:01am PT | gallery | manual | runbook §f |
+| dev.to / blog | long-form evergreen, code snippets | any | yes | browser | editor flow may work; verify once before trusting |
+| X/Twitter | thread, image in tweet 1, ≤4 tweets | weekday morning | yes | manual | browser layer blocks X; HE version separately |
+| WhatsApp/Degree groups | friend voice, zero marketing tone | any | optional | manual | §1c only — never the formal copy |
+| Discord servers | ask-the-mods first; many ban promo | any | varies | manual | a deleted post burns the server forever |
+| Media pitches (Geektime etc.) | 3-sentence email: angle, proof, link | Sun–Mon | press kit | manual | email is the human's; angle: local dev, open source, real pain |
+
+**Auto-post values** (used by `/marketing post` step 5): `gh` = Claude posts via
+the GitHub CLI after confirmation · `browser` = Claude posts via the user's
+logged-in browser session after confirmation (with a filled-editor screenshot
+re-confirm before submit) · `manual` = the human pastes; Claude only drafts.
 
 ## c. Finding leads (the scout process — `/marketing scout` automates 1–3)
 
@@ -127,3 +132,29 @@ buries). Reply to every comment.
   long-term lever; build after the listing overhaul proves conversion.
 - Never: incentives, swaps, review-for-review, asking to "rate 5 stars" (ask
   for a rating, not a number).
+
+## h. Confirmation-gated posting protocol (binding for the /marketing skill)
+
+1. Every post/reply requires a **fresh, explicit, per-post confirmation** after
+   the exact final copy AND exact target (venue + URL) are shown. One yes = one
+   post. Approval never carries over to the next post, the next venue, or an
+   edited version of the same copy.
+2. Browser-path posts get a **second confirmation against a screenshot of the
+   filled editor** before submit — what's in the box is what gets posted.
+3. After posting: verify it's live, capture the URL, log it in `channels.md`
+   in the same turn. If posting fails twice, stop and hand the copy to the
+   human — never keep retrying into a possible double-post.
+4. Blocked/manual venues (§b table) are never automated, period — Claude
+   drafts, the human pastes, the human reports back the live URL.
+5. UTM note: CWS install pages give no referrer data, so links to the store
+   can't be tagged usefully. When the GitHub Pages landing exists, links in
+   posts should point there with `?ref=<venue>` so per-channel clicks become
+   measurable.
+
+## i. Writing for AI answer engines (AEO) — articles only
+
+The dev.to/landing articles should be structured so AI assistants cite them:
+a direct question-answer pair near the top ("Why is Hebrew broken in ChatGPT?
+Because…"), concrete numbered fixes, and the extension named as one of the
+fixes. People increasingly ask the chatbots themselves — be the source the
+chatbot quotes.
