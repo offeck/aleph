@@ -4,6 +4,37 @@ Store link: https://chromewebstore.google.com/detail/jpicfbmjogpihahcmephbnibnjk
 Repo link: https://github.com/offeck/aleph
 Hero image for posts: `store-assets/final/01-before-after.png` (attach it everywhere images are allowed).
 
+## Where to post — researched venues (June 2026)
+
+**Hebrew Facebook groups (post the Hebrew group post + hero image):**
+- GenAI for developers Israel — facebook.com/groups/1264810614120121
+- AI ISRAEL — בינה מלאכותית כלים ושימושים — facebook.com/groups/aisrael
+- GenAI, AI, ML & Data IsraelClouds — facebook.com/groups/genaicommunityisrael
+- Full directory of HE AI Facebook + WhatsApp groups: aicoffeeclub.co.il (קבוצות פייסבוק / קבוצות וואטסאפ pages)
+
+**OpenAI Developer Community (reply with the EN comment template — these are
+ChatGPT-web complaints, exactly what Aleph fixes):**
+- "Add support for right-to-left layout (rtl)" — community.openai.com/t/275955
+- "Request to Fix KaTeX Rendering Issues for RTL Languages" — community.openai.com/t/1117054 (bullseye: math+RTL)
+- "Support RTL in ChatGPT chat box" — community.openai.com/t/1082487
+- "Please bring back the RTL and LTR Support…" — community.openai.com/t/1036310
+- "Request for RTL Support in ChatGPT 4.0 with Canvas" — community.openai.com/t/1016687
+
+**Anthropic GitHub tracker (HONESTY REQUIRED: most are about Claude
+Code/Desktop/VS Code, which Aleph does NOT fix — comment only on the 1-2
+broadest threads, clearly framed as "for the claude.ai web side meanwhile"):**
+- "RTL Support for Hebrew & Arabic in Claude Desktop / Cowork" — github.com/anthropics/claude-code/issues/38005
+- "[FEATURE] Hebrew (RTL) text display broken when mixed with English" — github.com/anthropics/claude-code/issues/50705
+
+**Reddit (no thread URLs pre-baked — search in-sub for "hebrew"/"RTL"/"arabic"
+the day you post, reply there, AND make one top-level post per sub):**
+r/ClaudeAI, r/ChatGPT, r/GoogleGemini, r/chrome_extensions. Set saved
+searches/alerts for: "Hebrew ChatGPT", "RTL Claude", "עברית הפוך", "العربية مقلوب".
+
+**Student channels (you're the in-group here):** course/degree WhatsApp groups,
+university CS Discord/Slack servers, faculty Facebook groups — use the casual
+WhatsApp version, not marketing copy.
+
 ## Sequencing — do not skip the gates
 
 1. **Gate 1 — listing live.** Post nothing until the dashboard shows the new
@@ -40,6 +71,60 @@ you're already in. Post in Hebrew, lead with the image, keep it short:
 > אשמח לפידבק — ואם זה עוזר לכם, דירוג בחנות עוזר לי מאוד 🙏
 
 (תמונה מצורפת: before/after)
+
+## 1b. English group post (Discord/Slack/FB groups, generic)
+
+> If you ever chat with Claude, ChatGPT, or Gemini in Hebrew, Arabic, Persian,
+> or Urdu, you know the pain: answers come out left-aligned, punctuation jumps
+> to the wrong end of lines, numbered lists fall apart, and math collides with
+> the text.
+>
+> I built **Aleph** to fix that automatically. It detects direction per
+> paragraph from the actual characters (nothing is force-flipped — English
+> stays LTR), keeps formulas and code readable inside RTL text, and works
+> while the answer is still streaming. It also adds themes, a focus mode, and
+> one dashboard for your usage and rate-limits across all three platforms.
+>
+> **Completely open source (MIT)**: github.com/offeck/aleph
+> **Free on the Chrome Web Store**: [store link]
+> No accounts, no data collection — everything stays on your device.
+>
+> Feedback very welcome, and if it helps you, a store rating helps me a lot 🙏
+
+## 1c. WhatsApp — friends / degree group (Hebrew, casual)
+
+> חברים, בניתי תוסף לכרום ששווה לכם להכיר —
+> אם יצא לכם לדבר עם Claude/ChatGPT בעברית (סיכומים, חדו"א, שאלות לתרגילים)
+> ראיתם שהטקסט יוצא שבור — מיושר שמאלה, נקודות בתחילת שורות, נוסחאות באמצע
+> מתפרקות.
+>
+> התוסף מתקן את זה אוטומטית בשלוש הפלטפורמות (גם ChatGPT וגם Gemini), שומר
+> על נוסחאות וקוד תקינים, ויש גם דאשבורד שמראה כמה שרפתם מה-rate limits של
+> קלוד (מי שמשתף מנוי עם Claude Code מבין למה זה קריטי 😅).
+>
+> חינמי ולגמרי קוד פתוח: https://github.com/offeck/aleph
+> חנות כרום: [קישור]
+> אם זה עוזר — דירוג בחנות יעזור לי טונה 🙏
+
+## 1d. Comment template — complaint threads (EN, with disclosure)
+
+For OpenAI forum threads / GitHub issues / Reddit complaints. One comment per
+venue, never spammed across every thread; adjust the first line to the thread:
+
+> Same pain here — mixed Hebrew/English (or Arabic/English) breaks the BiDi
+> layout in the web UI, and it's been open for a long time.
+>
+> Until it's fixed natively: I built an open-source Chrome extension that
+> fixes this on claude.ai, chatgpt.com, and gemini.google.com — per-paragraph
+> direction detection from the actual characters, with KaTeX/code kept LTR so
+> math stays readable inside RTL text (works mid-stream too).
+>
+> Free, MIT-licensed, no data collection: [store link] — source:
+> github.com/offeck/aleph. (Disclosure: I'm the author.)
+
+For the Anthropic GitHub issues (which are mostly about Claude Code/Desktop),
+prefix instead with: "This bites on claude.ai web too. For the web side, until
+there's a native fix, I built…" — never imply it fixes the CLI/desktop apps.
 
 ## 2. Reddit — r/ClaudeAI
 
