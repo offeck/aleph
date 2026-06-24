@@ -176,16 +176,26 @@
     </div>
   </section>
 
-  <!-- ── Antigravity (experimental; connect from the popup) ──────── -->
+  <!-- ── Antigravity (experimental) ──────────────────────────────── -->
   <section id="antigravitySection">
     <h2>Antigravity</h2>
-    <div id="antigravityConnected" style="display:none">
+    <p class="hint">Experimental: show your Google Antigravity (Cloud Code) per-model quota in the popup's usage meters. Paste your Antigravity OAuth client secret to enable it — it stays on this device and is never synced or shipped with the extension.</p>
+    <div class="secret-row">
+      <input id="antigravitySecretInput" type="password" placeholder="Antigravity client secret" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="antigravitySecretSaveBtn" class="secret-btn">Save</button>
+    </div>
+    <div id="antigravitySecretSavedRow" style="display:none; margin-top:8px">
+      <span class="sync-status">Secret saved on this device.</span>
+      <button id="antigravitySecretClearBtn" class="danger-btn" style="margin-left:8px">Clear</button>
+    </div>
+
+    <div id="antigravityConnected" style="display:none; margin-top:12px">
       <p class="sync-status">Connected as <strong id="antigravityEmail"></strong></p>
       <p class="hint">Per-model Cloud Code quota shows in the popup's usage meters.</p>
       <button id="antigravityDisconnectBtn" class="danger-btn" style="margin-top:8px">Disconnect</button>
     </div>
-    <div id="antigravityDisconnected">
-      <p class="hint">Experimental: connect your Google Antigravity (Cloud Code) account to show its per-model quota in the popup's usage meters.</p>
+    <div id="antigravityDisconnected" style="display:none; margin-top:12px">
+      <p class="hint">Secret saved — open the popup and click Connect Antigravity to sign in (or connect here).</p>
       <button id="antigravityConnectBtn" class="google-btn">Connect Antigravity</button>
     </div>
   </section>

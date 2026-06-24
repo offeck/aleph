@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ANTIGRAVITY_AUTH_KEY,
   ANTIGRAVITY_PKCE_KEY,
+  ANTIGRAVITY_SECRET_KEY,
   buildConsentUrl,
   captureAntigravityCode,
   disconnectAntigravity,
@@ -9,6 +10,7 @@ import {
   getAntigravityAccessToken,
   getAntigravityAuthStatus,
   pkceChallengeS256,
+  setAntigravitySecret,
   startAntigravityConnect,
   _resetAntigravityAuthForTests,
 } from "../../src/background/antigravityAuth";
@@ -75,7 +77,7 @@ describe("antigravity PKCE + consent URL", () => {
 describe("antigravity code exchange", () => {
   let storage: Stored;
   beforeEach(() => {
-    storage = {};
+    storage = { [ANTIGRAVITY_SECRET_KEY]: "test-secret" };
     installChromeStorage(storage);
     _resetAntigravityAuthForTests();
     vi.useFakeTimers();
@@ -100,7 +102,8 @@ describe("antigravity code exchange", () => {
       expect(body.get("code")).toBe("auth-code-1");
       expect(body.get("code_verifier")).toBe("verifier-xyz");
       expect(body.get("client_id")).toContain("1071006060591-");
-      expect(body.get("client_secret")).toBeTruthy();
+      // The secret comes from local storage now, not a build-time constant.
+      expect(body.get("client_secret")).toBe("test-secret");
       expect(body.get("redirect_uri")).toBe("http://localhost:51121/oauth-callback");
       return jsonResponse({ refresh_token: "rt-1", access_token: "at-1", expires_in: 3600 });
     });
@@ -149,12 +152,25 @@ describe("antigravity code exchange", () => {
     expect(result.success).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("refuses (no network call) when no client secret is saved", async () => {
+    delete storage[ANTIGRAVITY_SECRET_KEY];
+    storage[ANTIGRAVITY_PKCE_KEY] = "v";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await captureAntigravityCode("c");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Settings");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("getAntigravityAccessToken", () => {
   let storage: Stored;
   beforeEach(() => {
-    storage = {};
+    storage = { [ANTIGRAVITY_SECRET_KEY]: "test-secret" };
     installChromeStorage(storage);
     _resetAntigravityAuthForTests();
     vi.useFakeTimers();
@@ -180,6 +196,7 @@ describe("getAntigravityAccessToken", () => {
       const body = new URLSearchParams(String(init?.body));
       expect(body.get("grant_type")).toBe("refresh_token");
       expect(body.get("refresh_token")).toBe("rt");
+      expect(body.get("client_secret")).toBe("test-secret");
       return jsonResponse({ access_token: "at-new", expires_in: 3600 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -203,16 +220,27 @@ describe("getAntigravityAccessToken", () => {
     expect(await getAntigravityAccessToken()).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("returns null (no network call) when no secret is saved, even with a stored token", async () => {
+    delete storage[ANTIGRAVITY_SECRET_KEY];
+    storage[ANTIGRAVITY_AUTH_KEY] = { refreshToken: "rt", accessToken: "at-fresh", expiresAt: 1_000_000 + 600_000, email: null, connectedAt: 0 };
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await getAntigravityAccessToken()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("antigravity status + disconnect", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("round-trips connected status and clears it on disconnect", async () => {
-    const storage: Stored = {};
+    const storage: Stored = { [ANTIGRAVITY_SECRET_KEY]: "test-secret" };
     installChromeStorage(storage);
     _resetAntigravityAuthForTests();
 
+    // Secret saved but no token yet → configured, not connected.
     expect(await getAntigravityAuthStatus()).toEqual({ connected: false, configured: true });
 
     storage[ANTIGRAVITY_AUTH_KEY] = { refreshToken: "rt", accessToken: "at", expiresAt: 1, email: "u@e.com", connectedAt: 42 };
@@ -220,6 +248,46 @@ describe("antigravity status + disconnect", () => {
 
     await disconnectAntigravity();
     expect(storage[ANTIGRAVITY_AUTH_KEY]).toBeUndefined();
+    // Disconnect drops the token but keeps the secret — still configured.
+    expect(storage[ANTIGRAVITY_SECRET_KEY]).toBe("test-secret");
     expect(await getAntigravityAuthStatus()).toEqual({ connected: false, configured: true });
+  });
+});
+
+describe("antigravity client secret (user-entered)", () => {
+  let storage: Stored;
+  beforeEach(() => {
+    storage = {};
+    installChromeStorage(storage);
+    _resetAntigravityAuthForTests();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reports not configured until a secret is saved", async () => {
+    expect(await getAntigravityAuthStatus()).toEqual({ connected: false, configured: false });
+
+    await setAntigravitySecret("my-secret");
+
+    expect(storage[ANTIGRAVITY_SECRET_KEY]).toBe("my-secret");
+    expect((await getAntigravityAuthStatus()).configured).toBe(true);
+  });
+
+  it("trims the saved secret and clears it when set to blank", async () => {
+    await setAntigravitySecret("  spaced-secret  ");
+    expect(storage[ANTIGRAVITY_SECRET_KEY]).toBe("spaced-secret");
+
+    await setAntigravitySecret("   ");
+    expect(storage[ANTIGRAVITY_SECRET_KEY]).toBeUndefined();
+    expect((await getAntigravityAuthStatus()).configured).toBe(false);
+  });
+
+  it("startAntigravityConnect refuses without a secret and works once one is saved", async () => {
+    await expect(startAntigravityConnect()).rejects.toThrow(/Settings/);
+
+    await setAntigravitySecret("my-secret");
+    const { url } = await startAntigravityConnect();
+
+    expect(url).toContain("accounts.google.com/o/oauth2/v2/auth");
+    expect(storage[ANTIGRAVITY_PKCE_KEY]).toBeTruthy();
   });
 });

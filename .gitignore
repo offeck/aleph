@@ -5,6 +5,8 @@ _metadata/
 node_modules/
 *.zip
 .claude/settings.local.json
+# Obsolete local dev secret file (the build no longer reads it; the Antigravity
+# secret is user-entered in Settings now) — kept ignored so it never gets committed.
 .antigravity-secret
 dist/
 Trace-*.json.gz

@@ -71,10 +71,6 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          # Unset -> empty -> Antigravity ships inert. Set this repo secret only
-          # when deliberately shipping the experimental feature active.
-          ANTIGRAVITY_CLIENT_SECRET: ${{ secrets.ANTIGRAVITY_CLIENT_SECRET }}
 
       - name: Install chrome-webstore-upload-cli
         run: npm install -g chrome-webstore-upload-cli@3

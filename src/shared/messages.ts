@@ -47,13 +47,14 @@ export type PageToBackgroundMessage =
   | { type: "aleph-sync-now" }
   | { type: "aleph-antigravity-connect" }
   | { type: "aleph-antigravity-status" }
+  | { type: "aleph-antigravity-set-secret"; secret: string }
   | { type: "aleph-antigravity-disconnect" };
 
 export interface AntigravityStatusResponse {
   connected: boolean;
-  // Whether this build has a client secret at all. An inert build (no secret)
-  // can't connect, so the UI hides the connect CTA rather than offering one that
-  // would only throw.
+  // Whether a client secret is currently saved (user-entered in Settings,
+  // local-only). Without one the feature is inert — the UI offers the secret entry
+  // instead of a Connect CTA that would only throw.
   configured: boolean;
   email?: string | null;
   connectedAt?: number | null;

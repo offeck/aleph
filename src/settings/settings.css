@@ -170,6 +170,40 @@ input[type="range"]::-moz-range-thumb {
 .danger-btn:hover { color: #ff6b6b; border-color: #ff6b6b; }
 .danger-btn:disabled { opacity: 0.5; cursor: wait; }
 
+/* ── Antigravity secret ──────────────────────────────────────────── */
+.secret-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.secret-row input[type="password"] {
+  flex: 1;
+  min-width: 0;
+  background: #1a1a2e;
+  color: #e2e2e2;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.secret-row input[type="password"]:focus { border-color: #7c83ff; }
+.secret-btn {
+  padding: 8px 16px;
+  background: #1a1a2e;
+  color: #e2e2e2;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.secret-btn:hover { border-color: #7c83ff; color: #7c83ff; }
+.secret-btn:disabled { opacity: 0.5; cursor: wait; }
+
 /* ── Reset button ─────────────────────────────────────────────────── */
 #resetBtn {
   width: 100%;

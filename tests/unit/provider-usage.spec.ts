@@ -12,10 +12,11 @@ import {
   refreshProviderUsage,
   shouldRefreshUsage,
 } from "../../src/background/providerUsage";
-import { ANTIGRAVITY_AUTH_KEY, _resetAntigravityAuthForTests } from "../../src/background/antigravityAuth";
+import { ANTIGRAVITY_AUTH_KEY, ANTIGRAVITY_SECRET_KEY, _resetAntigravityAuthForTests } from "../../src/background/antigravityAuth";
 
 // A fresh stored Antigravity access token — getAntigravityAccessToken returns it
-// directly (no token-endpoint round-trip) while expiresAt is in the future.
+// directly (no token-endpoint round-trip) while expiresAt is in the future. The
+// user-entered client secret must also be present, or the whole path stays inert.
 const ANTIGRAVITY_AUTH_FRESH = { refreshToken: "ag-refresh", accessToken: "ag-access", expiresAt: 9_999_999_999_999, email: "ag@example.com", connectedAt: 0 };
 
 type Stored = Record<string, unknown>;
@@ -363,7 +364,7 @@ describe("refreshProviderUsage", () => {
   });
 
   it("fetches ChatGPT, Claude, and Gemini provider limits with nested Antigravity data", async () => {
-    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH };
+    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH, [ANTIGRAVITY_SECRET_KEY]: "test-secret" };
     installChromeStorage(storage);
     const fetchMock = installProviderFetch();
 
@@ -493,6 +494,7 @@ describe("refreshProviderUsage", () => {
     // disconnect isn't clobbered by the older request.
     const storage: Stored = {
       [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH,
+      [ANTIGRAVITY_SECRET_KEY]: "test-secret",
       insights_platform_usage_gemini: {
         source: "provider",
         fetchedAt: 0,
@@ -512,7 +514,7 @@ describe("refreshProviderUsage", () => {
   });
 
   it("canary: records antigravity drift when fetchAvailableModels returns an unrecognized model shape", async () => {
-    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH };
+    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH, [ANTIGRAVITY_SECRET_KEY]: "test-secret" };
     installChromeStorage(storage);
     // A healthy 200 that carries model entries, but the quota shape changed
     // (quotaInfo → quotaShifted) so the normalizer keeps none — the silent failure.
@@ -529,7 +531,7 @@ describe("refreshProviderUsage", () => {
   });
 
   it("canary: does NOT record drift on a healthy antigravity response", async () => {
-    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH };
+    const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH, [ANTIGRAVITY_SECRET_KEY]: "test-secret" };
     installChromeStorage(storage);
     installProviderFetch();
 

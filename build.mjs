@@ -3,24 +3,16 @@
 // never edit dist/ by hand. See CLAUDE.md (Architecture).
 import * as esbuild from "esbuild";
 import { watch as watchFile } from "node:fs";
-import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, rm } from "node:fs/promises";
 
 const dev = process.argv.includes("--dev");
 const watch = process.argv.includes("--watch");
 const buildStamp = new Date().toISOString();
 
-// The Antigravity client secret is injected at build time, never committed to
-// source. Prefer the env var (CI provides it as a GitHub Actions secret); fall
-// back to a gitignored local file for dev. Absent -> "" -> the feature is inert.
-async function loadAntigravitySecret() {
-  if (process.env.ANTIGRAVITY_CLIENT_SECRET) return process.env.ANTIGRAVITY_CLIENT_SECRET.trim();
-  try {
-    return (await readFile(".antigravity-secret", "utf8")).trim();
-  } catch {
-    return "";
-  }
-}
-const antigravitySecret = await loadAntigravitySecret();
+// The Antigravity client secret is NOT a build input — it would land in the
+// shipped bundle (a Google first-party credential in the Web Store ZIP is a
+// review/policy risk). The user pastes it into Settings instead; it lives in
+// local storage and the feature stays inert until then. See antigravityAuth.ts.
 
 const jsEntries = {
   content: "src/content/index.ts",
@@ -57,7 +49,6 @@ const jsCommon = {
   minify: false, // keep bundles readable (store review + debugging); size is irrelevant
   define: {
     __ALEPH_BUILD__: JSON.stringify(buildStamp),
-    __ANTIGRAVITY_CLIENT_SECRET__: JSON.stringify(antigravitySecret),
   },
 };
 
@@ -114,6 +105,5 @@ if (watch) {
 } else {
   await Promise.all(allBuilds.map((opts) => esbuild.build(opts)));
   await copyHtml();
-  const agNote = antigravitySecret ? "" : " — Antigravity inert (no secret)";
-  console.log(`[aleph] build complete (${buildStamp})${agNote}`);
+  console.log(`[aleph] build complete (${buildStamp})`);
 }

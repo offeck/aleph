@@ -1,7 +1,9 @@
-// ── Antigravity (settings: logout only) ──────────────────
-// Login lives in the popup; the settings page only shows the connected account
-// and the Disconnect (logout) control. Connect status arrives as raw JSON from
-// the background — boundary `any`.
+// ── Antigravity (settings: secret entry + logout) ────────
+// The borrowed-client secret is user-supplied — it's entered here (never shipped
+// in the bundle) and saved to a local-only key. Once a secret is saved the popup
+// offers Connect (login); this page also offers Connect as a fallback and owns the
+// Disconnect (logout). Connect status arrives as raw JSON from the background —
+// boundary `any`.
 function setDisplay(id: string, show: boolean) {
   const el = document.getElementById(id);
   if (el) el.style.display = show ? "" : "none";
@@ -9,12 +11,11 @@ function setDisplay(id: string, show: boolean) {
 
 function renderAntigravityStatus(status: any) {
   const connected = Boolean(status && status.connected);
-  const configured = Boolean(status && status.configured);
-  // Inert build (no client secret) with nothing connected: nothing actionable —
-  // hide the whole section rather than offer a Connect button that only throws.
-  setDisplay("antigravitySection", configured || connected);
+  const configured = Boolean(status && status.configured); // a secret is saved
+  setDisplay("antigravitySecretSavedRow", configured);
   setDisplay("antigravityConnected", connected);
-  setDisplay("antigravityDisconnected", !connected);
+  // Offer Connect only once a secret is saved and we're not already connected.
+  setDisplay("antigravityDisconnected", configured && !connected);
   if (connected) {
     const email = document.getElementById("antigravityEmail");
     if (email) email.textContent = status.email || "your Google account";
@@ -26,6 +27,32 @@ export function loadAntigravityStatus() {
 }
 
 export function bindAntigravityEvents() {
+  const input = document.getElementById("antigravitySecretInput") as HTMLInputElement | null;
+
+  const saveSecret = () => {
+    const secret = (input?.value || "").trim();
+    if (!secret) { input?.focus(); return; }
+    const btn = document.getElementById("antigravitySecretSaveBtn") as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    chrome.runtime.sendMessage({ type: "aleph-antigravity-set-secret", secret }, () => {
+      btn.disabled = false;
+      btn.textContent = "Save";
+      if (input) input.value = ""; // never leave the secret sitting in the field
+      loadAntigravityStatus();
+    });
+  };
+
+  document.getElementById("antigravitySecretSaveBtn")?.addEventListener("click", saveSecret);
+  input?.addEventListener("keydown", (e) => { if (e.key === "Enter") saveSecret(); });
+
+  document.getElementById("antigravitySecretClearBtn")?.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "aleph-antigravity-set-secret", secret: "" }, () => {
+      if (input) input.value = "";
+      loadAntigravityStatus();
+    });
+  });
+
   // Connect is also offered here (popup is primary, but this is the fallback for
   // users who dismissed the popup prompt). Opens the same consent flow.
   document.getElementById("antigravityConnectBtn")?.addEventListener("click", () => {
@@ -43,8 +70,9 @@ export function bindAntigravityEvents() {
     chrome.runtime.sendMessage({ type: "aleph-antigravity-disconnect" }, () => loadAntigravityStatus());
   });
 
-  // Reflect a popup connect/disconnect live (the token write lands in local storage).
+  // Reflect a popup connect/disconnect or a secret change live (both land in local
+  // storage).
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.insights_antigravity_auth) loadAntigravityStatus();
+    if (area === "local" && (changes.insights_antigravity_auth || changes.insights_antigravity_secret)) loadAntigravityStatus();
   });
 }

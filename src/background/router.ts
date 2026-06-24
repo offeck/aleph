@@ -25,6 +25,7 @@ import {
   captureAntigravityCode,
   disconnectAntigravity,
   getAntigravityAuthStatus,
+  setAntigravitySecret,
   startAntigravityConnect,
 } from "./antigravityAuth";
 
@@ -145,14 +146,24 @@ export function registerBackgroundListeners() {
       return true;
     }
 
-    // Antigravity (experimental, opt-in) — login from the popup, logout from
-    // settings; borrowed-client OAuth, see antigravityAuth.ts.
+    // Antigravity (experimental, opt-in) — secret entry + login from the popup,
+    // logout from settings; borrowed-client OAuth, see antigravityAuth.ts.
     if (msg.type === "aleph-antigravity-connect") {
       startAntigravityTabConnect().then(sendResponse);
       return true;
     }
     if (msg.type === "aleph-antigravity-status") {
       getAntigravityAuthStatus().then(sendResponse);
+      return true;
+    }
+    if (msg.type === "aleph-antigravity-set-secret") {
+      const secret = msg.secret;
+      setAntigravitySecret(secret)
+        // Clearing the secret turns the feature inert — drop stale meters now
+        // rather than waiting for the next refresh to notice it's disconnected.
+        .then(() => (secret.trim() ? Promise.resolve() : clearAntigravityUsage()))
+        .then(() => sendResponse({ success: true }))
+        .catch(() => sendResponse({ success: false }));
       return true;
     }
     if (msg.type === "aleph-antigravity-disconnect") {
