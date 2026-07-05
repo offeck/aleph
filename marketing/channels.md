@@ -37,7 +37,7 @@ Venue norms + selection criteria: `playbook.md` §b. Gates before posting anywhe
 
 | Venue | Type | URL | Lang | Copy ref | Status | Posted | Outcome | Notes |
 |---|---|---|---|---|---|---|---|---|
-| r/ClaudeAI | subreddit | reddit.com/r/ClaudeAI | EN | §2 | todo | | | check self-promo rules day-of |
+| r/ClaudeAI | subreddit | reddit.com/r/ClaudeAI | EN | §2b | todo | | | check self-promo rules day-of; personal study/limits variant |
 | r/ChatGPT | subreddit | reddit.com/r/ChatGPT | EN | §2 variant | todo | | | swap platform emphasis |
 | r/GoogleGemini | subreddit | reddit.com/r/GoogleGemini | EN | §2 variant | todo | | | |
 | r/chrome_extensions | subreddit | reddit.com/r/chrome_extensions | EN | §2 | todo | | | builder audience, honest show-off OK |
@@ -52,7 +52,7 @@ Venue norms + selection criteria: `playbook.md` §b. Gates before posting anywhe
 | Product Hunt | launch | producthunt.com | EN | §6 | todo | | | after HN/Reddit prove the pitch |
 | dev.to | article | dev.to | EN | BiDi deep-dive (backlog) | todo | | | evergreen technical link |
 | X/Twitter | thread | x.com | EN+HE | §5 | todo | | | hero image first tweet |
-| LinkedIn (optional) | post | linkedin.com | EN/HE | §1b | todo | | | low priority |
+| LinkedIn (optional) | post | linkedin.com | EN/HE | §1f | todo | | | manual; HE personal story, use §1b for English |
 | Anthropic/OpenAI community Discords | Discord | (verify rules first) | EN | §1b | todo | | | many ban self-promo — check first |
 | GitHub good-first-issues | repo | github.com/offeck/aleph | EN | — | todo | | | label 3-4 issues (themes/fonts) |
 

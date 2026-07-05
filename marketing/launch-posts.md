@@ -51,6 +51,38 @@ you're already in. Post in Hebrew, lead with the image, keep it short:
 
 ## 1c. WhatsApp — friends / degree group (Hebrew, casual)
 
+**Personal degree/test variant — preferred for course WhatsApp groups:**
+
+> חברים, בניתי תוסף כרום קטן שיכול להיות שימושי למי שלומד או עובד עם
+> Claude / ChatGPT בעברית.
+>
+> לי זה התחיל מזה שלמדתי למבחנים עם Claude, וכל פעם שהתשובה הייתה בעברית עם
+> נוסחאות, אנגלית או קוד, הטקסט היה מתבלגן. נקודות קופצות לצד הלא נכון,
+> נוסחאות לא יושבות טוב בתוך המשפט, ורשימות נהיות פחות קריאות.
+>
+> כשאני לומד למבחן זה לא סתם מציק. לפעמים זה באמת ההבדל בין להבין את ההסבר
+> לבין להתייאש ממנו.
+>
+> אז בניתי את Aleph.
+>
+> הוא מתקן אוטומטית כיווניות של עברית וערבית ב-Claude, ChatGPT ו-Gemini,
+> ושומר על נוסחאות, קוד ואנגלית בצורה קריאה.
+>
+> הוספתי גם ערכות נושא, שינוי גופנים, גודל טקסט, רוחב צ'אט ועוד כמה דברים
+> שעושים את הצ'אט נוח יותר.
+>
+> ובנוסף יש דאשבורד אחד שמרכז את השימוש והמגבלות של הכלים האלה, כדי לראות
+> איפה עוד אפשר לעבוד בלי לגלות באמצע שנגמרה המכסה.
+>
+> זה חינמי, קוד פתוח, בלי טלמטריה ובלי איסוף שיחות.
+>
+> חנות כרום: [קישור]
+> GitHub: [קישור]
+>
+> אשמח שתנסו ותגידו לי אם זה עוזר לכם או אם יש מקרה שזה עדיין לא מתקן.
+
+**Shorter friends / degree group variant:**
+
 > חברים, בניתי תוסף לכרום ששווה לכם להכיר —
 > אם יצא לכם לדבר עם Claude/ChatGPT בעברית (סיכומים, חדו"א, שאלות לתרגילים)
 > ראיתם שהטקסט יוצא שבור — מיושר שמאלה, נקודות בתחילת שורות, נוסחאות באמצע
@@ -121,6 +153,52 @@ there's a native fix, I built…" — never imply it fixes the CLI/desktop apps.
 > (Disclosure: I'm the author.) If you hit a case it doesn't handle, I want to
 > know about it.
 
+## 1f. LinkedIn - personal study story (Hebrew)
+
+Use this if posting in Hebrew on LinkedIn. Put the Chrome Web Store and GitHub
+links in the first comment, and attach the before/after image if the post needs
+a visual anchor.
+
+> אני שונא את זה כשאני לומד למבחן עם Claude, והתשובה בעברית פשוט מתבלגנת.
+>
+> במיוחד כשיש מתמטיקה באמצע.
+>
+> התשובה יכולה להיות נכונה, אבל אם העברית הפוכה, סימני הפיסוק קופצים,
+> והנוסחאות לא יושבות טוב בתוך הטקסט, אני מאבד את הרצף.
+>
+> כשאני לומד למבחן, זה לא באג קטן בממשק.
+>
+> בשבילי זה לפעמים ההבדל בין להבין את החומר לבין להיתקע עליו לגמרי.
+>
+> בגלל זה בניתי את Aleph.
+>
+> Aleph מתקן כיווניות של עברית וערבית בצ'אטים של AI, ושומר על מתמטיקה, קוד
+> ואנגלית בצורה קריאה.
+>
+> וזה לא עובד רק ב-Claude. זה עובד גם ב-ChatGPT וב-Gemini.
+>
+> הוספתי גם את הדברים שתמיד רציתי בזמן שאני עובד עם הכלים האלה: ערכות נושא,
+> סגנון וגודל גופן, רוחב הצ'אט, מצב פוקוס ועוד כמה שיפורים קטנים שהופכים את
+> הצ'אט לנוח יותר.
+>
+> אבל קריאות לא הייתה הבעיה היחידה.
+>
+> גם נמאס לי לקפוץ בין Claude, ChatGPT/Codex ו-Gemini/Antigravity כדי להבין
+> איפה עוד נשאר לי לעבוד.
+>
+> אז הוספתי דאשבורד שמרכז במקום אחד את מצב השימוש ואת המגבלות המעודכנות של
+> הכלים האלה.
+>
+> עכשיו אני יכול לראות מהר איפה אפשר להמשיך לעבוד, במקום לגלות את זה באמצע
+> סשן עבודה.
+>
+> זו הפעם הראשונה שאני מפרסם על זה כאן, אבל אני מקווה שזה יעזור למישהו כמו
+> שזה עוזר לי.
+>
+> חינמי, קוד פתוח, ברישיון MIT, בלי טלמטריה ובלי איסוף שיחות.
+>
+> קישורים בתגובה הראשונה.
+
 ## 2. Reddit — r/ClaudeAI
 
 **Title:** I built a free, open-source extension that fixes Hebrew/Arabic text direction on Claude (works on ChatGPT & Gemini too)
@@ -147,6 +225,56 @@ there's a native fix, I built…" — never imply it fixes the CLI/desktop apps.
 (Attach the before/after image. Variants: r/ChatGPT — swap the first line's
 platform emphasis; r/GoogleGemini likewise. Read each sub's self-promo rules
 the same day you post; some require a comment ratio or specific flair.)
+
+## 2b. Reddit — r/ClaudeAI, personal study/limits variant
+
+Use this when leading with the personal student pain instead of the broader
+launch pitch.
+
+**Title options:**
+
+> I built Aleph because studying with broken Hebrew/math in Claude was driving me crazy
+
+> I built a free extension that fixes Hebrew/Arabic text in Claude, ChatGPT and Gemini
+
+> I got tired of broken Hebrew + math in Claude, so I built a Chrome extension
+
+**Body:**
+
+> I built Aleph because I kept running into this while studying for tests with
+> Claude:
+>
+> The answer was useful, but the Hebrew was messed up.
+>
+> Once Hebrew, English, math and code appear in the same response, the layout
+> can become painful to read. Punctuation jumps around, equations don't sit
+> cleanly inside the text, and I end up spending energy trying to understand
+> the formatting instead of the material.
+>
+> For studying, that is not just annoying. Sometimes it is the difference
+> between actually understanding the answer and giving up on it.
+>
+> So I built Aleph.
+>
+> It fixes Hebrew and Arabic text direction in Claude, ChatGPT and Gemini, while
+> keeping math, code and English readable.
+>
+> It also lets you adjust themes, fonts, font size, chat width and a few other
+> things that make the chat more comfortable to use.
+>
+> Then I added the other thing I wanted: one dashboard for usage and limits
+> across the AI tools I use, including Claude, ChatGPT/Codex and
+> Gemini/Antigravity. The goal is simple: know where I can keep working before
+> I start, instead of finding out mid-session.
+>
+> Free, open source, MIT licensed, zero telemetry. Chat text never leaves the
+> page.
+>
+> Chrome Web Store: [link]
+> GitHub: [link]
+>
+> Disclosure: I'm the author. I'd love feedback, especially from people who use
+> Hebrew, Arabic, Persian or Urdu in AI chats.
 
 ## 3. Show HN
 
