@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aleph - AI Chat Styler</title>
+    <meta
+      name="description"
+      content="Aleph is an open-source Chrome extension that fixes Hebrew and Arabic-script text direction in Claude, ChatGPT, and Gemini, with themes, focus mode, and usage insights."
+    >
+    <meta property="og:title" content="Aleph - AI Chat Styler">
+    <meta
+      property="og:description"
+      content="Readable Hebrew and Arabic-script AI chats across Claude, ChatGPT, and Gemini."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://offeck.github.io/aleph/assets/social-preview.png">
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="640">
+    <meta property="og:image:alt" content="Aleph - AI Chat Styler">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="theme-color" content="#7c83ff">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/icon16.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="assets/icon48.png">
+    <link rel="icon" type="image/png" sizes="128x128" href="assets/icon128.png">
+    <link rel="apple-touch-icon" href="assets/icon128.png">
+    <link rel="shortcut icon" href="assets/icon48.png">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Aleph home">
+        <img src="assets/icon128.png" alt="" width="32" height="32">
+        <span>Aleph</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="#why">Why</a>
+        <a href="#features">Features</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#install">Install</a>
+      </nav>
+      <a class="header-cta" href="https://chromewebstore.google.com/detail/jpicfbmjogpihahcmephbnibnjkfkfia" rel="noopener">
+        Add to Chrome
+      </a>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-inner">
+          <div class="hero-copy">
+            <h1 id="hero-title">Aleph</h1>
+            <p class="hero-lede">
+              The open-source Chrome extension that makes Hebrew and Arabic-script AI chats readable across Claude,
+              ChatGPT, and Gemini.
+            </p>
+            <div class="hero-actions" aria-label="Primary actions">
+              <a class="button button-primary" href="https://chromewebstore.google.com/detail/jpicfbmjogpihahcmephbnibnjkfkfia" rel="noopener">
+                Add to Chrome
+              </a>
+              <a class="button button-secondary" href="https://github.com/offeck/aleph" rel="noopener">
+                View GitHub
+              </a>
+            </div>
+          </div>
+          <dl class="hero-proof" aria-label="Aleph highlights">
+            <div>
+              <dt>3</dt>
+              <dd>AI platforms</dd>
+            </div>
+            <div>
+              <dt>14</dt>
+              <dd>themes</dd>
+            </div>
+            <div>
+              <dt>0</dt>
+              <dd>telemetry</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="section intro" id="why">
+        <div class="section-copy">
+          <h2>AI chats were not built for mixed-direction work.</h2>
+          <p>
+            Hebrew, Arabic, Persian, and Urdu can fall apart when they mix with English words, code, or math. Aleph
+            detects direction from the actual characters on the page, fixes the affected elements, and keeps math and
+            code isolated left-to-right.
+          </p>
+        </div>
+        <div class="proof-row" aria-label="Supported platform coverage">
+          <span>Claude</span>
+          <span>ChatGPT</span>
+          <span>Gemini</span>
+          <span>KaTeX</span>
+          <span>MathJax</span>
+          <span>Code blocks</span>
+        </div>
+      </section>
+
+      <section class="section media-section">
+        <div class="media-frame wide">
+          <img
+            src="assets/rtl-math.png"
+            alt="Hebrew math answer with equations preserved left-to-right"
+            width="1280"
+            height="800"
+            loading="lazy"
+            decoding="async"
+          >
+        </div>
+        <div class="section-copy narrow">
+          <h2>RTL where it belongs. LTR where it matters.</h2>
+          <p>
+            Aleph marks Hebrew and Arabic-script text at the element level instead of forcing an entire page into one
+            direction. That keeps formulas, inline variables, code blocks, bullets, and English passages readable.
+          </p>
+        </div>
+      </section>
+
+      <section class="section features" id="features">
+        <div class="section-copy">
+          <h2>More than a BiDi patch.</h2>
+          <p>
+            Aleph also gives each AI chat the same readable shape: themes, fonts, focus mode, smooth streaming, and a
+            usage dashboard that makes subscriptions and quota easier to understand.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <h3>Direction fixing</h3>
+            <p>Per-element Hebrew and Arabic-script detection, live while answers stream.</p>
+          </article>
+          <article>
+            <h3>Readable styling</h3>
+            <p>Fourteen themes, custom fonts, code styling, line height, spacing, and chat width.</p>
+          </article>
+          <article>
+            <h3>Focus mode</h3>
+            <p>Hide upgrade banners, suggestion chips, promos, and other chat clutter by category.</p>
+          </article>
+          <article>
+            <h3>Usage insights</h3>
+            <p>Track local time, sends, estimated tokens, subscription spend, and provider quota snapshots.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section split">
+        <div class="section-copy narrow">
+          <h2>One popup for the daily work.</h2>
+          <p>
+            Toggle platforms, switch themes, check quota, open settings, and keep the reading experience consistent
+            without leaving the chat surface.
+          </p>
+        </div>
+        <div class="media-frame">
+          <img
+            src="assets/popup.png"
+            alt="Aleph popup with usage meters, theme controls, and platform toggles"
+            width="1280"
+            height="800"
+            loading="lazy"
+            decoding="async"
+          >
+        </div>
+      </section>
+
+      <section class="section split reverse">
+        <div class="section-copy narrow">
+          <h2>Settings and insights stay transparent.</h2>
+          <p>
+            The dashboard shows subscriptions, daily activity, and weekly usage. Settings are explicit, exportable, and
+            built from the same controls the extension uses in production.
+          </p>
+        </div>
+        <div class="media-frame">
+          <img
+            src="assets/insights-settings.png"
+            alt="Aleph insights dashboard and settings page"
+            width="1280"
+            height="800"
+            loading="lazy"
+            decoding="async"
+          >
+        </div>
+      </section>
+
+      <section class="section privacy" id="privacy">
+        <div class="section-copy">
+          <h2>Local-first and open source.</h2>
+          <p>
+            Aleph does not collect telemetry, analytics, or conversation text. Optional Google sign-in syncs only
+            settings and aggregate daily usage summaries to your own account. The code, sync rules, and privacy policy
+            are public.
+          </p>
+        </div>
+        <div class="privacy-links">
+          <a href="https://github.com/offeck/aleph/blob/main/PRIVACY.md" rel="noopener">Privacy policy</a>
+          <a href="https://github.com/offeck/aleph/blob/main/docs/SYNC.md" rel="noopener">Sync design</a>
+          <a href="https://github.com/offeck/aleph/blob/main/LICENSE" rel="noopener">MIT license</a>
+        </div>
+      </section>
+
+      <section class="section install" id="install">
+        <div class="install-panel">
+          <div>
+            <h2>Install Aleph</h2>
+            <p>
+              Install from the Chrome Web Store, or load the repository as an unpacked extension while developing.
+            </p>
+          </div>
+          <div class="install-actions">
+            <a class="button button-primary" href="https://chromewebstore.google.com/detail/jpicfbmjogpihahcmephbnibnjkfkfia" rel="noopener">
+              Add to Chrome
+            </a>
+            <a class="button button-secondary" href="https://github.com/offeck/aleph" rel="noopener">
+              Source code
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Aleph - AI Chat Styler</span>
+      <a href="https://github.com/offeck/aleph" rel="noopener">GitHub</a>
+    </footer>
+  </body>
+</html>
