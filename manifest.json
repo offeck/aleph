@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Aleph — AI Chat Styler",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA29pbrx8kJPpj5LrR7MyLlZ+Tjba8nvtlvnuhxiTXJEkIrMC3Jfr638QhVM5hb/qe+3zD7e2+kO8p3dOXjVmM0CyqCJDuwSkx3rNdEozmv1VYmTybg3g3f9hjQPWiCLg0XxbCRrLYz59QqAS65c6u1FfEIJcJu2X4xvtnOLtnquO4gKdDSGw0xv9r4RfGoOBD2ltRhGXKjEjAWIbyIAUVfzT/TM+/s20dmmRnWSGVVgPJKiQDb2fRtYlf5aM/vSv8lsJ2LiZwQmkSJ2Rk6x+rnGIY3fnLayNz/AsN+DPZFa7XWgeQ/aAZ+gVS09qKgNpk17uEecsu9//diD5AcrcRSwIDAQAB",
   "description": "Hebrew & Arabic-script RTL/BiDi fixes, themes, focus mode & styling across Claude, ChatGPT & Gemini",
   "permissions": ["storage", "activeTab", "identity", "cookies", "alarms", "declarativeNetRequestWithHostAccess"],

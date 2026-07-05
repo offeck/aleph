@@ -1,6 +1,6 @@
 {
   "name": "aleph",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "private": true,
   "type": "module",
   "description": "Aleph — AI Chat Styler. Source of truth for the shipped version is manifest.json; keep equal.",
