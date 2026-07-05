@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aleph Reset Meter Design Options</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 28px;
+      background: #101023;
+      color: #e2e2e2;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+    .intro {
+      margin: 0 0 20px;
+      color: #a6a6b8;
+      max-width: 760px;
+      line-height: 1.45;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 14px;
+      max-width: 1040px;
+    }
+    .option {
+      background: #2a2a4a;
+      border: 1px solid #3a3a5a;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .option h2 {
+      margin: 0 0 4px;
+      font-size: 12px;
+      color: #ffffff;
+      letter-spacing: 0;
+    }
+    .note {
+      margin: 0 0 10px;
+      color: #8e8ea2;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .meter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 22px;
+      margin-top: 8px;
+      font-size: 10px;
+      color: #aaa;
+    }
+    .label {
+      min-width: 70px;
+      color: #d97706;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .bar {
+      position: relative;
+      flex: 1;
+      min-width: 56px;
+      height: 4px;
+      background: #1a1a2e;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .fill {
+      width: 25%;
+      height: 100%;
+      border-radius: 2px;
+      background: #d97706;
+    }
+    .pct {
+      min-width: 36px;
+      color: #d97706;
+      font-weight: 700;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .muted { color: #8e8ea2; }
+    .reset {
+      color: #d97706;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 5px;
+      border: 1px solid rgba(217, 119, 6, 0.38);
+      border-radius: 999px;
+      color: #f0a13c;
+      background: rgba(217, 119, 6, 0.09);
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .subline {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      min-width: 80px;
+      flex-direction: column;
+    }
+    .subline .label { min-width: 0; }
+    .subline .reset { color: #9f9fb2; font-size: 9px; }
+    .stacked-value {
+      min-width: 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      line-height: 1.1;
+    }
+    .stacked-value .reset { color: #9f9fb2; font-size: 9px; margin-top: 2px; }
+    .tiny-icon {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(217, 119, 6, 0.14);
+      color: #f0a13c;
+      font-size: 10px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+    .footer-reset {
+      display: grid;
+      grid-template-columns: 70px 1fr 36px;
+      gap: 8px;
+      align-items: center;
+    }
+    .footer-reset .meter { display: contents; }
+    .footer {
+      grid-column: 2 / 4;
+      margin-top: 2px;
+      color: #9f9fb2;
+      font-size: 9px;
+      text-align: right;
+    }
+    .mono {
+      font-variant-numeric: tabular-nums;
+    }
+    .slash {
+      color: #9f9fb2;
+      font-weight: 600;
+    }
+    .right-chip {
+      min-width: 70px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .section-title {
+      grid-column: 1 / -1;
+      margin: 14px 0 0;
+      padding-top: 10px;
+      border-top: 1px solid #3a3a5a;
+    }
+    .section-title h2 {
+      margin: 0 0 4px;
+      font-size: 15px;
+      color: #fff;
+      letter-spacing: 0;
+    }
+    .subline-variant {
+      min-width: 86px;
+      max-width: 112px;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.05;
+      gap: 2px;
+    }
+    .subline-variant .label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .subline-variant .sub {
+      color: #9f9fb2;
+      font-size: 9px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .subline-variant .sub.accent { color: #d99b4a; }
+    .subline-variant .sub.blue { color: #86adff; }
+    .subline-variant .sub.green { color: #60d7b6; }
+    .subline-variant.center {
+      align-items: center;
+      text-align: center;
+    }
+    .subline-variant.row-sub {
+      gap: 1px;
+    }
+    .subline-variant.row-sub .sub {
+      display: inline-flex;
+      width: fit-content;
+      max-width: 100%;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: rgba(159, 159, 178, 0.08);
+    }
+    .subline-variant.pale .label { color: #d5d5df; }
+    .subline-variant.pale .sub { color: #77778e; }
+    .subline-variant.strong .sub {
+      color: #f0a13c;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <h1>Reset Meter Design Options</h1>
+  <p class="intro">Same sample quota, different reset treatments. Exact reset time would remain available via tooltip in all options.</p>
+
+  <div class="grid">
+    <section class="option">
+      <h2>1. Left Microcopy</h2>
+      <p class="note">Current direction: reset sits near label, usage stays right-aligned.</p>
+      <div class="meter">
+        <span class="label">Claude 5h</span>
+        <span class="reset">⟳ 4h</span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="label" style="color:#10a37f">Gemini</span>
+        <span class="reset" style="color:#10a37f">⟳ 12h</span>
+        <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+        <span class="pct" style="color:#10a37f">41%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>2. Clock Chip</h2>
+      <p class="note">More visually grouped, but a little heavier.</p>
+      <div class="meter">
+        <span class="label">Claude 5h</span>
+        <span class="chip">◷ 4h</span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="label" style="color:#4285f4">Codex 5h</span>
+        <span class="chip" style="border-color:rgba(66,133,244,.38);color:#86adff;background:rgba(66,133,244,.1)">◷ 45m</span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="pct" style="color:#4285f4">30%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>3. Label Subline</h2>
+      <p class="note">Calmer hierarchy; costs vertical density only inside label area.</p>
+      <div class="meter">
+        <span class="subline">
+          <span class="label">Claude 5h</span>
+          <span class="reset">resets 4h</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline">
+          <span class="label" style="color:#10a37f">Gemini</span>
+          <span class="reset">resets 12h</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+        <span class="pct" style="color:#10a37f">41%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>4. Right Stack</h2>
+      <p class="note">Keeps reset close to the value it explains; can feel busy on the right.</p>
+      <div class="meter">
+        <span class="label">Claude 5h</span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="stacked-value"><span class="pct">25%</span><span class="reset">4h</span></span>
+      </div>
+      <div class="meter">
+        <span class="label" style="color:#4285f4">Codex 5h</span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="stacked-value"><span class="pct" style="color:#4285f4">30%</span><span class="reset">45m</span></span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>5. Icon Only</h2>
+      <p class="note">Minimal visible UI; exact reset is discoverable on hover only.</p>
+      <div class="meter">
+        <span class="label">Claude 5h</span>
+        <span class="tiny-icon" title="Resets in 4h">◷</span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="label" style="color:#10a37f">Gemini</span>
+        <span class="tiny-icon" style="background:rgba(16,163,127,.14);color:#60d7b6" title="Resets in 12h">◷</span>
+        <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+        <span class="pct" style="color:#10a37f">41%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>6. Slash Value</h2>
+      <p class="note">Compact and readable, but mixes two concepts in one value block.</p>
+      <div class="meter">
+        <span class="label">Claude 5h</span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct mono">25<span class="slash"> / </span>4h</span>
+      </div>
+      <div class="meter">
+        <span class="label" style="color:#4285f4">Codex 5h</span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="pct mono" style="color:#4285f4">30<span class="slash"> / </span>45m</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>7. Footer Reset</h2>
+      <p class="note">Clean main row; reset is secondary and hard to miss.</p>
+      <div class="footer-reset">
+        <div class="meter">
+          <span class="label">Claude 5h</span>
+          <span class="bar"><span class="fill"></span></span>
+          <span class="pct">25%</span>
+        </div>
+        <div class="footer">resets in 4h</div>
+      </div>
+      <div class="footer-reset">
+        <div class="meter">
+          <span class="label" style="color:#10a37f">Gemini</span>
+          <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+          <span class="pct" style="color:#10a37f">41%</span>
+        </div>
+        <div class="footer">resets in 12h</div>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>8. Right Reset Chip</h2>
+      <p class="note">Reset is visible but visually separated from the percent.</p>
+      <div class="meter">
+        <span class="label">Claude 5h</span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+        <span class="right-chip"><span class="chip">4h</span></span>
+      </div>
+      <div class="meter">
+        <span class="label" style="color:#4285f4">Codex 5h</span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="pct" style="color:#4285f4">30%</span>
+        <span class="right-chip"><span class="chip" style="border-color:rgba(66,133,244,.38);color:#86adff;background:rgba(66,133,244,.1)">45m</span></span>
+      </div>
+    </section>
+
+    <div class="section-title">
+      <h2>Subline Variations</h2>
+      <p class="note">Same left-stacked structure, different copy and emphasis. These keep the bar/value clean.</p>
+    </div>
+
+    <section class="option">
+      <h2>A. Plain</h2>
+      <p class="note">Direct, quiet, and already close to the production version.</p>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label">Claude 5h</span>
+          <span class="sub">resets 4h</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label" style="color:#4285f4">Codex 5h</span>
+          <span class="sub blue">resets 45m</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="pct" style="color:#4285f4">30%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>B. Short Label</h2>
+      <p class="note">Less wordy: the label tells you what the countdown means.</p>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label">Claude 5h</span>
+          <span class="sub">reset 4h</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label" style="color:#10a37f">Gemini</span>
+          <span class="sub green">reset 12h</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+        <span class="pct" style="color:#10a37f">41%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>C. Countdown First</h2>
+      <p class="note">Fastest to scan if the number matters more than the word.</p>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label">Claude 5h</span>
+          <span class="sub">4h to reset</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label" style="color:#4285f4">Codex 5h</span>
+          <span class="sub blue">45m to reset</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="pct" style="color:#4285f4">30%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>D. Ready In</h2>
+      <p class="note">More human, but less literal than "reset".</p>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label">Claude 5h</span>
+          <span class="sub">ready in 4h</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label" style="color:#10a37f">Gemini</span>
+          <span class="sub green">ready in 12h</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+        <span class="pct" style="color:#10a37f">41%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>E. Time Of Day</h2>
+      <p class="note">Specific and calm; weaker as a quick countdown.</p>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label">Claude 5h</span>
+          <span class="sub">resets 14:30</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant">
+          <span class="label" style="color:#4285f4">Codex 5h</span>
+          <span class="sub blue">resets 10:45</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="pct" style="color:#4285f4">30%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>F. Muted</h2>
+      <p class="note">Keeps reset from competing with the quota value.</p>
+      <div class="meter">
+        <span class="subline-variant pale">
+          <span class="label">Claude 5h</span>
+          <span class="sub">resets 4h</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant pale">
+          <span class="label" style="color:#d5d5df">Gemini</span>
+          <span class="sub">resets 12h</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+        <span class="pct" style="color:#10a37f">41%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>G. Mini Badge</h2>
+      <p class="note">Readable but more UI-like; might be too decorative for the popup.</p>
+      <div class="meter">
+        <span class="subline-variant row-sub">
+          <span class="label">Claude 5h</span>
+          <span class="sub">reset 4h</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant row-sub">
+          <span class="label" style="color:#4285f4">Codex 5h</span>
+          <span class="sub blue">reset 45m</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#4285f4;width:30%"></span></span>
+        <span class="pct" style="color:#4285f4">30%</span>
+      </div>
+    </section>
+
+    <section class="option">
+      <h2>H. Strong Subline</h2>
+      <p class="note">Most noticeable; useful if reset timing is a primary feature.</p>
+      <div class="meter">
+        <span class="subline-variant strong">
+          <span class="label">Claude 5h</span>
+          <span class="sub">resets 4h</span>
+        </span>
+        <span class="bar"><span class="fill"></span></span>
+        <span class="pct">25%</span>
+      </div>
+      <div class="meter">
+        <span class="subline-variant strong">
+          <span class="label" style="color:#10a37f">Gemini</span>
+          <span class="sub">resets 12h</span>
+        </span>
+        <span class="bar"><span class="fill" style="background:#10a37f;width:41%"></span></span>
+        <span class="pct" style="color:#10a37f">41%</span>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

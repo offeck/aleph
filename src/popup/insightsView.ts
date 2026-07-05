@@ -20,6 +20,7 @@ import {
   asNumber,
   cleanLabel,
   computeTrend,
+  detailWithReset,
   estimatedTokenTotal,
   metricChangedRecently,
   sumCodexWorkspace,
@@ -100,8 +101,8 @@ export function loadInsights() {
       const cu = platformUsage.claude;
       const fiveHourUtil = asNumber(cu.fiveHour?.utilization);
       const sevenDayUtil = asNumber(cu.sevenDay?.utilization);
-      if (fiveHourUtil != null) rawMeters.claude.push({ label: "Claude 5h", pct: Math.round(fiveHourUtil), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: fiveHourUtil <= 0 });
-      if (sevenDayUtil != null) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(sevenDayUtil), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: sevenDayUtil <= 0 });
+      if (fiveHourUtil != null) rawMeters.claude.push({ label: "Claude 5h", pct: Math.round(fiveHourUtil), ...detailWithReset(`${Math.round(fiveHourUtil)}%`, cu.fiveHour), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: fiveHourUtil <= 0 });
+      if (sevenDayUtil != null) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(sevenDayUtil), ...detailWithReset(`${Math.round(sevenDayUtil)}%`, cu.sevenDay), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: sevenDayUtil <= 0 });
     }
 
     // ChatGPT/Codex: provider-backed usage.
@@ -266,16 +267,28 @@ export function loadInsights() {
         const fillColor = m.pct != null && m.pct >= 90 ? "#ff6b6b" : m.color;
         const row = document.createElement("div");
         row.className = "usage-meter";
+        if (m.title) row.title = m.title;
+        const labelBlock = document.createElement("span");
+        labelBlock.className = "usage-meter-label-block";
         const label = document.createElement("span");
         label.className = "usage-meter-label";
         label.style.color = fillColor;
         label.textContent = m.label;
-        row.appendChild(label);
+        labelBlock.appendChild(label);
+        if (m.reset) {
+          const reset = document.createElement("span");
+          reset.className = "usage-meter-reset";
+          reset.textContent = m.reset;
+          if (m.title) reset.title = m.title;
+          labelBlock.appendChild(reset);
+        }
+        row.appendChild(labelBlock);
         if (m.pct == null) {
           const detail = document.createElement("span");
           detail.className = "usage-meter-detail";
           detail.style.color = fillColor;
           detail.textContent = m.detail || "";
+          if (m.title) detail.title = m.title;
           row.appendChild(detail);
         } else {
           const track = document.createElement("div");
@@ -291,6 +304,7 @@ export function loadInsights() {
           pct.className = "usage-meter-pct";
           pct.style.color = fillColor;
           pct.textContent = m.detail || (m.pct + "%");
+          if (m.title) pct.title = m.title;
           row.appendChild(pct);
         }
         metersEl.appendChild(row);

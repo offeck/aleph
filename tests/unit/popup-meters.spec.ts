@@ -7,9 +7,11 @@ import {
   cleanLabel,
   codexLimitLabel,
   computeTrend,
+  detailWithReset,
   estimatedTokenTotal,
   METRIC_CHANGE_WINDOW_MS,
   metricChangedRecently,
+  resetDetail,
   shortCodexModelLabel,
   sumCodexWorkspace,
   type Meter,
@@ -79,6 +81,36 @@ describe("metric change windows", () => {
   });
 });
 
+describe("reset details", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-08T10:00:00.000Z"));
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("formats ISO reset timestamps as countdowns with an exact-time title", () => {
+    const reset = resetDetail({ resetsAt: "2026-06-08T12:30:00.000Z" });
+    expect(reset?.text).toBe("resets 2h 30m");
+    expect(reset?.title).toContain("Resets at");
+  });
+
+  it("formats duration-style reset values and ignores invalid values", () => {
+    expect(resetDetail({ reset_after: "6m0s" })?.text).toBe("resets 6m");
+    expect(resetDetail({ resetAfterSeconds: 90 })?.text).toBe("resets 2m");
+    expect(resetDetail({ resetAfterSeconds: "90" })?.text).toBe("resets 2m");
+    expect(resetDetail({ resetTime: String(Date.parse("2026-06-08T11:00:00.000Z") / 1000) })?.text).toBe("resets 1h");
+    expect(resetDetail({ resetsAt: "not-a-date" })).toBeNull();
+  });
+
+  it("keeps reset text separate from existing meter details", () => {
+    expect(detailWithReset("25%", { resetsAt: "2026-06-08T11:00:00.000Z" })).toMatchObject({
+      detail: "25%",
+      reset: "resets 1h",
+    });
+    expect(detailWithReset("25%", {})).toEqual({ detail: "25%" });
+  });
+});
+
 describe("addQuotaMeter", () => {
   it("builds a percentage meter from used/limit and clamps to 0-100", () => {
     const target: Meter[] = [];
@@ -86,6 +118,16 @@ describe("addQuotaMeter", () => {
     addQuotaMeter(target, "Clamped", { limit: 10, used: 25 }, "#4285F4");
     expect(target[0]).toMatchObject({ label: "ChatGPT GPT-5", pct: 25, quota: true, fullAvailable: false });
     expect(target[1].pct).toBe(100);
+  });
+
+  it("adds reset countdown details to percentage meters", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-08T10:00:00.000Z"));
+    const target: Meter[] = [];
+    addQuotaMeter(target, "Gemini credits", { limit: 100, remaining: 75, resetsAt: "2026-06-08T14:00:00.000Z" }, "#10A37F");
+    expect(target[0]).toMatchObject({ pct: 25, detail: "25%", reset: "resets 4h" });
+    expect(target[0].title).toContain("Resets at");
+    vi.useRealTimers();
   });
 
   it("derives used from remaining and flags fully available quotas", () => {
@@ -105,6 +147,15 @@ describe("addQuotaMeter", () => {
     addQuotaMeter(target, "Empty", {}, "#fff");
     expect(target).toHaveLength(1);
   });
+
+  it("adds reset countdown details to remaining-only meters", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-08T10:00:00.000Z"));
+    const target: Meter[] = [];
+    addQuotaMeter(target, "Credits", { remaining: 7, reset_after: "1h30m" }, "#fff");
+    expect(target[0]).toMatchObject({ pct: null, detail: "7 left", reset: "resets 1h 30m" });
+    vi.useRealTimers();
+  });
 });
 
 describe("addCodexLimitMeter", () => {
@@ -122,6 +173,15 @@ describe("addCodexLimitMeter", () => {
     const target: Meter[] = [];
     addCodexLimitMeter(target, { remainingPct: 100 }, "#4285F4");
     expect(target[0]).toMatchObject({ pct: 0, fullAvailable: true });
+  });
+
+  it("adds reset countdown details to Codex limit meters", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-08T10:00:00.000Z"));
+    const target: Meter[] = [];
+    addCodexLimitMeter(target, { usedPct: 30, period: "5h", resets_at: "2026-06-08T10:45:00.000Z" }, "#4285F4");
+    expect(target[0]).toMatchObject({ label: "Codex 5h", pct: 30, detail: "30%", reset: "resets 45m" });
+    vi.useRealTimers();
   });
 });
 

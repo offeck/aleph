@@ -221,12 +221,35 @@ h2 {
   font-size: 10px;
   color: #aaa;
 }
+.usage-meter-label-block {
+  min-width: 74px;
+  max-width: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.05;
+}
 .usage-meter-label {
-  min-width: 50px;
+  min-width: 0;
   color: #888;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.usage-meter-reset {
+  min-width: 0;
+  max-width: 92px;
+  color: #9f9fb2;
+  font-weight: 600;
+  font-size: 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .usage-meter-track {
   flex: 1;
+  min-width: 48px;
   height: 4px;
   background: #1a1a2e;
   border-radius: 2px;
@@ -242,9 +265,13 @@ h2 {
 .usage-meter-fill.high { background: #ff6b6b; }
 .usage-meter-pct {
   min-width: 56px;
+  max-width: 68px;
   text-align: right;
   font-weight: 600;
   font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .usage-meter-detail {
   flex: 1;
@@ -253,6 +280,9 @@ h2 {
   font-size: 10px;
   color: #bbb;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Sparklines */
