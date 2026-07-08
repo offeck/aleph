@@ -163,3 +163,19 @@ describe("meta docs", () => {
     await assertSucceeds(getDoc(doc(db, `users/${OWNER}/meta/settings2`)));
   });
 });
+
+describe("public config", () => {
+  it("lets any client, even unauthenticated, read config docs", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "config/antigravity"), { secret: "svc-secret", version: 1 });
+    });
+    await assertSucceeds(getDoc(doc(anonDb(), "config/antigravity")));
+    await assertSucceeds(getDoc(doc(strangerDb(), "config/antigravity")));
+  });
+
+  it("denies all client writes to config docs (admin SDK only)", async () => {
+    await assertFails(setDoc(doc(anonDb(), "config/antigravity"), { secret: "x", version: 2 }));
+    await assertFails(setDoc(doc(strangerDb(), "config/antigravity"), { secret: "x", version: 2 }));
+    await assertFails(setDoc(doc(ownerDb(), "config/antigravity"), { secret: "x", version: 2 }));
+  });
+});

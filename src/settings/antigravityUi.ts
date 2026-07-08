@@ -11,15 +11,20 @@ function setDisplay(id: string, show: boolean) {
 
 function renderAntigravityStatus(status: any) {
   const connected = Boolean(status && status.connected);
-  const configured = Boolean(status && status.configured); // a secret is saved
-  setDisplay("antigravitySecretSavedRow", configured);
+  const configured = Boolean(status && status.configured); // a secret is available (fetched default or override)
   setDisplay("antigravityConnected", connected);
-  // Offer Connect only once a secret is saved and we're not already connected.
+  // Offer Connect once a secret is available and we're not already connected.
   setDisplay("antigravityDisconnected", configured && !connected);
   if (connected) {
     const email = document.getElementById("antigravityEmail");
     if (email) email.textContent = status.email || "your Google account";
   }
+  // The "saved / Clear" row is about the user's OWN pasted override, not the
+  // fetched default — read the local override key directly so it doesn't show for
+  // the out-of-the-box (Firestore-served) secret.
+  chrome.storage.local.get({ insights_antigravity_secret: "" }, (r: Record<string, unknown>) => {
+    setDisplay("antigravitySecretSavedRow", Boolean(String(r.insights_antigravity_secret || "").trim()));
+  });
 }
 
 export function loadAntigravityStatus() {
@@ -70,9 +75,9 @@ export function bindAntigravityEvents() {
     chrome.runtime.sendMessage({ type: "aleph-antigravity-disconnect" }, () => loadAntigravityStatus());
   });
 
-  // Reflect a popup connect/disconnect or a secret change live (both land in local
-  // storage).
+  // Reflect a popup connect/disconnect, an override change, or the boot-time
+  // Firestore secret cache landing live (all land in local storage).
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && (changes.insights_antigravity_auth || changes.insights_antigravity_secret)) loadAntigravityStatus();
+    if (area === "local" && (changes.insights_antigravity_auth || changes.insights_antigravity_secret || changes.insights_antigravity_secret_cache)) loadAntigravityStatus();
   });
 }

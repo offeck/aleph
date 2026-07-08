@@ -52,9 +52,10 @@ export function bindAntigravityConnect() {
     setTimeout(() => setDisplay("antigravityDismissedHint", false), 4000);
   });
 
-  // Re-render on connect/disconnect (token write), a secret save/clear (toggles
-  // whether Connect is offerable), or a dismiss toggle on another view.
+  // Re-render on connect/disconnect (token write), an override save/clear or the
+  // boot-time Firestore secret cache landing (both toggle whether Connect is
+  // offerable), or a dismiss toggle on another view.
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && (changes.insights_antigravity_auth || changes.insights_antigravity_secret || changes[DISMISS_KEY])) loadAntigravityConnect();
+    if (area === "local" && (changes.insights_antigravity_auth || changes.insights_antigravity_secret || changes.insights_antigravity_secret_cache || changes[DISMISS_KEY])) loadAntigravityConnect();
   });
 }

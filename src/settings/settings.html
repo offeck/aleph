@@ -179,13 +179,13 @@
   <!-- ── Antigravity (experimental) ──────────────────────────────── -->
   <section id="antigravitySection">
     <h2>Antigravity</h2>
-    <p class="hint">Experimental: show your Google Antigravity (Cloud Code) per-model quota in the popup's usage meters. Paste your Antigravity OAuth client secret to enable it — it stays on this device and is never synced or shipped with the extension.</p>
+    <p class="hint">Experimental: show your Google Antigravity (Cloud Code) per-model quota in the popup's usage meters. It works automatically — open the popup and click Connect Antigravity to sign in. Advanced: paste your own OAuth client secret below only to override the built-in one; it stays on this device and is never synced.</p>
     <div class="secret-row">
-      <input id="antigravitySecretInput" type="password" placeholder="Antigravity client secret" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <input id="antigravitySecretInput" type="password" placeholder="Antigravity client secret (optional override)" autocomplete="off" autocapitalize="off" spellcheck="false">
       <button id="antigravitySecretSaveBtn" class="secret-btn">Save</button>
     </div>
     <div id="antigravitySecretSavedRow" style="display:none; margin-top:8px">
-      <span class="sync-status">Secret saved on this device.</span>
+      <span class="sync-status">Your override secret is saved on this device.</span>
       <button id="antigravitySecretClearBtn" class="danger-btn" style="margin-left:8px">Clear</button>
     </div>
 
@@ -195,7 +195,7 @@
       <button id="antigravityDisconnectBtn" class="danger-btn" style="margin-top:8px">Disconnect</button>
     </div>
     <div id="antigravityDisconnected" style="display:none; margin-top:12px">
-      <p class="hint">Secret saved — open the popup and click Connect Antigravity to sign in (or connect here).</p>
+      <p class="hint">Open the popup and click Connect Antigravity to sign in (or connect here).</p>
       <button id="antigravityConnectBtn" class="google-btn">Connect Antigravity</button>
     </div>
   </section>

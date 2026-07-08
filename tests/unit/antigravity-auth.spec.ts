@@ -3,9 +3,11 @@ import {
   ANTIGRAVITY_AUTH_KEY,
   ANTIGRAVITY_PKCE_KEY,
   ANTIGRAVITY_SECRET_KEY,
+  ANTIGRAVITY_SECRET_CACHE_KEY,
   buildConsentUrl,
   captureAntigravityCode,
   disconnectAntigravity,
+  ensureAntigravitySecretCached,
   generatePkceVerifier,
   getAntigravityAccessToken,
   getAntigravityAuthStatus,
@@ -162,7 +164,7 @@ describe("antigravity code exchange", () => {
     const result = await captureAntigravityCode("c");
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("Settings");
+    expect(result.error).toContain("try again");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -221,9 +223,9 @@ describe("getAntigravityAccessToken", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns null (no network call) when no secret is saved, even with a stored token", async () => {
+  it("returns null (no OAuth call) when the token needs refreshing but no secret is available", async () => {
     delete storage[ANTIGRAVITY_SECRET_KEY];
-    storage[ANTIGRAVITY_AUTH_KEY] = { refreshToken: "rt", accessToken: "at-fresh", expiresAt: 1_000_000 + 600_000, email: null, connectedAt: 0 };
+    storage[ANTIGRAVITY_AUTH_KEY] = { refreshToken: "rt", accessToken: "at-old", expiresAt: 1_000_000 - 1, email: null, connectedAt: 0 };
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
@@ -282,12 +284,120 @@ describe("antigravity client secret (user-entered)", () => {
   });
 
   it("startAntigravityConnect refuses without a secret and works once one is saved", async () => {
-    await expect(startAntigravityConnect()).rejects.toThrow(/Settings/);
+    await expect(startAntigravityConnect()).rejects.toThrow(/try again/);
 
     await setAntigravitySecret("my-secret");
     const { url } = await startAntigravityConnect();
 
     expect(url).toContain("accounts.google.com/o/oauth2/v2/auth");
     expect(storage[ANTIGRAVITY_PKCE_KEY]).toBeTruthy();
+  });
+});
+
+describe("antigravity secret from Firestore (out of the box)", () => {
+  let storage: Stored;
+  // Fake firestore serving one config/antigravity doc; returns the `get` spy.
+  function stubFirebaseSecret(secret: string, version = 1) {
+    const get = vi.fn(async () => ({ exists: true, data: () => ({ secret, version }) }));
+    vi.stubGlobal("firebase", { apps: [{}], firestore: () => ({ doc: () => ({ get }) }) });
+    return get;
+  }
+  beforeEach(() => {
+    storage = {};
+    installChromeStorage(storage);
+    _resetAntigravityAuthForTests();
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("mints with the Firestore secret and caches it when none is pasted", async () => {
+    const get = stubFirebaseSecret("db-secret", 2);
+    storage[ANTIGRAVITY_PKCE_KEY] = "v";
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(new URLSearchParams(String(init?.body)).get("client_secret")).toBe("db-secret");
+      return jsonResponse({ refresh_token: "rt", access_token: "at", expires_in: 3600 });
+    }));
+
+    const res = await captureAntigravityCode("code");
+
+    expect(res.success).toBe(true);
+    expect(get).toHaveBeenCalled();
+    expect((storage[ANTIGRAVITY_SECRET_CACHE_KEY] as { secret: string }).secret).toBe("db-secret");
+  });
+
+  it("uses the cached Firestore secret without refetching while fresh", async () => {
+    storage[ANTIGRAVITY_SECRET_CACHE_KEY] = { secret: "cached", version: 1, fetchedAt: 1_000_000 };
+    storage[ANTIGRAVITY_AUTH_KEY] = { refreshToken: "rt", accessToken: "old", expiresAt: 1, email: null, connectedAt: 0 };
+    const get = stubFirebaseSecret("should-not-read", 9);
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(new URLSearchParams(String(init?.body)).get("client_secret")).toBe("cached");
+      return jsonResponse({ access_token: "new", expires_in: 3600 });
+    }));
+
+    expect(await getAntigravityAccessToken()).toBe("new");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("lets a pasted secret override the cached Firestore secret", async () => {
+    storage[ANTIGRAVITY_SECRET_KEY] = "user-override";
+    storage[ANTIGRAVITY_SECRET_CACHE_KEY] = { secret: "cached", version: 1, fetchedAt: 1_000_000 };
+    storage[ANTIGRAVITY_AUTH_KEY] = { refreshToken: "rt", accessToken: "old", expiresAt: 1, email: null, connectedAt: 0 };
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(new URLSearchParams(String(init?.body)).get("client_secret")).toBe("user-override");
+      return jsonResponse({ access_token: "new", expires_in: 3600 });
+    }));
+
+    expect(await getAntigravityAccessToken()).toBe("new");
+  });
+
+  it("refetches and retries once on invalid_client (secret rotation)", async () => {
+    storage[ANTIGRAVITY_SECRET_CACHE_KEY] = { secret: "old-secret", version: 1, fetchedAt: 1_000_000 };
+    storage[ANTIGRAVITY_AUTH_KEY] = { refreshToken: "rt", accessToken: "old", expiresAt: 1, email: null, connectedAt: 0 };
+    const get = stubFirebaseSecret("new-secret", 2); // Firestore now serves the rotated secret
+    let call = 0;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      call++;
+      const cs = new URLSearchParams(String(init?.body)).get("client_secret");
+      if (call === 1) { expect(cs).toBe("old-secret"); return jsonResponse({ error: "invalid_client" }, false); }
+      expect(cs).toBe("new-secret");
+      return jsonResponse({ access_token: "recovered", expires_in: 3600 });
+    }));
+
+    expect(await getAntigravityAccessToken()).toBe("recovered");
+    expect(get).toHaveBeenCalled();
+    expect((storage[ANTIGRAVITY_SECRET_CACHE_KEY] as { secret: string }).secret).toBe("new-secret");
+  });
+
+  it("becomes configured once the boot fill primes the cache from Firestore (no paste)", async () => {
+    // Cold: no override, no cache → not configured, so the CTA stays hidden.
+    expect((await getAntigravityAuthStatus()).configured).toBe(false);
+    // Boot fill fetches the secret and caches it...
+    const get = stubFirebaseSecret("db-secret");
+    await ensureAntigravitySecretCached();
+    expect(get).toHaveBeenCalled();
+    expect((storage[ANTIGRAVITY_SECRET_CACHE_KEY] as { secret: string }).secret).toBe("db-secret");
+    // ...and now status reports configured (the popup re-renders on the cache key).
+    const status = await getAntigravityAuthStatus();
+    expect(status.configured).toBe(true);
+    expect(status.connected).toBe(false);
+  });
+
+  it("boot fill is a no-op when a secret is already cached", async () => {
+    storage[ANTIGRAVITY_SECRET_CACHE_KEY] = { secret: "cached", fetchedAt: 1_000_000 };
+    const get = stubFirebaseSecret("should-not-read");
+    await ensureAntigravitySecretCached();
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("never fetches the secret for a user who never connected (no stored auth)", async () => {
+    const get = stubFirebaseSecret("db-secret");
+    vi.stubGlobal("fetch", vi.fn());
+    expect(await getAntigravityAccessToken()).toBeNull();
+    expect(get).not.toHaveBeenCalled();                           // no Firestore read on the meter path
+    expect(storage[ANTIGRAVITY_SECRET_CACHE_KEY]).toBeUndefined(); // nothing cached for a non-opted-in user
   });
 });

@@ -52,9 +52,10 @@ export type PageToBackgroundMessage =
 
 export interface AntigravityStatusResponse {
   connected: boolean;
-  // Whether a client secret is currently saved (user-entered in Settings,
-  // local-only). Without one the feature is inert — the UI offers the secret entry
-  // instead of a Connect CTA that would only throw.
+  // Whether the Connect CTA should show — a borrowed client secret is available
+  // without a network fetch: either a user-pasted override (Settings, local-only)
+  // or one fetched from Firestore and cached (primed once at boot). See
+  // antigravityAuth.getAntigravityAuthStatus.
   configured: boolean;
   email?: string | null;
   connectedAt?: number | null;

@@ -1,4 +1,5 @@
 import { alephSync } from "./sync";
+import { ensureAntigravitySecretCached } from "./antigravityAuth";
 import { registerBackgroundListeners } from "./router";
 
 declare function importScripts(...urls: string[]): void;
@@ -27,6 +28,9 @@ if (ALEPH_FIREBASE_CONFIG.apiKey !== "PLACEHOLDER") {
     .then(() => alephSync.ensureMigrated())
     .then(() => alephSync.flushDirty())
     .catch(() => {});
+  // Prime the Antigravity secret cache once (public config read) so the Connect
+  // CTA can appear out of the box. No-op when a secret is already cached/overridden.
+  void ensureAntigravitySecretCached();
 }
 
 // MV3: all chrome.* listeners must be registered in the worker's first
