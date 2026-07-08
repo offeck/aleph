@@ -68,7 +68,9 @@ Works on all three platforms. Toggle on/off anytime with Alt+Shift+A. Free, no a
 | 2 | 02-popup.png | The popup: quota meters, spend, today's usage + quick controls |
 | 3 | 03-insights-settings.png | Insights dashboard and full settings page |
 | 4 | 04-rtl-math.png | Hebrew + rendered math, correctly laid out on Claude |
-| 5 | (optional) | Mini-game while a long answer streams, or a themed conversation |
+| 5 | 05-popup-usage.png | The usage dashboard — monthly AI spend and per-provider quota meters |
+
+(CWS lets you drag-reorder after upload; `05-popup-usage.png` is a strong differentiator, so consider placing it 2nd or 3rd in the live order regardless of filename.)
 
 ---
 
@@ -173,10 +175,10 @@ No remotely hosted JavaScript or executable code is loaded. Firebase, KaTeX, and
 
 ## Post-update checklist (Developer Dashboard)
 
-1. Replace the single existing screenshot with `store-assets/final/01..04` (in order) — the old one has an "Activate Windows" watermark.
+1. Replace the single existing screenshot with `store-assets/final/01..05` (in order) — the old one has an "Activate Windows" watermark.
 2. Switch Category: Productivity → Accessibility.
 3. Paste the new English title + summary + description (title/summary changes are
    experiment E1/E2 in `metrics.md` — judge after 4 weeks).
 4. Add languages: עברית and العربية with the listings above.
-5. After the scrollbar-fix build ships, retake a popup screenshot for slot 5 (theme grid view) at high DPI.
+5. Slot 5 is `05-popup-usage.png` (the usage/spend dashboard), composed from the raw `store-assets/popup-usage.png` capture by `store-assets/compose-usage.ps1` — rerun that script if the popup UI changes.
 6. Re-verify the contact email if prompted, and submit for review.
