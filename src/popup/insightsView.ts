@@ -24,6 +24,7 @@ import {
   estimatedTokenTotal,
   metricChangedRecently,
   sumCodexWorkspace,
+  visibleUsageMeters,
   type Meter,
 } from "./meters";
 
@@ -105,10 +106,12 @@ export function loadInsights() {
       if (sevenDayUtil != null) rawMeters.claude.push({ label: "Claude 7d", pct: Math.round(sevenDayUtil), ...detailWithReset(`${Math.round(sevenDayUtil)}%`, cu.sevenDay), color: "#D97706", alwaysShow: true, quota: true, fullAvailable: sevenDayUtil <= 0 });
     }
 
-    // ChatGPT/Codex: provider-backed usage.
+    // ChatGPT: provider-backed usage. Codex is displayed as its own subgroup
+    // so a fully available Codex account still renders a "Codex 0%" row.
     const gptUsage = platformUsage?.chatgpt;
     const GPT_LABELS: Record<string, string> = { deep_research: "Research", odyssey: "Reasoning", image_gen: "Images" };
     const gptChat = gptUsage?.chat || gptUsage;
+    const codexMeters: Meter[] = [];
     // Metric key builders live in shared/metricKeys.ts.
     for (const ml of (gptChat?.modelLimits || []).slice(0, 4)) {
       const key = chatgptModelMetricKey(ml.model || ml.name || ml.feature);
@@ -127,10 +130,10 @@ export function loadInsights() {
 
     const codexAnalytics = gptUsage?.codex?.analytics;
     for (const card of (codexAnalytics?.limits || [])) {
-      addCodexLimitMeter(rawMeters.chatgpt, card, "#4285F4");
+      addCodexLimitMeter(codexMeters, card, "#4285F4");
     }
     if (codexAnalytics?.credits) {
-      rawMeters.chatgpt.push({
+      codexMeters.push({
         label: "Codex credits",
         pct: null,
         detail: `${codexAnalytics.credits.remaining || 0} left`,
@@ -143,7 +146,7 @@ export function loadInsights() {
 
     const codexTotals = sumCodexWorkspace(gptUsage?.codex?.dailyWorkspaceUsage);
     if (codexTotals) {
-      rawMeters.chatgpt.push({
+      codexMeters.push({
         label: "Codex",
         pct: null,
         detail: `${codexTotals.turns} turns / ${codexTotals.threads} threads`,
@@ -230,18 +233,13 @@ export function loadInsights() {
       chatgpt: { label: "ChatGPT", color: "#4285F4" },
       gemini: { label: "Gemini", color: "#10A37F" },
     };
-    const shouldShowMeter = (m: Meter) => !m.requiresRecentDelta || m.changedWithin24h;
     for (const p of PLATFORMS) {
       const pm = rawMeters[p];
-      if (pm.length === 0) continue;
-      const pctMeters = pm.filter((m) => m.pct != null);
-      const activePctMeters = pctMeters.filter((m) => (m.pct ?? 0) > 0);
-      const detailMeters = pm.filter((m) => m.pct == null && shouldShowMeter(m) && (m.alwaysShow || m.detail));
-      const visibleMeters = [...activePctMeters, ...detailMeters];
-      if (visibleMeters.length > 0) {
-        meters.push(...visibleMeters);
-      } else {
-        meters.push({ label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true, quota: true, fullAvailable: true });
+      if (pm.length > 0) {
+        meters.push(...visibleUsageMeters(pm, { label: PLATFORM_FALLBACK[p].label, pct: 0, color: PLATFORM_FALLBACK[p].color, alwaysShow: true, quota: true, fullAvailable: true }));
+      }
+      if (p === "chatgpt" && codexMeters.length > 0) {
+        meters.push(...visibleUsageMeters(codexMeters, { label: "Codex", pct: 0, color: "#4285F4", alwaysShow: true, quota: true, fullAvailable: true }));
       }
     }
 
@@ -250,14 +248,7 @@ export function loadInsights() {
     // per-platform fallback so a fully-available connection still shows, beside
     // "Gemini 0%"). Nothing shows when not connected (no antigravity block).
     if (antUsage) {
-      const activeAg = agMeters.filter((m) => m.pct != null && (m.pct ?? 0) > 0);
-      const detailAg = agMeters.filter((m) => m.pct == null && shouldShowMeter(m) && (m.alwaysShow || m.detail));
-      const visibleAg = [...activeAg, ...detailAg];
-      if (visibleAg.length > 0) {
-        meters.push(...visibleAg);
-      } else {
-        meters.push({ label: "Antigravity", pct: 0, color: "#A142F4", alwaysShow: true, quota: true, fullAvailable: true });
-      }
+      meters.push(...visibleUsageMeters(agMeters, { label: "Antigravity", pct: 0, color: "#A142F4", alwaysShow: true, quota: true, fullAvailable: true }));
     }
 
     if (meters.length > 0) {

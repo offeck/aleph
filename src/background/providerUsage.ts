@@ -169,7 +169,41 @@ function normalizeChatgptPlanFromSession(session: unknown): ChatgptPlan | null {
   });
 }
 
-type ChatgptSession = { origin: string; token: string | null; plan: ChatgptPlan | null };
+function firstStringValue(obj: unknown, names: string[]): string | null {
+  if (!obj || typeof obj !== "object") return null;
+  const record = obj as RawRecord;
+  for (const name of names) {
+    const value = record[name];
+    if (typeof value === "string" && value) return value;
+  }
+  return null;
+}
+
+function decodeJwtPayload(token: unknown): RawRecord | null {
+  if (typeof token !== "string" || !token.includes(".")) return null;
+  try {
+    const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
+    const parsed = JSON.parse(atob(padded));
+    return parsed && typeof parsed === "object" ? parsed as RawRecord : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function chatgptAccountIdRaw(session: unknown): string | null {
+  if (!session || typeof session !== "object") return null;
+  const record = session as RawRecord;
+  const accountId = firstStringValue(record.account, ["id", "accountId", "account_id"]) ||
+    firstStringValue(record, ["accountId", "account_id", "chatgptAccountId", "chatgpt_account_id"]);
+  if (accountId) return accountId;
+
+  const jwt = decodeJwtPayload(record.accessToken);
+  return firstStringValue(jwt?.["https://api.openai.com/auth"], ["chatgpt_account_id", "account_id"]) ||
+    firstStringValue(jwt, ["chatgpt_account_id", "account_id"]);
+}
+
+type ChatgptSession = { origin: string; token: string | null; accountId: string | null; plan: ChatgptPlan | null };
 
 async function fetchChatgptSession(): Promise<ChatgptSession | null> {
   // A 200 from one origin can still be a token-less guest session while the real
@@ -183,6 +217,7 @@ async function fetchChatgptSession(): Promise<ChatgptSession | null> {
       const result: ChatgptSession = {
         origin,
         token: typeof rawToken === "string" ? rawToken : null,
+        accountId: chatgptAccountIdRaw(session),
         plan: normalizeChatgptPlanFromSession(session),
       };
       if (!result.plan) {
@@ -200,7 +235,10 @@ async function fetchChatgptProviderUsage(): Promise<ProviderFetchResult> {
   const session = await fetchChatgptSession();
   const origin = session?.origin || CHATGPT_ORIGINS[0];
   const token = session?.token || null;
-  const authHeaders: HeadersInit = token ? { Authorization: "Bearer " + token } : {};
+  const authHeaders: HeadersInit = token ? {
+    Authorization: "Bearer " + token,
+    ...(session?.accountId ? { "ChatGPT-Account-Id": session.accountId } : {}),
+  } : {};
 
   const chatPromise = token
     ? fetchJson(origin + "/backend-api/conversation/init", {

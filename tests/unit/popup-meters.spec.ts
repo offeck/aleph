@@ -14,6 +14,7 @@ import {
   resetDetail,
   shortCodexModelLabel,
   sumCodexWorkspace,
+  visibleUsageMeters,
   type Meter,
 } from "../../src/popup/meters";
 
@@ -182,6 +183,27 @@ describe("addCodexLimitMeter", () => {
     addCodexLimitMeter(target, { usedPct: 30, period: "5h", resets_at: "2026-06-08T10:45:00.000Z" }, "#4285F4");
     expect(target[0]).toMatchObject({ label: "Codex 5h", pct: 30, detail: "30%", reset: "resets 45m" });
     vi.useRealTimers();
+  });
+});
+
+describe("visibleUsageMeters", () => {
+  it("collapses fully available quota rows to the provided fallback", () => {
+    const fallback: Meter = { label: "Codex", pct: 0, color: "#4285F4", alwaysShow: true, quota: true, fullAvailable: true };
+    expect(visibleUsageMeters([
+      { label: "Codex 5h", pct: 0, color: "#4285F4", alwaysShow: true, quota: true, fullAvailable: true },
+      { label: "Codex 7d", pct: 0, color: "#4285F4", alwaysShow: true, quota: true, fullAvailable: true },
+    ], fallback)).toEqual([fallback]);
+  });
+
+  it("keeps active quota rows and recently changed detail rows", () => {
+    expect(visibleUsageMeters([
+      { label: "Codex 5h", pct: 12, color: "#4285F4", alwaysShow: true, quota: true },
+      { label: "Codex credits", pct: null, detail: "0 left", color: "#4285F4", alwaysShow: true, requiresRecentDelta: true, changedWithin24h: true },
+      { label: "Old credits", pct: null, detail: "9 left", color: "#4285F4", alwaysShow: true, requiresRecentDelta: true, changedWithin24h: false },
+    ])).toMatchObject([
+      { label: "Codex 5h", pct: 12 },
+      { label: "Codex credits", detail: "0 left" },
+    ]);
   });
 });
 

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetProviderUsageRefreshStateForTests,
+  chatgptAccountIdRaw,
   chatgptPlanTypeRaw,
   clearAntigravityUsage,
   detectAntigravityModelDrift,
@@ -27,6 +28,10 @@ function makeJsonResponse(data: unknown) {
     json: () => Promise.resolve(data),
     text: () => Promise.resolve(typeof data === "string" ? data : JSON.stringify(data)),
   } as Response;
+}
+
+function testJwt(payload: Record<string, unknown>): string {
+  return "header." + btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") + ".sig";
 }
 
 function installChromeStorage(storage: Stored) {
@@ -66,12 +71,13 @@ function installProviderFetch(overrides: { antigravityModels?: unknown; onAntigr
     if (url === "https://chatgpt.com/api/auth/session") {
       return Promise.resolve(makeJsonResponse({
         accessToken: "chat-token",
-        account: { planType: "plus" },
+        account: { id: "acct-chat", planType: "plus" },
       }));
     }
     if (url === "https://chatgpt.com/backend-api/conversation/init") {
       expect(init?.method).toBe("POST");
       expect((init?.headers as Record<string, string>)?.Authorization).toBe("Bearer chat-token");
+      expect((init?.headers as Record<string, string>)?.["ChatGPT-Account-Id"]).toBe("acct-chat");
       return Promise.resolve(makeJsonResponse({
         limits_progress: [{ feature_name: "deep_research", remaining: 8, limit: 10 }],
         model_limits: [{ model_slug: "gpt-5", remaining: 40, limit: 50 }],
@@ -79,6 +85,7 @@ function installProviderFetch(overrides: { antigravityModels?: unknown; onAntigr
     }
     if (url === "https://chatgpt.com/backend-api/wham/usage") {
       expect((init?.headers as Record<string, string>)?.Authorization).toBe("Bearer chat-token");
+      expect((init?.headers as Record<string, string>)?.["ChatGPT-Account-Id"]).toBe("acct-chat");
       return Promise.resolve(makeJsonResponse({
         rate_limit: {
           primary_window: { used_percent: 20 },
@@ -347,6 +354,26 @@ describe("chatgptPlanTypeRaw (API-shape canary)", () => {
     expect(chatgptPlanTypeRaw({})).toBe(null);
     expect(chatgptPlanTypeRaw(null)).toBe(null);
     expect(chatgptPlanTypeRaw("guest")).toBe(null);
+  });
+});
+
+describe("chatgptAccountIdRaw", () => {
+  it("reads account ids from the session account and top-level fallback fields", () => {
+    expect(chatgptAccountIdRaw({ account: { id: "acct-primary" } })).toBe("acct-primary");
+    expect(chatgptAccountIdRaw({ account_id: "acct-top" })).toBe("acct-top");
+    expect(chatgptAccountIdRaw({ chatgpt_account_id: "acct-chatgpt" })).toBe("acct-chatgpt");
+  });
+
+  it("falls back to the OpenAI auth claim inside the access token", () => {
+    expect(chatgptAccountIdRaw({
+      accessToken: testJwt({ "https://api.openai.com/auth": { chatgpt_account_id: "acct-jwt" } }),
+    })).toBe("acct-jwt");
+  });
+
+  it("returns null when no account id is present", () => {
+    expect(chatgptAccountIdRaw({ account: { planType: "plus" } })).toBe(null);
+    expect(chatgptAccountIdRaw({ accessToken: "not-a-jwt" })).toBe(null);
+    expect(chatgptAccountIdRaw(null)).toBe(null);
   });
 });
 
