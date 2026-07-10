@@ -1,12 +1,3 @@
-/* Aleph mark: Frank Ruhl Libre 700, subset to the aleph glyph only (~0.7KB).
-   Keeps the popup/settings header glyph consistent with the extension icon. */
-@font-face {
-  font-family: "AlephMark";
-  src: url(data:font/woff2;base64,d09GMgABAAAAAAL8ABAAAAAABggAAAKjAAYBBgAAAAAAAAAAAAAAAAAAAAAAAAAAGhQbIBwwBmA/U1RBVCoANBEICoF0gVcBNgIkAwgLBgAEIAWEJgcgDAcbzwQgHgfOeSvgbB4UGVz+J4KI7KjqWRzpV0pmABwCzqg5XNNLAWWrv0CkMKoE+pHy+baTs2JuUk2NQr17AK9A08xw/3uLv018+ziCqSy6wAbai+LTbrAAEz8uHgWYRoHeoJBz0478AmGFtdEGEMAVABDqgTOhGKi2fneDGCaA1gBgoanagseltydHgHldqQWMHWg3VYI6hQVqhmoD0Dxslk70C0SCI776wQDnrOvTZZz+fwCCXUgrgEgAclctAiIFEQRHBPCFgFCBob0VigRQCIDY6hQACjAAX0EE8BUiEmBiImBd1xpav7MgAATRGg9AUACYhFaqDTj+WQBmgJ9LQNclK5KlFWtk/MGQJOO2+4nLdzNuXyAnLjNXhudXrN2b8UxLXbbK7757feCz+ntvQCcvcdmqVa2XLInHR/bI+HsBLoxbHLfdvJtx6wJ/nB2WqRbD/hd7ZY9s9Il6WLuK+E9jIsL7XVznHOXnntxtYwvnvgPrlReXXWoY22oX33rnhQ833bPPnDdT7r7xbtOzcjX6aO3s8EZwbaeUh/tZL3yxT1Tg+ikAVEKALfaEa12ks0fpN0fDeA94PjxhBcDbQZmT9P0/Y843DgE2CgCBrjhe30D+dasjoC+V4cxMFUUJAhRDRJmMjQAWmgjgxABBxHQCTgFbDiHSLyrceYwGlf7QJLNktAiuHbNJbRAngqus246No+yihs3xhVDJFFRWX1fPSNaNQpSFESyLLuvCpzBk7ag4xASn9W0aEY/KWvJRChvhyapSUJTDM9fRIVOx3Mdp49lMHRKbhRJJS6Y2CW2D6WqFfX8hkvkMLGKsratraAG7wRaPSBqs0BoxvyHoyuCDiPCobJasEpJLrJ7E5pxqxWYQBAFAryKbvMdET95nzgY=) format("woff2");
-  font-weight: 700;
-  font-style: normal;
-}
-
 /* Slim themed scrollbars for the extension pages — Chrome's default gray
    bar clashes with the dark UI. Webkit pseudos only: with the standard
    scrollbar-width/color properties also set, Chrome ≥121 would ignore these,
@@ -38,8 +29,7 @@
 }
 
 .logo {
-  font-family: "AlephMark", "Frank Ruhl Libre", serif;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
   color: #7c83ff;
   line-height: 1;
