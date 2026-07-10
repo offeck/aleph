@@ -16,15 +16,6 @@ export interface Meter {
   changedWithin24h?: boolean;
 }
 
-export function visibleUsageMeters(items: Meter[], fallback?: Meter): Meter[] {
-  const shouldShowMeter = (m: Meter) => !m.requiresRecentDelta || m.changedWithin24h;
-  const pctMeters = items.filter((m) => m.pct != null);
-  const activePctMeters = pctMeters.filter((m) => (m.pct ?? 0) > 0);
-  const detailMeters = items.filter((m) => m.pct == null && shouldShowMeter(m) && (m.alwaysShow || m.detail));
-  const visibleMeters = [...activePctMeters, ...detailMeters];
-  return visibleMeters.length > 0 ? visibleMeters : (fallback ? [fallback] : []);
-}
-
 export function estimatedTokenTotal(day: any): number {
   if (!day) return 0;
   return (day.tokensIn || 0) + (day.tokensOut || 0);
