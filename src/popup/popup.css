@@ -439,6 +439,23 @@ h2 {
   border-color: #7c83ff;
 }
 
+/* ── Window Primer (compact popup control) ────────────────────────── */
+.primer-pop-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  background: #7c83ff12;
+  border: 1px solid #7c83ff30;
+  color: #7c83ff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.2s, border-color 0.2s;
+}
+.primer-pop-btn:hover { background: #7c83ff25; border-color: #7c83ff; }
+.primer-pop-btn:disabled { opacity: 0.6; cursor: wait; }
+
 /* ── Toggle rows ──────────────────────────────────────────────────── */
 .toggle-row {
   padding: 6px 0; cursor: pointer;
