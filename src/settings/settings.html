@@ -224,7 +224,7 @@
       <div class="field">
         <span>Daily times <small>when to prime</small></span>
         <div class="time-adder">
-          <input type="time" id="primerTimeInput">
+          <select id="primerTimeInput" class="time-select"></select>
           <button type="button" id="primerTimeAdd" class="primer-add-btn">Add</button>
         </div>
         <div class="time-chips" id="primerTimesChips"></div>
@@ -239,7 +239,7 @@
       </label>
       <div class="primer-row">
         <span>Active hours</span>
-        <span class="primer-range"><input type="time" id="primerActiveStart"> to <input type="time" id="primerActiveEnd"></span>
+        <span class="primer-range"><select id="primerActiveStart" class="time-select"></select> to <select id="primerActiveEnd" class="time-select"></select></span>
       </div>
     </div>
 

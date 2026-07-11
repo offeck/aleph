@@ -23,6 +23,30 @@ function isValidHHMM(s: string): boolean {
 
 function save(key: string, value: unknown) { chrome.storage.sync.set({ [key]: value }); }
 
+// Half-hour options ("00:00", "00:30" … "23:30") for the time dropdowns.
+function timeOptions(): string[] {
+  const out: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    const hh = String(h).padStart(2, "0");
+    out.push(`${hh}:00`, `${hh}:30`);
+  }
+  return out;
+}
+
+function fillTimeSelect(sel: HTMLSelectElement | null, placeholder?: string) {
+  if (!sel || sel.options.length) return;
+  if (placeholder) {
+    const o = document.createElement("option");
+    o.value = ""; o.textContent = placeholder; o.selected = true;
+    sel.appendChild(o);
+  }
+  for (const t of timeOptions()) {
+    const o = document.createElement("option");
+    o.value = t; o.textContent = t;
+    sel.appendChild(o);
+  }
+}
+
 function updateModeVisibility(mode: string) {
   const smart = mode === "smart";
   const s = $("primerSmartFields"); if (s) s.style.display = smart ? "" : "none";
@@ -84,17 +108,20 @@ function renderTimes() {
 }
 
 function addTime() {
-  const input = $("primerTimeInput") as HTMLInputElement | null;
-  const v = input?.value;
+  const sel = $("primerTimeInput") as HTMLSelectElement | null;
+  const v = sel?.value;
   if (v && isValidHHMM(v) && !times.includes(v)) {
     times = [...times, v].sort();
     save("primerTimes", times);
     renderTimes();
   }
-  if (input) input.value = "";
+  if (sel) sel.value = "";
 }
 
 export function loadPrimerUI(): void {
+  fillTimeSelect($("primerTimeInput") as HTMLSelectElement | null, "Pick a time…");
+  fillTimeSelect($("primerActiveStart") as HTMLSelectElement | null);
+  fillTimeSelect($("primerActiveEnd") as HTMLSelectElement | null);
   chrome.storage.sync.get(DEFAULTS, (s) => {
     TOGGLES.forEach((k) => { const el = $(k) as HTMLInputElement | null; if (el) el.checked = Boolean(s[k]); });
     TEXTS.forEach((k) => { const el = $(k) as HTMLInputElement | null; if (el) el.value = String(s[k]); });

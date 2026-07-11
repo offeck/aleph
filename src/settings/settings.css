@@ -273,6 +273,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Scheduled daily-times: adder + removable chips */
 .time-adder { display: flex; gap: 8px; align-items: center; }
+.time-select { min-width: 96px; font-variant-numeric: tabular-nums; }
 .primer-add-btn {
   padding: 8px 16px;
   background: #7c83ff12;
