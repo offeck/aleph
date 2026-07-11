@@ -18,6 +18,10 @@ vi.mock("../../src/popup/ui", () => ({
   loadSyncIndicator: vi.fn(),
   loadUI: vi.fn(),
 }));
+vi.mock("../../src/popup/primerControl", () => ({
+  loadPrimerControl: vi.fn(),
+  bindPrimerControl: vi.fn(),
+}));
 
 describe("popup usage refresh", () => {
   afterEach(() => {
