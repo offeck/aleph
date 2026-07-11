@@ -1,3 +1,8 @@
+/* All extension pages are dark — tell the browser so, or it renders native
+   controls (time inputs, selects, spinners, the time-picker popup, the clock
+   indicator) in light mode on top of the dark UI, which looks broken. */
+:root { color-scheme: dark; }
+
 /* Slim themed scrollbars for the extension pages — Chrome's default gray
    bar clashes with the dark UI. Webkit pseudos only: with the standard
    scrollbar-width/color properties also set, Chrome ≥121 would ignore these,
