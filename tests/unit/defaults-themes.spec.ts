@@ -27,6 +27,18 @@ const DEFAULT_KEYS = [
   "streamAnimation",
   "messageSpacing",
   "miniGame",
+  "primerEnabled",
+  "primerMode",
+  "primerTimes",
+  "primerOffDays",
+  "primerActiveHoursEnabled",
+  "primerActiveStart",
+  "primerActiveEnd",
+  "primerTargetClaude",
+  "primerTargetCodex",
+  "primerAutoDeleteClaude",
+  "primerJitterEnabled",
+  "primerJitterSeconds",
 ] as const;
 
 const THEME_FIELDS = [
@@ -52,6 +64,21 @@ describe("shared defaults", () => {
     expect(filterToDefaults({ theme: "nord", fontSize: 0, injected: "x", __proto__junk: 1 }))
       .toEqual({ theme: "nord", fontSize: 0 });
     expect(filterToDefaults({})).toEqual({});
+  });
+
+  it("defines primer defaults with correct types", () => {
+    expect(DEFAULTS.primerEnabled).toBe(false);
+    expect(DEFAULTS.primerMode).toBe("scheduled");
+    expect(DEFAULTS.primerTimes).toEqual([]);
+    expect(DEFAULTS.primerOffDays).toEqual([]);
+    expect(DEFAULTS.primerActiveHoursEnabled).toBe(false);
+    expect(DEFAULTS.primerActiveStart).toBe("07:00");
+    expect(DEFAULTS.primerActiveEnd).toBe("23:00");
+    expect(DEFAULTS.primerTargetClaude).toBe(true);
+    expect(DEFAULTS.primerTargetCodex).toBe(true);
+    expect(DEFAULTS.primerAutoDeleteClaude).toBe(true);
+    expect(DEFAULTS.primerJitterEnabled).toBe(true);
+    expect(DEFAULTS.primerJitterSeconds).toBe(120);
   });
 });
 
