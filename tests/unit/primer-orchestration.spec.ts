@@ -10,6 +10,9 @@ vi.mock("../../src/background/providerUsage", () => ({
   getClaudeOrgId: vi.fn(() => Promise.resolve("ORG")),
   fetchJson: vi.fn(() => Promise.resolve({})),
 }));
+vi.mock("../../src/background/sync", () => ({
+  alephSync: { tryClaimPrimerLock: vi.fn(() => Promise.resolve(true)) },
+}));
 
 import * as primer from "../../src/background/primer";
 import { fetchJson } from "../../src/background/providerUsage";
@@ -73,5 +76,20 @@ describe("handlePrimerAlarm smart-mode failure backoff", () => {
     const rearm = created.find((c) => c.name === "aleph-primer-smart-codex");
     expect(rearm).toBeTruthy();
     expect(rearm!.when - before).toBeGreaterThan(5 * 60_000); // backed off, not ~now
+  });
+});
+
+describe("runPrimer cross-device lock", () => {
+  afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
+  it("skips the send when another device holds the lock", async () => {
+    chromeStub();
+    (fetchJson as ReturnType<typeof vi.fn>).mockResolvedValue({}); // window inactive
+    const { alephSync } = await import("../../src/background/sync");
+    (alephSync.tryClaimPrimerLock as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await primer.runPrimer("codex");
+    expect(fetchMock).not.toHaveBeenCalled(); // no send — another device holds the lock
+    expect(r.reason).toMatch(/another device/i);
   });
 });

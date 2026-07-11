@@ -8,10 +8,22 @@ import {
   makeKeyedThrottle,
   mergeSettings,
   mergeSubscriptions,
+  primerLockHeld,
   rollupDocId,
   sumPlatformDays,
   sumUsageDays,
 } from "../../src/background/syncSchema";
+
+describe("primerLockHeld", () => {
+  it("is held within the cooldown and free after it", () => {
+    const now = 1_000_000;
+    expect(primerLockHeld({ at: now - 1_000 }, now, 5_000)).toBe(true);   // 1s ago < 5s
+    expect(primerLockHeld({ at: now - 6_000 }, now, 5_000)).toBe(false);  // 6s ago >= 5s
+    expect(primerLockHeld({ at: now }, now, 5_000)).toBe(true);           // just claimed
+    expect(primerLockHeld(null, now, 5_000)).toBe(false);                 // no claim
+    expect(primerLockHeld({}, now, 5_000)).toBe(false);                   // no timestamp
+  });
+});
 
 describe("sumPlatformDays", () => {
   it("adds counters elementwise (device rollups, never max)", () => {

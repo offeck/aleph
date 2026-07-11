@@ -18,6 +18,8 @@ import {
   makeKeyedThrottle,
   mergeSettings,
   mergeSubscriptions,
+  PRIMER_LOCK_COOLDOWN_MS,
+  primerLockHeld,
   REMOTE_USAGE_KEY,
   rollupDocId,
   SCHEMA_FLAG_KEY,
@@ -738,6 +740,26 @@ export const alephSync = (function () {
     } catch (e) {}
   }
 
+  // Cross-device dedup: claim this target's prime for the current window so two
+  // signed-in devices don't both send. Fail-open (never blocks priming on error)
+  // and a no-op when signed out. skip-if-active stays the primary safety net.
+  async function tryClaimPrimerLock(target: string): Promise<boolean> {
+    if (!_uid) return true;
+    try {
+      const deviceId = await getDeviceId();
+      const ref = _userDoc().collection("meta").doc("primerLock");
+      return await _db.runTransaction(async (tx: any) => {
+        const snap = await tx.get(ref);
+        const data = snap.exists ? snap.data() : {};
+        if (primerLockHeld(data?.[target], Date.now(), PRIMER_LOCK_COOLDOWN_MS)) return false;
+        tx.set(ref, { [target]: { at: Date.now(), device: deviceId } }, { merge: true });
+        return true;
+      });
+    } catch (e) {
+      return true;
+    }
+  }
+
   return {
     init: init,
     signIn: signIn,
@@ -750,5 +772,6 @@ export const alephSync = (function () {
     flushDirty: flushDirty,
     lightweightPull: lightweightPull,
     fullMergeAndSync: fullMergeAndSync,
+    tryClaimPrimerLock: tryClaimPrimerLock,
   };
 })();

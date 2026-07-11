@@ -9,6 +9,7 @@ import {
   PRIMER_ALARM_PREFIX, type PrimerTarget,
 } from "./primerSchedule";
 import { DEFAULTS } from "../shared/defaults";
+import { alephSync } from "./sync";
 
 export const PRIMER_STATUS_KEY = "primer_status";
 
@@ -132,18 +133,21 @@ function getAllAlarms(): Promise<chrome.alarms.Alarm[]> {
   return new Promise((resolve) => chrome.alarms.getAll((a) => resolve(a)));
 }
 
-/** Prime one target unless its window is already running. Records + returns the result. */
+/** Prime one target unless its window is already running or another device claimed it. */
 export async function runPrimer(target: PrimerTarget): Promise<PrimerRunResult> {
   const s = await getSettings();
-  const active = (resetAt: number | null): PrimerRunResult =>
-    ({ at: Date.now(), ok: true, reason: "already active", windowResetAt: resetAt ?? undefined });
+  const win: { active: boolean; resetAt: number | null; model?: string } =
+    target === "codex" ? await readCodexWindow() : await readClaudeWindow();
   let r: PrimerRunResult;
-  if (target === "codex") {
-    const win = await readCodexWindow();
-    r = win.active ? active(win.resetAt) : await sendCodexPrimer(win.model);
+  if (win.active) {
+    r = { at: Date.now(), ok: true, reason: "already active", windowResetAt: win.resetAt ?? undefined };
+  } else if (!(await alephSync.tryClaimPrimerLock(target))) {
+    // Another signed-in device is priming this window (cross-device dedup).
+    r = { at: Date.now(), ok: true, reason: "another device is priming" };
   } else {
-    const win = await readClaudeWindow();
-    r = win.active ? active(win.resetAt) : await sendClaudePrimer(s.primerAutoDeleteClaude);
+    r = target === "codex"
+      ? await sendCodexPrimer(win.model ?? DEFAULT_CODEX_MODEL)
+      : await sendClaudePrimer(s.primerAutoDeleteClaude);
   }
   await recordPrimerResult(target, r);
   return r;

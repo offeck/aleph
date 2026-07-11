@@ -39,9 +39,10 @@ service cloud.firestore {
       }
 
       // settings (legacy flat doc), settings2 (v2 per-key-stamped doc),
-      // subscriptions (per-platform plan detections).
+      // subscriptions (per-platform plan detections), primerLock (best-effort
+      // cross-device dedup for the Window Primer — a small { target: {at, device} } doc).
       match /meta/{doc} {
-        allow read, write: if isOwner() && doc in ['settings', 'settings2', 'subscriptions'];
+        allow read, write: if isOwner() && doc in ['settings', 'settings2', 'subscriptions', 'primerLock'];
       }
     }
 

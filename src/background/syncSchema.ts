@@ -336,3 +336,16 @@ export function chunkOps<T>(ops: T[], size = 450): T[][] {
   for (let i = 0; i < ops.length; i += size) chunks.push(ops.slice(i, i + size));
   return chunks;
 }
+
+// ── Primer cross-device lock ─────────────────────────────
+// Best-effort dedup so multiple signed-in devices don't all prime the same
+// window. skip-if-active is the real safety net; this only closes the brief
+// race before a prime registers in the account's window state. The cooldown
+// must exceed the max jitter spread (120s) so a device that fired a bit later
+// still sees the claim.
+export const PRIMER_LOCK_COOLDOWN_MS = 5 * 60 * 1000;
+
+export function primerLockHeld(claim: unknown, now: number, cooldownMs: number): boolean {
+  const at = num(asRecord(claim).at);
+  return at > 0 && now - at < cooldownMs;
+}
