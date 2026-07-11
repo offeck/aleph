@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCodexPrimerRequest, buildClaudeCreateRequest,
-  buildClaudeCompletionRequest, buildClaudeDeleteRequest, parseCodexPrimary,
+  buildClaudeCompletionRequest, buildClaudeDeleteRequest, parseCodexPrimary, pickCodexModel,
 } from "../../src/background/primerRequests";
 
 describe("buildCodexPrimerRequest", () => {
@@ -61,5 +61,24 @@ describe("parseCodexPrimary", () => {
     const p = parseCodexPrimary({ get: () => null });
     expect(p.resetAt).toBeNull();
     expect(p.usedPercent).toBeNull();
+  });
+});
+
+describe("pickCodexModel", () => {
+  it("slugifies the account's Codex model from wham additional_rate_limits", () => {
+    const wham = { additional_rate_limits: [{ limit_name: "GPT-5.3-Codex-Spark", metered_feature: "codex_bengalfox" }] };
+    expect(pickCodexModel(wham)).toBe("gpt-5.3-codex-spark");
+  });
+  it("prefers a lightweight tier when several Codex models exist", () => {
+    const wham = { additional_rate_limits: [
+      { limit_name: "GPT-5.4-Codex", metered_feature: "codex_a" },
+      { limit_name: "GPT-5.3-Codex-Spark", metered_feature: "codex_b" },
+    ] };
+    expect(pickCodexModel(wham)).toBe("gpt-5.3-codex-spark");
+  });
+  it("returns null when no Codex model is present", () => {
+    expect(pickCodexModel({ additional_rate_limits: [{ limit_name: "GPT-5.4", metered_feature: "chat" }] })).toBeNull();
+    expect(pickCodexModel(null)).toBeNull();
+    expect(pickCodexModel({})).toBeNull();
   });
 });

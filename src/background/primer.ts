@@ -2,7 +2,7 @@ import { readLocal, writeLocal, enqueueUsageWork } from "./usage";
 import { fetchChatgptSession, getClaudeOrgId, fetchJson } from "./providerUsage";
 import {
   buildCodexPrimerRequest, buildClaudeCreateRequest,
-  buildClaudeCompletionRequest, buildClaudeDeleteRequest, parseCodexPrimary,
+  buildClaudeCompletionRequest, buildClaudeDeleteRequest, parseCodexPrimary, pickCodexModel,
 } from "./primerRequests";
 import {
   pickGreeting, desiredPrimerAlarmNames, computeAlarmWhen, nextSmartFire,
@@ -48,14 +48,18 @@ export async function getPrimerStatus(): Promise<Record<string, PrimerRunResult>
   return readLocal<Record<string, PrimerRunResult>>(PRIMER_STATUS_KEY, {});
 }
 
-const DEFAULT_CODEX_MODEL = "gpt-5-codex-mini";
+// Fallback only — pickCodexModel derives the account's actual Codex model from
+// wham/usage. gpt-5.3-codex-spark is the current lightweight ChatGPT-mode tier
+// (verified against this account's wham + OpenAI docs, 2026-07); it is Pro-gated,
+// hence the derive-from-account approach rather than trusting this constant alone.
+const DEFAULT_CODEX_MODEL = "gpt-5.3-codex-spark";
 
 async function doFetch(req: { url: string; method: string; headers: Record<string, string>; body?: string }): Promise<Response> {
   return fetch(req.url, { method: req.method, headers: req.headers, body: req.body, credentials: "include" });
 }
 
-/** Read Codex primary-window state (skip-if-active + verify). resetAt in ms, or null. */
-export async function readCodexWindow(): Promise<{ active: boolean; resetAt: number | null }> {
+/** Read Codex primary-window state + the account's Codex model. resetAt in ms, or null. */
+export async function readCodexWindow(): Promise<{ active: boolean; resetAt: number | null; model: string }> {
   try {
     const session = await fetchChatgptSession();
     const headers: Record<string, string> = session?.token
@@ -68,8 +72,8 @@ export async function readCodexWindow(): Promise<{ active: boolean; resetAt: num
     const used = typeof pw?.used_percent === "number" ? pw.used_percent : 0;
     const resetAt = typeof pw?.reset_at === "number" ? pw.reset_at * 1000
       : (typeof pw?.reset_after_seconds === "number" ? Date.now() + pw.reset_after_seconds * 1000 : null);
-    return { active: used > 0 && resetAt != null && resetAt > Date.now(), resetAt };
-  } catch (e) { return { active: false, resetAt: null }; }
+    return { active: used > 0 && resetAt != null && resetAt > Date.now(), resetAt, model: pickCodexModel(usage) ?? DEFAULT_CODEX_MODEL };
+  } catch (e) { return { active: false, resetAt: null, model: DEFAULT_CODEX_MODEL }; }
 }
 
 /** Read Claude 5h-window state via the org usage endpoint (five_hour.resets_at). */
@@ -87,13 +91,13 @@ export async function readClaudeWindow(): Promise<{ active: boolean; resetAt: nu
   } catch (e) { return { active: false, resetAt: null }; }
 }
 
-export async function sendCodexPrimer(rng: () => number = Math.random): Promise<PrimerRunResult> {
+export async function sendCodexPrimer(model: string, rng: () => number = Math.random): Promise<PrimerRunResult> {
   const at = Date.now();
   const session = await fetchChatgptSession();
   if (!session?.token || !session.accountId) return { at, ok: false, reason: "signed out of ChatGPT" };
   const req = buildCodexPrimerRequest({
     origin: session.origin, token: session.token, accountId: session.accountId,
-    model: DEFAULT_CODEX_MODEL, greeting: pickGreeting(rng),
+    model, greeting: pickGreeting(rng),
   });
   const res = await doFetch(req);
   if (!res.ok) return { at, ok: false, reason: `codex responses ${res.status}` };
@@ -131,13 +135,16 @@ function getAllAlarms(): Promise<chrome.alarms.Alarm[]> {
 /** Prime one target unless its window is already running. Records + returns the result. */
 export async function runPrimer(target: PrimerTarget): Promise<PrimerRunResult> {
   const s = await getSettings();
-  const win = target === "codex" ? await readCodexWindow() : await readClaudeWindow();
-  if (win.active) {
-    const r: PrimerRunResult = { at: Date.now(), ok: true, reason: "already active", windowResetAt: win.resetAt ?? undefined };
-    await recordPrimerResult(target, r);
-    return r;
+  const active = (resetAt: number | null): PrimerRunResult =>
+    ({ at: Date.now(), ok: true, reason: "already active", windowResetAt: resetAt ?? undefined });
+  let r: PrimerRunResult;
+  if (target === "codex") {
+    const win = await readCodexWindow();
+    r = win.active ? active(win.resetAt) : await sendCodexPrimer(win.model);
+  } else {
+    const win = await readClaudeWindow();
+    r = win.active ? active(win.resetAt) : await sendClaudePrimer(s.primerAutoDeleteClaude);
   }
-  const r = target === "codex" ? await sendCodexPrimer() : await sendClaudePrimer(s.primerAutoDeleteClaude);
   await recordPrimerResult(target, r);
   return r;
 }

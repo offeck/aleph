@@ -26,7 +26,7 @@ describe("sendCodexPrimer", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("chrome", { action: { setBadgeText: vi.fn(), setBadgeBackgroundColor: vi.fn() } });
 
-    const r = await sendCodexPrimer(() => 0);
+    const r = await sendCodexPrimer("gpt-5.3-codex-spark", () => 0);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://chatgpt.com/backend-api/codex/responses",
       expect.objectContaining({ method: "POST", credentials: "include" }),
@@ -40,7 +40,7 @@ describe("sendCodexPrimer", () => {
     (fetchChatgptSession as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ...session, token: null });
     vi.stubGlobal("fetch", vi.fn());
     vi.stubGlobal("chrome", { action: { setBadgeText: vi.fn(), setBadgeBackgroundColor: vi.fn() } });
-    const r = await sendCodexPrimer(() => 0);
+    const r = await sendCodexPrimer("gpt-5.3-codex-spark", () => 0);
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/signed out/i);
   });

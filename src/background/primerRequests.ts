@@ -73,3 +73,22 @@ export function parseCodexPrimary(h: { get(name: string): string | null }): { re
     usedPercent: used != null ? Number(used) : null,
   };
 }
+
+/**
+ * Derive a Codex model slug the account actually has, from its wham/usage payload —
+ * so the primer isn't pinned to a hardcoded slug that drifts across versions or is
+ * plan-gated (e.g. gpt-5.3-codex-spark is Pro-only). Prefers a lightweight tier
+ * (cheapest for a throwaway prime). Returns null when no Codex model is listed.
+ */
+export function pickCodexModel(
+  wham: { additional_rate_limits?: Array<{ limit_name?: string; metered_feature?: string }> } | null | undefined,
+): string | null {
+  const list = wham?.additional_rate_limits;
+  const arr = Array.isArray(list) ? list : [];
+  const codex = arr.filter((e) => /codex/i.test(e?.limit_name || "") || /codex/i.test(e?.metered_feature || ""));
+  if (!codex.length) return null;
+  const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/^-+|-+$/g, "");
+  const light = codex.find((e) => /spark|mini|nano|lite|flash|fast/i.test(e?.limit_name || ""));
+  const chosen = light || codex[0];
+  return chosen.limit_name ? slugify(chosen.limit_name) : null;
+}
