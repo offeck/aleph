@@ -540,6 +540,63 @@ describe("refreshProviderUsage", () => {
     expect(gemini.credits).toMatchObject({ limit: 100, remaining: 90 }); // fresh Gemini web data still saved
   });
 
+  it("writes Gemini web meters without waiting for the slow Antigravity fetch", async () => {
+    // The Antigravity cloudcode calls (~1.5s) must not hold back the Gemini web
+    // meters (~0.6s): the web snapshot has to land independently, before Antigravity
+    // resolves, then Antigravity merges in afterward. Real timers so the fast web
+    // fetch + its storage write settle while the gated Antigravity fetch hangs.
+    vi.useRealTimers();
+    const fresh = Date.now();
+    let releaseAntigravity: () => void = () => {};
+    const antigravityGate = new Promise<void>((resolve) => { releaseAntigravity = resolve; });
+    const storage: Stored = {
+      // Keep ChatGPT + Claude fresh so only Gemini fetches this run.
+      insights_platform_usage_chatgpt: { source: "provider", fetchedAt: fresh },
+      insights_platform_usage_claude: { source: "provider", fetchedAt: fresh },
+      insights_subscriptions: {
+        chatgpt: { plan: "plus", detectedAt: fresh, manualOverride: false },
+        claude: { plan: "max5x", detectedAt: fresh, manualOverride: false },
+      },
+      [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH,
+      [ANTIGRAVITY_SECRET_KEY]: "test-secret",
+    };
+    installChromeStorage(storage);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "https://gemini.google.com/app") {
+        return makeJsonResponse(`<script>WIZ_global_data={FdrFJe:"sid-123",SNlM0e:"at-token"}</script><script src="/_/mss/boq_assistant-bard-web-server_20260608.01_p0/main.js"></script>`);
+      }
+      if (url.startsWith("https://gemini.google.com/_/BardChatUi/data/batchexecute")) {
+        const quotas = [[[null, 2, 0, [1780679819, 0], 100, 90]]];
+        return makeJsonResponse(JSON.stringify([["wrb.fr", "qpEbW", JSON.stringify(quotas)]]));
+      }
+      if (url === "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist") {
+        await antigravityGate; // hang the whole Antigravity path until released
+        return makeJsonResponse({ planInfo: { monthlyPromptCredits: 500, planType: "premium" }, availablePromptCredits: 450, cloudaicompanionProject: { id: "ag-project" } });
+      }
+      if (url === "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels") {
+        return makeJsonResponse({ models: { "claude-sonnet-4-5": { displayName: "Claude Sonnet 4.5", quotaInfo: { remainingFraction: 0.4, resetTime: "2026-06-08T13:00:00.000Z" } } } });
+      }
+      throw new Error("unexpected fetch " + url);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const refreshPromise = refreshProviderUsage();
+    // Let the fast Gemini web fetch + write settle while Antigravity is still gated.
+    await new Promise((r) => setTimeout(r, 30));
+
+    const early = storage.insights_platform_usage_gemini as Stored;
+    expect(early?.credits).toMatchObject({ limit: 100, remaining: 90 }); // web written independently
+    expect(early?.antigravity).toBeUndefined();                          // Antigravity still in flight
+
+    releaseAntigravity();
+    await refreshPromise;
+
+    const final = storage.insights_platform_usage_gemini as Stored;
+    expect(final?.credits).toMatchObject({ limit: 100, remaining: 90 }); // web preserved
+    expect(final?.antigravity).toMatchObject({ credits: { limit: 500, remaining: 450 } });
+  });
+
   it("canary: records antigravity drift when fetchAvailableModels returns an unrecognized model shape", async () => {
     const storage: Stored = { [ANTIGRAVITY_AUTH_KEY]: ANTIGRAVITY_AUTH_FRESH, [ANTIGRAVITY_SECRET_KEY]: "test-secret" };
     installChromeStorage(storage);

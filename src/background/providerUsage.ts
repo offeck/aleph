@@ -514,36 +514,49 @@ async function fetchAntigravityProviderUsage(): Promise<ProviderFetchResult> {
   return { usage, reason: usage ? undefined : "no-data" };
 }
 
-async function fetchGeminiProviderUsage(): Promise<ProviderFetchResult> {
-  const [geminiResult, antigravityResult] = await Promise.allSettled([
-    fetchGeminiWebProviderUsage(),
-    fetchAntigravityProviderUsage(),
-  ]);
-  const gemini = geminiResult.status === "fulfilled" ? geminiResult.value : { usage: null, reason: "error" as const };
-  const antigravity = antigravityResult.status === "fulfilled" ? antigravityResult.value : { usage: null, reason: "error" as const };
+// Gemini refreshes its web quotas and the Antigravity CLI quotas INDEPENDENTLY, so
+// the slow Antigravity cloudcode calls (~1.5s: loadCodeAssist → fetchAvailableModels)
+// never hold back the Gemini web meters (~0.6s). The web snapshot is written the
+// moment it resolves; the Antigravity block is merged into the same snapshot after
+// it lands. Both share the single Gemini freshness throttle (checked by the caller)
+// and are sequenced here — web write, then Antigravity write — so the two
+// read-modify-write updates to insights_platform_usage_gemini never race. The whole
+// thing is still awaited, keeping the MV3 worker alive for the trailing Antigravity
+// write, while the earlier web write has already fired storage.onChanged so the popup
+// renders Gemini meters without waiting on Antigravity.
+async function refreshGeminiUsage(): Promise<PlatformRefreshResult> {
+  const webPromise = fetchGeminiWebProviderUsage();
+  const antigravityPromise = fetchAntigravityProviderUsage();
 
+  // Web quotas: write as soon as they resolve — do NOT await Antigravity first.
+  const gemini = await webPromise.catch((): ProviderFetchResult => ({ usage: null, reason: "error" }));
+  let savedUsage = false;
+  if (gemini.usage) {
+    await saveProviderUsageSnapshot("gemini", gemini.usage);
+    savedUsage = true;
+  }
+  const savedPlan = await saveProviderPlan("gemini", gemini.plan);
+
+  // Antigravity: independent, merged into the same snapshot when it lands. The web
+  // write above preserves any prior antigravity block (prepareProviderUsageSnapshot),
+  // so a merge or a clear here is what refreshes/removes it.
+  const antigravity = await antigravityPromise.catch((): ProviderFetchResult => ({ usage: null, reason: "error" }));
   // Re-check the connection at WRITE time, after the network round-trip. A refresh
   // that obtained a token can land after the user disconnects (or the token was
-  // revoked mid-flight); accepting its `antigravity.usage` would resurrect meters a
-  // just-completed disconnect cleared. So keep Antigravity data only while still
-  // connected — otherwise drop it (fresh OR stale) and strip any stored block
-  // (no-op if none). A transient failure keeps the auth, so its meters survive.
-  const antigravityConnected = (await getAntigravityAuthStatus()).connected;
-  const antigravityUsage = antigravityConnected ? antigravity.usage : null;
-  if (!antigravityConnected) await clearAntigravityUsage();
-
-  const usage: RawRecord = gemini.usage ? { ...gemini.usage } : { source: "provider" };
-  if (antigravityUsage) usage.antigravity = antigravityUsage;
-
-  if (gemini.usage || antigravityUsage) {
-    return {
-      usage,
-      plan: gemini.plan,
-    };
+  // revoked mid-flight); accepting its usage would resurrect meters a just-completed
+  // disconnect cleared. Keep Antigravity data only while still connected — otherwise
+  // drop it (fresh OR stale) and strip any stored block. A transient failure keeps
+  // the auth, so its meters survive.
+  if (!(await getAntigravityAuthStatus()).connected) {
+    await clearAntigravityUsage();
+  } else if (antigravity.usage) {
+    await saveProviderUsageSnapshot("gemini", { source: "provider", antigravity: antigravity.usage });
+    savedUsage = true;
   }
+
+  if (savedUsage || savedPlan) return { refreshed: true };
   return {
-    usage: null,
-    plan: gemini.plan,
+    refreshed: false,
     reason: gemini.reason === "missing-auth" && antigravity.reason === "missing-auth"
       ? "missing-auth"
       : gemini.reason || antigravity.reason || "no-data",
@@ -640,10 +653,10 @@ async function saveProviderPlan(platform: Platform, plan: PlanDetection | null |
   return run;
 }
 
-async function fetchProviderUsage(platform: BackgroundUsagePlatform): Promise<ProviderFetchResult> {
-  if (platform === "chatgpt") return fetchChatgptProviderUsage();
-  if (platform === "claude") return fetchClaudeProviderUsage();
-  return fetchGeminiProviderUsage();
+// Gemini is refreshed by refreshGeminiUsage (independent web + Antigravity writes),
+// so it never reaches here — only the single-fetch, single-write platforms do.
+async function fetchProviderUsage(platform: "chatgpt" | "claude"): Promise<ProviderFetchResult> {
+  return platform === "chatgpt" ? fetchChatgptProviderUsage() : fetchClaudeProviderUsage();
 }
 
 async function refreshPlatformUsage(platform: BackgroundUsagePlatform, trigger: UsageRefreshTrigger, force = false): Promise<PlatformRefreshResult> {
@@ -679,6 +692,9 @@ async function refreshPlatformUsage(platform: BackgroundUsagePlatform, trigger: 
       }
     }
     try {
+      // Gemini fans out into independent web + Antigravity writes so the slow
+      // Antigravity fetch never blocks the Gemini web meters (see refreshGeminiUsage).
+      if (platform === "gemini") return await refreshGeminiUsage();
       const result = await fetchProviderUsage(platform);
       let savedUsage = false;
       if (result.usage) {
