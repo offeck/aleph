@@ -28,6 +28,8 @@ import {
   setAntigravitySecret,
   startAntigravityConnect,
 } from "./antigravityAuth";
+import { reconcilePrimerAlarms, handlePrimerAlarm, runPrimerNow, getPrimerStatus } from "./primer";
+import { PRIMER_ALARM_PREFIX } from "./primerSchedule";
 
 // Pull the OAuth authorization code out of the loopback callback URL. After
 // consent, Google redirects the tab to http://localhost:51121/oauth-callback?code=…;
@@ -96,11 +98,13 @@ export function registerBackgroundListeners() {
     cleanupOldUsage();
     ensureLimitsAlarm();
     bootSync();
+    void reconcilePrimerAlarms();
   });
   chrome.runtime.onStartup?.addListener(() => {
     cleanupOldUsage();
     ensureLimitsAlarm();
     bootSync();
+    void reconcilePrimerAlarms();
   });
 
   // Periodic limits refresh — works with no tab/popup open. refreshProviderUsage
@@ -110,6 +114,7 @@ export function registerBackgroundListeners() {
   // The same tick flushes deferred cloud pushes (an MV3 worker death loses the
   // trailing throttle timer) and refreshes the remote usage cache.
   chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name.startsWith(PRIMER_ALARM_PREFIX)) { void handlePrimerAlarm(alarm.name); return; }
     if (alarm.name === LIMITS_REFRESH_ALARM) {
       refreshProviderUsage("alarm").catch(() => {});
       alephSync.flushDirty().then(() => alephSync.lightweightPull()).catch(() => {});
@@ -120,6 +125,7 @@ export function registerBackgroundListeners() {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync") return;
     try { alephSync.onSettingsChanged(changes); } catch (e) {}
+    if (Object.keys(changes).some((k) => k.startsWith("primer"))) void reconcilePrimerAlarms();
   });
 
   // ── Message handlers ─────────────────────────────────────
@@ -220,6 +226,15 @@ export function registerBackgroundListeners() {
 
     if (msg.type === "insights-refresh-usage") {
       refreshProviderUsage("popup").then(sendResponse);
+      return true;
+    }
+
+    if (msg.type === "aleph-primer-run-now") {
+      runPrimerNow(msg.target).then(sendResponse);
+      return true;
+    }
+    if (msg.type === "aleph-primer-status") {
+      getPrimerStatus().then(sendResponse);
       return true;
     }
 

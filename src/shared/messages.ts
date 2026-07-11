@@ -48,7 +48,9 @@ export type PageToBackgroundMessage =
   | { type: "aleph-antigravity-connect" }
   | { type: "aleph-antigravity-status" }
   | { type: "aleph-antigravity-set-secret"; secret: string }
-  | { type: "aleph-antigravity-disconnect" };
+  | { type: "aleph-antigravity-disconnect" }
+  | { type: "aleph-primer-run-now"; target?: "claude" | "codex" }
+  | { type: "aleph-primer-status" };
 
 export interface AntigravityStatusResponse {
   connected: boolean;

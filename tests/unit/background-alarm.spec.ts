@@ -34,6 +34,12 @@ vi.mock("../../src/background/providerUsage", () => ({
   LIMITS_REFRESH_ALARM: "aleph-refresh-limits",
   LIMITS_REFRESH_PERIOD_MINUTES: 20,
 }));
+vi.mock("../../src/background/primer", () => ({
+  reconcilePrimerAlarms: vi.fn(() => Promise.resolve()),
+  handlePrimerAlarm: vi.fn(() => Promise.resolve()),
+  runPrimerNow: vi.fn(() => Promise.resolve({})),
+  getPrimerStatus: vi.fn(() => Promise.resolve({})),
+}));
 
 import { registerBackgroundListeners } from "../../src/background/router";
 import { alephSync } from "../../src/background/sync";
@@ -130,5 +136,30 @@ describe("background alarm wiring", () => {
     (alephSync.onSettingsChanged as ReturnType<typeof vi.fn>).mockClear();
     onChanged.fire(changes, "local");
     expect(alephSync.onSettingsChanged).not.toHaveBeenCalled();
+  });
+
+  it("routes primer alarms and reconciles on install and settings-change", async () => {
+    const { reconcilePrimerAlarms, handlePrimerAlarm } = await import("../../src/background/primer");
+    const onInstalled = makeEvent();
+    const onAlarm = makeEvent();
+    const onChanged = makeEvent();
+    vi.stubGlobal("chrome", {
+      runtime: { onInstalled, onStartup: makeEvent(), onMessage: makeEvent(), onMessageExternal: makeEvent() },
+      storage: { onChanged, sync: { get: vi.fn() } },
+      alarms: { onAlarm, create: vi.fn() },
+      commands: { onCommand: makeEvent() },
+      action: { setBadgeText: vi.fn(), setBadgeBackgroundColor: vi.fn() },
+    });
+
+    registerBackgroundListeners();
+    onInstalled.fire();
+    expect(reconcilePrimerAlarms).toHaveBeenCalled();
+
+    onAlarm.fire({ name: "aleph-primer-sched-08:00" });
+    expect(handlePrimerAlarm).toHaveBeenCalledWith("aleph-primer-sched-08:00");
+
+    (reconcilePrimerAlarms as ReturnType<typeof vi.fn>).mockClear();
+    onChanged.fire({ primerEnabled: { newValue: true } }, "sync");
+    expect(reconcilePrimerAlarms).toHaveBeenCalled();
   });
 });
