@@ -13,6 +13,10 @@ const TEXTS = ["primerMode", "primerActiveStart", "primerActiveEnd", "primerJitt
 function parseList(s: string): string[] {
   return s.split(",").map((x) => x.trim()).filter(Boolean);
 }
+function isValidHHMM(s: string): boolean {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  return !!m && Number(m[1]) <= 23 && Number(m[2]) <= 59;
+}
 
 function updateModeVisibility(mode: string) {
   const smart = mode === "smart";
@@ -55,7 +59,7 @@ export function bindPrimerEvents(): void {
   $("primerActiveStart")?.addEventListener("change", () => save("primerActiveStart", val("primerActiveStart")));
   $("primerActiveEnd")?.addEventListener("change", () => save("primerActiveEnd", val("primerActiveEnd")));
   $("primerJitterSeconds")?.addEventListener("change", () => save("primerJitterSeconds", Math.max(0, Math.min(120, Number(val("primerJitterSeconds")) || 0))));
-  $("primerTimes")?.addEventListener("change", () => save("primerTimes", parseList(val("primerTimes"))));
+  $("primerTimes")?.addEventListener("change", () => save("primerTimes", parseList(val("primerTimes")).filter(isValidHHMM)));
   $("primerOffDays")?.addEventListener("change", () => save("primerOffDays", parseList(val("primerOffDays")).map(Number).filter((n) => n >= 0 && n <= 6)));
   $("primerTestBtn")?.addEventListener("click", () => {
     const el = $("primerStatus"); if (el) el.textContent = "sending…";

@@ -60,3 +60,18 @@ describe("runPrimer skip-if-active", () => {
     expect(r.reason).toMatch(/already active/i);
   });
 });
+
+describe("handlePrimerAlarm smart-mode failure backoff", () => {
+  afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
+  it("backs off instead of hot-looping when a smart prime fails", async () => {
+    const { created } = chromeStub();
+    (fetchJson as ReturnType<typeof vi.fn>).mockResolvedValue({}); // window read → inactive (no skip)
+    // send fails (403) → runPrimer returns ok:false
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: false, status: 403, headers: new Headers(), text: () => Promise.resolve("") })));
+    const before = Date.now();
+    await primer.handlePrimerAlarm("aleph-primer-smart-codex");
+    const rearm = created.find((c) => c.name === "aleph-primer-smart-codex");
+    expect(rearm).toBeTruthy();
+    expect(rearm!.when - before).toBeGreaterThan(5 * 60_000); // backed off, not ~now
+  });
+});

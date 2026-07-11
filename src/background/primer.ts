@@ -161,6 +161,17 @@ export async function reconcilePrimerAlarms(): Promise<void> {
   }
 }
 
+// A re-arm must never land sooner than this (breaks any hot-loop from a bad or
+// past `when`); a failed smart prime backs off this long instead of retrying now.
+const PRIMER_MIN_REARM_MS = 60_000;
+const PRIMER_FAIL_BACKOFF_MS = 15 * 60_000;
+
+/** Clamp a re-arm time to finite and at least now + PRIMER_MIN_REARM_MS. */
+function safeWhen(when: number): number {
+  const floor = Date.now() + PRIMER_MIN_REARM_MS;
+  return Number.isFinite(when) && when > floor ? when : floor;
+}
+
 /** Fired from router's onAlarm for any aleph-primer* alarm. */
 export async function handlePrimerAlarm(name: string): Promise<void> {
   const s = await getSettings();
@@ -168,14 +179,20 @@ export async function handlePrimerAlarm(name: string): Promise<void> {
   const now = new Date();
   if (name.startsWith(`${PRIMER_ALARM_PREFIX}-smart-`)) {
     const target = name.slice(`${PRIMER_ALARM_PREFIX}-smart-`.length) as PrimerTarget;
-    await runPrimer(target);
-    const win = target === "codex" ? await readCodexWindow() : await readClaudeWindow();
-    const next = nextSmartFire(new Date(), win.resetAt ?? 0, s.primerOffDays, s.primerActiveHoursEnabled, s.primerActiveStart, s.primerActiveEnd);
-    chrome.alarms.create(name, { when: next.fireAt });
+    const r = await runPrimer(target);
+    if (!r.ok) {
+      // Signed out / wrong model / transient — back off rather than hot-loop
+      // (nextSmartFire returns "now" when the window is unknown).
+      chrome.alarms.create(name, { when: Date.now() + PRIMER_FAIL_BACKOFF_MS });
+      return;
+    }
+    // Re-arm to the window's own reset, from the run result (no extra read).
+    const next = nextSmartFire(new Date(), r.windowResetAt ?? 0, s.primerOffDays, s.primerActiveHoursEnabled, s.primerActiveStart, s.primerActiveEnd);
+    chrome.alarms.create(name, { when: safeWhen(next.fireAt) });
     return;
   }
   // scheduled: run all enabled targets, then re-arm for the next occurrence.
   if (s.primerTargetClaude) await runPrimer("claude");
   if (s.primerTargetCodex) await runPrimer("codex");
-  chrome.alarms.create(name, { when: computeAlarmWhen(name, now, s, Math.random) });
+  chrome.alarms.create(name, { when: safeWhen(computeAlarmWhen(name, now, s, Math.random)) });
 }
