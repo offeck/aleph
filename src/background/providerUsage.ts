@@ -75,7 +75,7 @@ export function shouldRefreshUsage(snapshot: RawRecord | null, now: number, ttlM
   return now - fetchedAt >= ttlMs;
 }
 
-async function fetchJson(url: string, options: RequestInit = {}): Promise<unknown> {
+export async function fetchJson(url: string, options: RequestInit = {}): Promise<unknown> {
   const response = await fetch(url, {
     cache: "no-store",
     ...options,
@@ -205,7 +205,7 @@ export function chatgptAccountIdRaw(session: unknown): string | null {
 
 type ChatgptSession = { origin: string; token: string | null; accountId: string | null; plan: ChatgptPlan | null };
 
-async function fetchChatgptSession(): Promise<ChatgptSession | null> {
+export async function fetchChatgptSession(): Promise<ChatgptSession | null> {
   // A 200 from one origin can still be a token-less guest session while the real
   // session lives on the other origin, so keep trying until one yields a token;
   // only fall back to a token-less response if none do.
@@ -328,7 +328,7 @@ export function extractClaudeOrgId(value: unknown, depth = 0): string | null {
   return null;
 }
 
-async function getClaudeOrgId(): Promise<string | null> {
+export async function getClaudeOrgId(): Promise<string | null> {
   const cookie = await getCookie({ url: "https://claude.ai/", name: "lastActiveOrg" });
   if (cookie?.value) return decodeCookieValue(cookie.value);
   try {
