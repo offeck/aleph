@@ -58,6 +58,21 @@
       <p id="antigravityDismissedHint" class="ag-dismissed-hint" style="display:none">Antigravity sign-in is still available in Settings.</p>
     </div>
 
+    <!-- ── Window Primer ─────────────────────────────────────────── -->
+    <div class="insight-card" id="primerPopupCard">
+      <div class="insight-card-header">
+        <h2>Window Primer</h2>
+        <span class="trend-badge flat" id="primerPopBadge">off</span>
+      </div>
+      <label class="toggle-row">
+        <span>Start my 5-hour window early</span>
+        <input type="checkbox" id="primerPopEnabled">
+        <span class="toggle"></span>
+      </label>
+      <button id="primerPopNow" class="primer-pop-btn" type="button" title="Send a tiny message now to start the window">Prime now</button>
+      <p class="hint" id="primerPopStatus" style="display:none"></p>
+    </div>
+
     <div class="insight-card" id="weekCard">
       <div class="insight-card-header">
         <h2>This Week</h2>
@@ -86,21 +101,6 @@
     </div>
 
     <button id="dashboardBtn" class="dashboard-btn">View Full Dashboard &rarr;</button>
-  </section>
-
-  <!-- ── Window Primer ─────────────────────────────────────────── -->
-  <section id="primerPopupSection">
-    <div class="insight-card-header">
-      <h2>Window Primer</h2>
-      <span class="trend-badge flat" id="primerPopBadge">off</span>
-    </div>
-    <label class="toggle-row">
-      <span>Start my 5-hour window early</span>
-      <input type="checkbox" id="primerPopEnabled">
-      <span class="toggle"></span>
-    </label>
-    <button id="primerPopNow" class="primer-pop-btn" type="button" title="Send a tiny message now to start the window">Prime now</button>
-    <p class="hint" id="primerPopStatus" style="display:none"></p>
   </section>
 
   <!-- ── Controls Zone ─────────────────────────────────────────── -->
