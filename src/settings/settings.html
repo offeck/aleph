@@ -218,33 +218,29 @@
         <option value="smart">Smart — keep a window always warm</option>
       </select>
     </label>
-    <p class="hint" id="primerSmartRisk" style="display:none">Smart mode sends ~5 automated requests/day per service — more bot-patterned than scheduled times; higher chance your account is throttled or asked to re-verify.</p>
+    <p class="primer-risk" id="primerSmartRisk" style="display:none">Smart mode sends ~5 automated requests/day per service — more bot-patterned than scheduled times, so a higher chance your account is throttled or asked to re-verify.</p>
 
-    <div id="primerScheduledFields">
+    <div class="primer-subgroup" id="primerScheduledFields">
       <label class="field">
-        <span>Daily times (comma-separated, HH:MM)</span>
+        <span>Daily times <small>comma-separated, HH:MM</small></span>
         <input type="text" id="primerTimes" placeholder="08:00, 13:00">
       </label>
     </div>
 
-    <div id="primerSmartFields" style="display:none">
+    <div class="primer-subgroup" id="primerSmartFields" style="display:none">
       <label class="toggle-row">
         <span>Only keep warm during active hours</span>
         <input type="checkbox" id="primerActiveHoursEnabled">
         <span class="toggle"></span>
       </label>
-      <label class="field">
-        <span>Active from</span>
-        <input type="time" id="primerActiveStart">
-      </label>
-      <label class="field">
-        <span>Active to</span>
-        <input type="time" id="primerActiveEnd">
-      </label>
+      <div class="primer-row">
+        <span>Active hours</span>
+        <span class="primer-range"><input type="time" id="primerActiveStart"> to <input type="time" id="primerActiveEnd"></span>
+      </div>
     </div>
 
     <label class="field">
-      <span>Off days (comma-separated, 0=Sun &hellip; 6=Sat)</span>
+      <span>Off days <small>comma-separated, 0=Sun &hellip; 6=Sat</small></span>
       <input type="text" id="primerOffDays" placeholder="5, 6">
     </label>
 
@@ -264,16 +260,16 @@
       <span class="toggle"></span>
     </label>
     <label class="toggle-row">
-      <span>Add random timing jitter</span>
+      <span>Add timing jitter</span>
       <input type="checkbox" id="primerJitterEnabled" checked>
       <span class="toggle"></span>
     </label>
-    <label class="field">
-      <span>Jitter seconds (0&ndash;120)</span>
-      <input type="number" id="primerJitterSeconds" min="0" max="120" value="120">
-    </label>
+    <div class="primer-row">
+      <span>Jitter spread</span>
+      <span class="primer-range"><input type="number" id="primerJitterSeconds" min="0" max="120" value="120"> seconds</span>
+    </div>
 
-    <button id="primerTestBtn" type="button" style="margin-top:8px">Send test now</button>
+    <button id="primerTestBtn" type="button">Send test now</button>
     <p class="hint" id="primerStatus"></p>
   </section>
 

@@ -221,3 +221,81 @@ input[type="range"]::-moz-range-thumb {
   color: #ff6b6b;
   border-color: #ff6b6b;
 }
+
+/* ── Window Primer ────────────────────────────────────────────────── */
+#primerSection input[type="text"],
+#primerSection input[type="number"],
+#primerSection input[type="time"] {
+  background: #1a1a2e;
+  color: #e2e2e2;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#primerSection input:focus { border-color: #7c83ff; }
+#primerSection input[type="text"] { width: 100%; }
+#primerSection input[type="number"] {
+  width: 64px;
+  text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+#primerSection input[type="number"]::-webkit-outer-spin-button,
+#primerSection input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+#primerSection .field small { font-weight: 400; font-size: 11px; color: #888; }
+#primerSection .hint { font-size: 12px; color: #888; line-height: 1.5; margin-bottom: 4px; }
+
+/* Mode-specific config, visually nested under the Mode selector */
+.primer-subgroup {
+  border-left: 2px solid #3a3d63;
+  padding-left: 14px;
+  margin: 2px 0 2px 3px;
+}
+
+/* Compact label-left / control-right row (active hours, jitter spread) */
+.primer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid #3a3a5a;
+}
+.primer-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #888;
+  font-size: 12px;
+}
+
+/* Smart-mode caution — distinct from a plain hint */
+.primer-risk {
+  background: rgba(255, 179, 71, 0.09);
+  border: 1px solid rgba(255, 179, 71, 0.30);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 8px 0 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #ffca8a;
+}
+
+#primerTestBtn {
+  margin-top: 14px;
+  padding: 8px 16px;
+  background: #1a1a2e;
+  color: #e2e2e2;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+#primerTestBtn:hover { border-color: #7c83ff; color: #7c83ff; }
+#primerStatus { margin-top: 10px; font-size: 12px; color: #9a9ab0; min-height: 1em; }
