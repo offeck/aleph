@@ -6,6 +6,7 @@ export type PrimerTarget = "claude" | "codex";
 export const PRIMER_GREETINGS = [
   "hi", "hello", "hey", "hey there", "hi there", "hiya", "howdy", "yo",
   "morning", "sup", "hey!", "hello!", "ping", "you around?", "just checking in",
+  "what is the first letter of the hebrew alphabet?",
 ];
 
 /** Uniformly-random roster member. rng() in [0,1). */
