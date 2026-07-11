@@ -42,8 +42,11 @@ export function loadPrimerControl() {
     const t = document.getElementById("primerPopEnabled") as HTMLInputElement | null;
     if (t) t.checked = s.primerEnabled;
     setBadge(s.primerEnabled ? "on" : "off");
+    // Call refreshStatus AFTER the toggle is set (not racing this callback) so
+    // it reads the right enabled state and its "needs attention" verdict is the
+    // last write to the badge — not clobbered by this on/off default.
+    refreshStatus();
   });
-  refreshStatus();
 }
 
 export function bindPrimerControl() {
