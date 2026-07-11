@@ -249,6 +249,68 @@ input[type="range"]::-moz-range-thumb {
 #primerSection .field small { font-weight: 400; font-size: 11px; color: #888; }
 #primerSection .hint { font-size: 12px; color: #888; line-height: 1.5; margin-bottom: 4px; }
 
+/* Off-days: day-of-week picker */
+.day-picker { display: flex; gap: 5px; }
+.day-chip {
+  flex: 1;
+  padding: 7px 0;
+  background: #1a1a2e;
+  color: #888;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.day-chip:hover { border-color: #7c83ff; color: #e2e2e2; }
+.day-chip.off {
+  background: rgba(255, 107, 107, 0.12);
+  border-color: rgba(255, 107, 107, 0.45);
+  color: #ff9b9b;
+}
+
+/* Scheduled daily-times: adder + removable chips */
+.time-adder { display: flex; gap: 8px; align-items: center; }
+.primer-add-btn {
+  padding: 8px 16px;
+  background: #7c83ff12;
+  color: #7c83ff;
+  border: 1px solid #7c83ff40;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.primer-add-btn:hover { border-color: #7c83ff; background: #7c83ff25; }
+.time-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.time-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 10px;
+  background: #7c83ff14;
+  border: 1px solid #7c83ff33;
+  border-radius: 6px;
+  color: #c7cbff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.time-chip-x {
+  background: none;
+  border: none;
+  color: #8a8ab0;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 3px;
+  border-radius: 4px;
+}
+.time-chip-x:hover { color: #ff6b6b; }
+.time-empty { font-size: 11px; color: #666; }
+
 /* Mode-specific config, visually nested under the Mode selector */
 .primer-subgroup {
   border-left: 2px solid #3a3d63;

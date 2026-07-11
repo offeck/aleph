@@ -221,10 +221,14 @@
     <p class="primer-risk" id="primerSmartRisk" style="display:none">Smart mode sends ~5 automated requests/day per service — more bot-patterned than scheduled times, so a higher chance your account is throttled or asked to re-verify.</p>
 
     <div class="primer-subgroup" id="primerScheduledFields">
-      <label class="field">
-        <span>Daily times <small>comma-separated, HH:MM</small></span>
-        <input type="text" id="primerTimes" placeholder="08:00, 13:00">
-      </label>
+      <div class="field">
+        <span>Daily times <small>when to prime</small></span>
+        <div class="time-adder">
+          <input type="time" id="primerTimeInput">
+          <button type="button" id="primerTimeAdd" class="primer-add-btn">Add</button>
+        </div>
+        <div class="time-chips" id="primerTimesChips"></div>
+      </div>
     </div>
 
     <div class="primer-subgroup" id="primerSmartFields" style="display:none">
@@ -239,10 +243,10 @@
       </div>
     </div>
 
-    <label class="field">
-      <span>Off days <small>comma-separated, 0=Sun &hellip; 6=Sat</small></span>
-      <input type="text" id="primerOffDays" placeholder="5, 6">
-    </label>
+    <div class="field">
+      <span>Off days <small>tap to skip</small></span>
+      <div class="day-picker" id="primerOffDays"></div>
+    </div>
 
     <label class="toggle-row">
       <span>Prime Claude</span>
