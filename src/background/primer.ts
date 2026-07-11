@@ -62,11 +62,13 @@ export async function readCodexWindow(): Promise<{ active: boolean; resetAt: num
       ? { Authorization: "Bearer " + session.token, ...(session.accountId ? { "ChatGPT-Account-ID": session.accountId } : {}) }
       : {};
     const origin = session?.origin || "https://chatgpt.com";
-    // raw provider JSON — field shape confirmed live in Task 14; a wrong guess degrades to "not active".
+    // wham/usage shape confirmed live 2026-07-11: rate_limit.primary_window.{reset_at (unix s), used_percent}.
     const usage = await fetchJson(origin + "/backend-api/wham/usage", { headers, credentials: "include" }) as any;
-    const resetRaw = usage?.primary?.reset_after_seconds ?? usage?.rate_limits?.primary?.resets_at ?? null;
-    const resetAt = typeof resetRaw === "number" ? (resetRaw > 1e6 ? resetRaw * 1000 : Date.now() + resetRaw * 1000) : null;
-    return { active: resetAt != null && resetAt > Date.now(), resetAt };
+    const pw = usage?.rate_limit?.primary_window;
+    const used = typeof pw?.used_percent === "number" ? pw.used_percent : 0;
+    const resetAt = typeof pw?.reset_at === "number" ? pw.reset_at * 1000
+      : (typeof pw?.reset_after_seconds === "number" ? Date.now() + pw.reset_after_seconds * 1000 : null);
+    return { active: used > 0 && resetAt != null && resetAt > Date.now(), resetAt };
   } catch (e) { return { active: false, resetAt: null }; }
 }
 
@@ -75,11 +77,13 @@ export async function readClaudeWindow(): Promise<{ active: boolean; resetAt: nu
   try {
     const orgId = await getClaudeOrgId();
     if (!orgId) return { active: false, resetAt: null };
-    // raw provider JSON — same fields normalizeClaudeUsage parses.
+    // five_hour.{resets_at (ISO), utilization} confirmed live 2026-07-11.
     const usage = await fetchJson(`https://claude.ai/api/organizations/${orgId}/usage`, { credentials: "include" }) as any;
-    const iso = usage?.five_hour?.resets_at ?? null;
+    const fh = usage?.five_hour;
+    const iso = fh?.resets_at ?? null;
     const resetAt = iso ? Date.parse(iso) : null;
-    return { active: resetAt != null && resetAt > Date.now(), resetAt };
+    const util = typeof fh?.utilization === "number" ? fh.utilization : 0;
+    return { active: util > 0 && resetAt != null && resetAt > Date.now(), resetAt };
   } catch (e) { return { active: false, resetAt: null }; }
 }
 

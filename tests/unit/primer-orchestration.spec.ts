@@ -51,8 +51,8 @@ describe("runPrimer skip-if-active", () => {
   afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
   it("skips the send when the window is already active", async () => {
     chromeStub();
-    // wham/usage read (mocked providerUsage.fetchJson) reports a live window.
-    (fetchJson as ReturnType<typeof vi.fn>).mockResolvedValue({ primary: { reset_after_seconds: 3600 } });
+    // wham/usage read (mocked providerUsage.fetchJson) reports a live window — real shape.
+    (fetchJson as ReturnType<typeof vi.fn>).mockResolvedValue({ rate_limit: { primary_window: { reset_at: Math.floor(Date.now() / 1000) + 3600, used_percent: 50 } } });
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const r = await primer.runPrimer("codex");

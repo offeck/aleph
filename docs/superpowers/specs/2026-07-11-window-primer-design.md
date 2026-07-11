@@ -212,7 +212,7 @@ path is gated.
 `PRIMER_GREETINGS` roster (~15 entries) and carry the timing jitter (0..120 s,
 toggleable — component 2), so they are neither byte-identical nor clockwork-regular.
 
-**Live validation (2026-07-11, logged-in claude.ai session).**
+**Live validation (2026-07-11, logged-in claude.ai + chatgpt.com sessions).**
 - Claude `create` → **201**, `delete` → **204** with cookie auth + the active org
   (`lastActiveOrg` cookie). A **pristine native `fetch`** (no app patch) also 201s →
   **no anti-CSRF token is required**. An initial 403 "Invalid authorization for
@@ -222,6 +222,11 @@ toggleable — component 2), so they are neither byte-identical nor clockwork-re
 - `GET /organizations/{org}/usage` returns `five_hour.resets_at` as an ISO string with
   offset — exactly the field `readClaudeWindow` parses; skip-if-active verified against
   a live active window.
+- **Codex** `GET /backend-api/wham/usage` live shape is `rate_limit.primary_window.{reset_at
+  (unix s), reset_after_seconds, used_percent}` — the initial `readCodexWindow` guessed the
+  wrong path (would never detect an active window). Corrected; both window reads now gate
+  `active` on `used > 0` so a *fresh* window isn't misread as active (the "never primes"
+  failure mode).
 - **Unresolved (not testable from a page context):** whether claude.ai accepts the
   background service worker's `Origin: chrome-extension://<id>` on POST. Handled by the
   send-transport decision below (MAIN-world fallback and/or DNR Origin rewrite).
