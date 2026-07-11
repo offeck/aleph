@@ -3,10 +3,27 @@
 
 export type PrimerTarget = "claude" | "codex";
 
+// Short, varied prompts the primer picks from at random. The point is variety —
+// a stream of near-identical "hi"s reads more bot-like than a human quickly asking
+// their assistant something (the bigger anti-fingerprint lever is the timing jitter).
+// Kept short so the responses, and thus quota, stay tiny.
 export const PRIMER_GREETINGS = [
-  "hi", "hello", "hey", "hey there", "hi there", "hiya", "howdy", "yo",
-  "morning", "sup", "hey!", "hello!", "ping", "you around?", "just checking in",
+  "hey",
   "what is the first letter of the hebrew alphabet?",
+  "what day is it today?",
+  "is 97 a prime number?",
+  "how do you say hello in hebrew?",
+  "what's 0xFF in decimal?",
+  "give me a random number between 1 and 100",
+  "one-word synonym for 'fast'",
+  "what's the capital of japan?",
+  "reverse the word 'shalom'",
+  "what's the square root of 144?",
+  "name a git command",
+  "what's the hebrew word for peace?",
+  "what rhymes with 'code'?",
+  "what's the opposite of 'up'?",
+  "count to three",
 ];
 
 /** Uniformly-random roster member. rng() in [0,1). */

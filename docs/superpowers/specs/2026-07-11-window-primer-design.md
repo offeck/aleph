@@ -111,10 +111,10 @@ No `chrome`/DOM access. All date/gating logic plus the two RNG-driven helpers:
   under test; jitter is a non-deterministic step, applied last, and never moves a smart
   fire before its `resetAt`.
 - `pickGreeting(rng): string` — returns a uniformly-random member of the
-  `PRIMER_GREETINGS` roster (~15 short innocuous greetings: `hi`, `hello`, `hey`,
-  `hey there`, `hi there`, `hiya`, `howdy`, `yo`, `morning`, `sup`, `hey!`, `hello!`,
-  `ping`, `you around?`, `just checking in`). Injected RNG → unit-testable. Its return
-  is the message text for both send paths, so no two primers are byte-identical.
+  `PRIMER_GREETINGS` roster (~16 short, varied prompts — a mix of casual openers,
+  quick factual questions, and tiny tasks, kept short so responses stay tiny).
+  Injected RNG → unit-testable. Its return is the message text for both send paths,
+  so no two primers are byte-identical.
 
 ### 3. `src/background/primer.ts` (new) — define-only at import (no top-level listeners)
 
