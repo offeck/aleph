@@ -200,6 +200,83 @@
     </div>
   </section>
 
+  <!-- ── Window Primer ─────────────────────────────────────────── -->
+  <section id="primerSection">
+    <h2>Window Primer</h2>
+    <p class="hint">Sends a real message on a schedule to start your 5-hour usage window early, so it resets when you want it to. It uses a small slice of your own quota. Off by default.</p>
+
+    <label class="toggle-row">
+      <span>Enable Window Primer</span>
+      <input type="checkbox" id="primerEnabled">
+      <span class="toggle"></span>
+    </label>
+
+    <label class="field">
+      <span>Mode</span>
+      <select id="primerMode">
+        <option value="scheduled">Scheduled — I set the times (lower footprint)</option>
+        <option value="smart">Smart — keep a window always warm</option>
+      </select>
+    </label>
+    <p class="hint" id="primerSmartRisk" style="display:none">Smart mode sends ~5 automated requests/day per service — more bot-patterned than scheduled times; higher chance your account is throttled or asked to re-verify.</p>
+
+    <div id="primerScheduledFields">
+      <label class="field">
+        <span>Daily times (comma-separated, HH:MM)</span>
+        <input type="text" id="primerTimes" placeholder="08:00, 13:00">
+      </label>
+    </div>
+
+    <div id="primerSmartFields" style="display:none">
+      <label class="toggle-row">
+        <span>Only keep warm during active hours</span>
+        <input type="checkbox" id="primerActiveHoursEnabled">
+        <span class="toggle"></span>
+      </label>
+      <label class="field">
+        <span>Active from</span>
+        <input type="time" id="primerActiveStart">
+      </label>
+      <label class="field">
+        <span>Active to</span>
+        <input type="time" id="primerActiveEnd">
+      </label>
+    </div>
+
+    <label class="field">
+      <span>Off days (comma-separated, 0=Sun &hellip; 6=Sat)</span>
+      <input type="text" id="primerOffDays" placeholder="5, 6">
+    </label>
+
+    <label class="toggle-row">
+      <span>Prime Claude</span>
+      <input type="checkbox" id="primerTargetClaude" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Prime Codex</span>
+      <input type="checkbox" id="primerTargetCodex" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Auto-delete the Claude primer chat</span>
+      <input type="checkbox" id="primerAutoDeleteClaude" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="toggle-row">
+      <span>Add random timing jitter</span>
+      <input type="checkbox" id="primerJitterEnabled" checked>
+      <span class="toggle"></span>
+    </label>
+    <label class="field">
+      <span>Jitter seconds (0&ndash;120)</span>
+      <input type="number" id="primerJitterSeconds" min="0" max="120" value="120">
+    </label>
+
+    <button id="primerTestBtn" type="button" style="margin-top:8px">Send test now</button>
+    <p class="hint" id="primerStatus"></p>
+  </section>
+
   <!-- ── Data ──────────────────────────────────────────────────── -->
   <section>
     <h2>Data</h2>
